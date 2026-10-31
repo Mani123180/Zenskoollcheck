@@ -24,14 +24,14 @@ export default function Login() {
     schooladmin_ssv: {
       label: 'School Admin',
       user: 'admin@ssvschool.com',
-      pass: 'admin123',
+      pass: 'Admin@12345',
       color: '#2563eb',
       badge: 'Campus Admin'
     },
     finance_manager: {
       label: 'Finance Manager',
       user: 'finance@ssvschool.com',
-      pass: 'finance123',
+      pass: 'Finance@12345',
       color: '#059669',
       badge: 'Finance Desk'
     },
