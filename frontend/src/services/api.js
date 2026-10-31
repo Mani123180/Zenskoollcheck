@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://zenc0-fouder-update-1.onrender.com/api' : '/api');
+const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '');
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
@@ -20,12 +20,19 @@ const handleResponse = async (res) => {
 export const api = {
   
   login: async (username, password) => {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-    return handleResponse(res);
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 4000) : null;
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+        signal: controller ? controller.signal : undefined,
+      });
+      return handleResponse(res);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
   },
 
   syncAuthUser: async (userData) => {

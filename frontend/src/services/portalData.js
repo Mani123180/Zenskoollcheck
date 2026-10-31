@@ -156,6 +156,7 @@ export const defaultPortalUsers = [
 
 
 const defaultData = {
+  schools: defaultPortalSchools,
   teachers: [
     {
       id: 'T01',
@@ -533,13 +534,13 @@ const defaultData = {
   ],
 
   users: [
-    { id: 'USR001', name: 'Dr. Savithri Raman', role: 'PRINCIPAL', phone: '+91 98401 23450', email: 'principal@ssvschool.com', username: 'principal', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
-    { id: 'USR002', name: 'School Administrator (SSV)', role: 'SCHOOL_ADMIN', phone: '+91 98401 23456', email: 'admin@ssvschool.com', username: 'admin', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
-    { id: 'USR003', name: 'Mrs. Priya Krishnan', role: 'TEACHER', phone: '+91 98401 23451', email: 'priya.k@ssvschool.com', username: 'priya', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
-    { id: 'USR004', name: 'Dr. Anandhi Rajan', role: 'TEACHER', phone: '+91 98401 23452', email: 'anandhi.r@ssvschool.com', username: 'anandhi', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
-    { id: 'USR005', name: 'Aishwarya Kumar', role: 'STUDENT', phone: '+91 98401 23453', email: 'aishwarya@ssvschool.com', username: 'aishwarya', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
-    { id: 'USR006', name: 'Kavitha Selvam', role: 'STUDENT', phone: '+91 98401 23454', email: 'kavitha@ssvschool.com', username: 'kavitha', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
-    { id: 'USR007', name: 'Ramesh Kumar', role: 'PARENT', phone: '+91 98401 99009', email: 'ramesh.k@gmail.com', username: 'parent', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', studentName: 'Aishwarya Kumar', studentRoll: 'S101', relationship: 'Father' },
+    ...defaultPortalUsers,
+    { id: 'USR001_PRIN', name: 'Dr. Savithri Raman', role: 'PRINCIPAL', phone: '+91 98401 23450', email: 'principal@ssvschool.com', username: 'principal', password: 'principal123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
+    { id: 'USR003_TEA', name: 'Mrs. Priya Krishnan', role: 'TEACHER', phone: '+91 98401 23451', email: 'priya.k@ssvschool.com', username: 'teacher', password: 'teacher123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', aliases: ['priya', 'teacher@ssvschool.com'] },
+    { id: 'USR004_TEA', name: 'Dr. Anandhi Rajan', role: 'TEACHER', phone: '+91 98401 23452', email: 'anandhi.r@ssvschool.com', username: 'anandhi', password: 'teacher123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
+    { id: 'USR005_STU', name: 'Aishwarya Kumar', role: 'STUDENT', phone: '+91 98401 23453', email: 'student@ssvschool.com', username: 'student', password: 'student123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', aliases: ['aishwarya', 'student@ssvschool.com'] },
+    { id: 'USR006_STU', name: 'Kavitha Selvam', role: 'STUDENT', phone: '+91 98401 23454', email: 'kavitha@ssvschool.com', username: 'kavitha', password: 'student123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
+    { id: 'USR007_PAR', name: 'Ramesh Kumar', role: 'PARENT', phone: '+91 98401 99009', email: 'parent@ssvschool.com', username: 'parent', password: 'parent123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', studentName: 'Aishwarya Kumar', studentRoll: 'S101', relationship: 'Father', aliases: ['ramesh', 'parent@ssvschool.com'] },
   ],
 
   nonTeachingStaff: [
