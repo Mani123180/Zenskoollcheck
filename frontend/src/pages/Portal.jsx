@@ -5,6 +5,8 @@ import { api } from '../services/api';
 import SuperAdminView from './portal/SuperAdminView';
 import SchoolAdminView from './portal/SchoolAdminView';
 import AcademicRolesView from './portal/AcademicRolesView';
+import SchoolFinanceModule from './portal/SchoolFinanceModule';
+import ChatBox from './portal/ChatBox';
 
 
 const saIcons = {
@@ -66,6 +68,57 @@ export default function Portal() {
   const currentRole = user ? user.role.toLowerCase() : 'superadmin';
 
   
+
+const finIcons = {
+  dashboard: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+    </svg>
+  ),
+  billing: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+      <circle cx="9" cy="7" r="4"></circle>
+      <line x1="19" y1="8" x2="19" y2="14"></line>
+      <line x1="22" y1="11" x2="16" y2="11"></line>
+    </svg>
+  ),
+  salary: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+      <line x1="2" y1="10" x2="22" y2="10"></line>
+    </svg>
+  ),
+  expenses: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path>
+      <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path>
+      <path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path>
+    </svg>
+  ),
+  reports: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"></line>
+      <line x1="12" y1="20" x2="12" y2="4"></line>
+      <line x1="6" y1="20" x2="6" y2="14"></line>
+    </svg>
+  ),
+  history: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <polyline points="12 6 12 12 16 14"></polyline>
+    </svg>
+  ),
+  messaging: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>
+  ),
+};
+
   const menuConfig = {
     superadmin: [
       { id: 'sa-dashboard', label: 'Dashboard', icon: saIcons.dashboard },
@@ -79,18 +132,33 @@ export default function Portal() {
     ],
     schooladmin: [
       { id: 'school-admin-users', label: 'DashBoard', icon: saIcons.dashboard },
-      { id: 'finance-management', label: 'Finance Manage', icon: saIcons.billing },
       { id: 'school-services-tab', label: 'Campus Services & Activities', icon: saIcons.services },
       { id: 'manage-staff', label: 'Manage Staff', icon: schIcons.teachers },
       { id: 'manage-students', label: 'Manage Students', icon: schIcons.students },
       { id: 'manage-parents', label: 'Manage Parents', icon: schIcons.parents },
       { id: 'manage-classes', label: 'Manage Classes', icon: schIcons.classes },
       { id: 'manage-subjects', label: 'Manage Subjects', icon: schIcons.subjects },
-      { id: 'fee-collection-tracker', label: 'Fee Collection & Dues', icon: saIcons.billing },
+      { id: 'financial-manage', label: 'Financial Manage', icon: saIcons.billing },
       { id: 'publish-announcements', label: 'Announcements', icon: schIcons.announcements },
       { id: 'view-reports', label: 'School Reports', icon: schIcons.reports },
       { id: 'secure-messaging', label: 'Secure Messaging', icon: schIcons.messaging },
     ],
+    finance: [
+      { id: 'dashboard', label: 'Finance Dashboard', icon: finIcons.dashboard },
+      { id: 'student-billing', label: 'Student Billing', icon: finIcons.billing },
+      { id: 'staff-salary', label: 'Staff Salary', icon: finIcons.salary },
+      { id: 'school-expenses', label: 'School Expenses', icon: finIcons.expenses },
+      { id: 'finance-reports', label: 'Finance Reports', icon: finIcons.reports },
+      { id: 'payment-history', label: 'Payment History', icon: finIcons.history },
+          ],
+    financemanager: [
+      { id: 'dashboard', label: 'Finance Dashboard', icon: finIcons.dashboard },
+      { id: 'student-billing', label: 'Student Billing', icon: finIcons.billing },
+      { id: 'staff-salary', label: 'Staff Salary', icon: finIcons.salary },
+      { id: 'school-expenses', label: 'School Expenses', icon: finIcons.expenses },
+      { id: 'finance-reports', label: 'Finance Reports', icon: finIcons.reports },
+      { id: 'payment-history', label: 'Payment History', icon: finIcons.history },
+          ],
     principal: [
       { id: 'dashboard-analytics', label: 'Dashboard Analytics', icon: saIcons.dashboard },
       { id: 'fee-collection-tracker', label: 'Fee Collection & Dues', icon: saIcons.billing },
@@ -163,6 +231,7 @@ export default function Portal() {
   const getRoleDisplayName = () => {
     if (currentRole === 'superadmin') return 'Super Administrator';
     if (currentRole === 'schooladmin') return 'School Administrator';
+    if (currentRole === 'finance' || currentRole === 'financemanager') return 'School Finance Manager';
     if (currentRole === 'principal') return 'Principal';
     if (currentRole === 'teacher') return 'Faculty Teacher';
     if (currentRole === 'student') return 'Student';
@@ -171,8 +240,16 @@ export default function Portal() {
   };
 
   const getSchoolDisplayName = () => {
-    if (currentRole === 'superadmin') return '';
-    return user?.schoolName || 'Sri Sankara Vidhyasala Girls High School';
+    if (currentRole === 'superadmin') return 'Zenith Central Trust';
+    if (user && user.schoolName) return user.schoolName;
+    try {
+      const store = getPortalData();
+      if (user && user.schoolId && store && store.schools) {
+        const found = store.schools.find((s) => s.id === user.schoolId);
+        if (found && found.name) return found.name;
+      }
+    } catch (e) {}
+    return user?.schoolName || 'School Campus';
   };
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : (currentRole === 'superadmin' ? 'S' : 'U');
@@ -182,13 +259,36 @@ export default function Portal() {
       
       <header className="header" style={{ position: 'sticky', top: 0, zIndex: 100, background: '#ffffff', borderBottom: '2px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div className="container nav-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '70px', padding: '0 20px' }}>
-          <Link to="/" className="logo" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-            <img
-              src="/images/zenschool_logo.png"
-              alt="ZenSkool Logo"
-              style={{ height: '62px', maxWidth: '220px', width: 'auto', objectFit: 'contain', display: 'block' }}
-            />
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+            <Link to="/" className="logo" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+              <img
+                src="/images/zenschool_logo.png"
+                alt="ZenSkool Logo"
+                style={{ height: '54px', maxWidth: '190px', width: 'auto', objectFit: 'contain', display: 'block' }}
+              />
+            </Link>
+            {currentRole !== 'superadmin' && (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: '#f8fafc',
+                border: '1px solid #cbd5e1',
+                padding: '6px 12px',
+                borderRadius: '8px'
+              }}>
+                <span style={{ fontSize: '1rem' }}></span>
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e3a8a', lineHeight: 1.2 }}>
+                    {getSchoolDisplayName()}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                    {getRoleDisplayName()} &bull; ID: <code>{user?.schoolId || 'CAMPUS'}</code>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <button 
             className="mobile-menu-btn" 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -217,21 +317,25 @@ export default function Portal() {
               </div>
               <div className="user-info">
                 {currentRole === 'superadmin' ? (
-                  <h3 id="user-display-name" style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-                    Super Administrator
-                  </h3>
-                ) : currentRole === 'schooladmin' ? (
-                  <h3 id="user-display-name" style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-                    School Administrator
-                  </h3>
+                  <>
+                    <h3 id="user-display-name" style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                      Super Administrator
+                    </h3>
+                    <span id="user-display-role" style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                      Zenith Central Trust (HQ)
+                    </span>
+                  </>
                 ) : (
                   <>
-                    <h3 id="user-display-name" style={{ margin: '0 0 2px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-                      {user?.name || getRoleDisplayName()}
+                    <h3 id="user-display-name" style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#1e3a8a', lineHeight: 1.3 }}>
+                      {getSchoolDisplayName()}
                     </h3>
-                    <span id="user-display-role" style={{ fontSize: '0.78rem', color: 'var(--color-secondary)', fontWeight: 600 }}>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--color-secondary, #b45309)', fontWeight: 700, marginTop: '2px' }}>
                       {getRoleDisplayName()}
-                    </span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                      Partition: {user?.schoolId || 'CAMPUS'}
+                    </div>
                   </>
                 )}
               </div>
@@ -265,7 +369,14 @@ export default function Portal() {
           
           <main className="portal-main">
             {currentRole === 'superadmin' && <SuperAdminView activeTab={activeTab} setActiveTab={setActiveTab} />}
-            {currentRole === 'schooladmin' && <SchoolAdminView activeTab={activeTab} setActiveTab={setActiveTab} />}
+            {currentRole === 'schooladmin' && <SchoolAdminView activeTab={activeTab} setActiveTab={setActiveTab} user={user} />}
+            {(currentRole === 'finance' || currentRole === 'financemanager') && (
+              <SchoolFinanceModule
+                user={user}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+              />
+            )}
             {['principal', 'teacher', 'student', 'parent'].includes(currentRole) && (
               <AcademicRolesView role={currentRole} user={user} activeTab={activeTab} setActiveTab={setActiveTab} />
             )}

@@ -180,6 +180,46 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
     setData(getPortalData());
   };
 
+  const getActiveStudentRecord = () => {
+    const students = (data && data.students) || [];
+    if (role === 'student') {
+      const byRoll = user?.studentRoll || user?.roll || user?.rollNo;
+      if (byRoll) {
+        const found = students.find(s => s.roll === byRoll);
+        if (found) return found;
+      }
+      if (user?.name) {
+        const found = students.find(s => s.name && s.name.toLowerCase() === user.name.toLowerCase());
+        if (found) return found;
+      }
+      return students[0] || null;
+    }
+    if (role === 'parent') {
+      const parents = (data && data.parents) || [];
+      const parentMatch = parents.find(p =>
+        (user?.id && p.id === user.id) ||
+        (user?.name && p.name && p.name.toLowerCase().includes(user.name.toLowerCase())) ||
+        (user?.email && p.email && p.email.toLowerCase() === user.email.toLowerCase()) ||
+        (user?.phone && p.phone && p.phone === user.phone)
+      );
+      if (parentMatch && parentMatch.studentRoll) {
+        const found = students.find(s => s.roll === parentMatch.studentRoll);
+        if (found) return found;
+      }
+      const byStudentRoll = user?.studentRoll;
+      if (byStudentRoll) {
+        const found = students.find(s => s.roll === byStudentRoll);
+        if (found) return found;
+      }
+      return students[0] || null;
+    }
+    return students[0] || null;
+  };
+
+  const activeStudentRecord = getActiveStudentRecord();
+  const currentStudentRoll = activeStudentRecord?.roll || user?.studentRoll || 'S101';
+
+
   
   const getTabTitle = () => {
     const titles = {
@@ -718,14 +758,14 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
         {['principal-services-tab', 'teacher-services-tab', 'student-services-tab', 'parent-services-tab'].includes(activeTab) && (() => {
           const currentStore = getPortalData();
           const masterServices = (currentStore.services || [
-            { id: 'SRV-01', name: 'Coding for Kids', icon: '💻', category: 'Technology', status: 'Active', cost: '0/yr', description: 'Interactive Python, Scratch block coding, and basic algorithmic thinking for students.', visibleRoles: ['schooladmin', 'teacher', 'student'] },
-            { id: 'SRV-02', name: 'Chess Academy', icon: '♟️', category: 'Mind Sports', status: 'Active', cost: '0/yr', description: 'Grandmaster tactics, opening strategies, and tournament training.', visibleRoles: ['schooladmin', 'principal', 'teacher', 'student', 'parent'] },
-            { id: 'SRV-03', name: 'Robotics', icon: '🤖', category: 'STEM', status: 'Active', cost: '0/yr', description: 'Arduino, sensor kits, circuit building and autonomous robot design.', visibleRoles: ['schooladmin', 'teacher', 'student'] },
-            { id: 'SRV-04', name: 'Drawing & Art', icon: '🎨', category: 'Creative Arts', status: 'Active', cost: '0/yr', description: 'Watercolors, canvas painting, sketch portraiture and digital design.', visibleRoles: ['schooladmin', 'student', 'parent'] },
-            { id: 'SRV-05', name: 'Spoken English', icon: '🗣️', category: 'Communication', status: 'Active', cost: '0/yr', description: 'Vocabulary building, public speaking, pronunciation and phonics.', visibleRoles: ['schooladmin', 'principal', 'teacher', 'student', 'parent'] },
-            { id: 'SRV-06', name: 'Abacus & Vedic Maths', icon: '🧮', category: 'Mathematics', status: 'Active', cost: '0/yr', description: 'Fast mental calculation techniques, memory retention, and number speed.', visibleRoles: ['schooladmin', 'teacher', 'student', 'parent'] },
-            { id: 'SRV-07', name: 'Dance & Music', icon: '🎵', category: 'Performing Arts', status: 'Active', cost: '0/yr', description: 'Classical & contemporary dance, vocal music, keyboard and guitar lessons.', visibleRoles: ['schooladmin', 'student', 'parent'] },
-            { id: 'SRV-08', name: 'Sports & Fitness', icon: '⚽', category: 'Athletics', status: 'Active', cost: '0/yr', description: 'Football, basketball, athletics coaching, yoga and physical agility.', visibleRoles: ['schooladmin', 'principal', 'teacher', 'student', 'parent'] },
+            { id: 'SRV-01', name: 'Coding for Kids', icon: '', category: 'Technology', status: 'Active', cost: '0/yr', description: 'Interactive Python, Scratch block coding, and basic algorithmic thinking for students.', visibleRoles: ['schooladmin', 'teacher', 'student'] },
+            { id: 'SRV-02', name: 'Chess Academy', icon: '♟', category: 'Mind Sports', status: 'Active', cost: '0/yr', description: 'Grandmaster tactics, opening strategies, and tournament training.', visibleRoles: ['schooladmin', 'principal', 'teacher', 'student', 'parent'] },
+            { id: 'SRV-03', name: 'Robotics', icon: '', category: 'STEM', status: 'Active', cost: '0/yr', description: 'Arduino, sensor kits, circuit building and autonomous robot design.', visibleRoles: ['schooladmin', 'teacher', 'student'] },
+            { id: 'SRV-04', name: 'Drawing & Art', icon: '', category: 'Creative Arts', status: 'Active', cost: '0/yr', description: 'Watercolors, canvas painting, sketch portraiture and digital design.', visibleRoles: ['schooladmin', 'student', 'parent'] },
+            { id: 'SRV-05', name: 'Spoken English', icon: '', category: 'Communication', status: 'Active', cost: '0/yr', description: 'Vocabulary building, public speaking, pronunciation and phonics.', visibleRoles: ['schooladmin', 'principal', 'teacher', 'student', 'parent'] },
+            { id: 'SRV-06', name: 'Abacus & Vedic Maths', icon: '', category: 'Mathematics', status: 'Active', cost: '0/yr', description: 'Fast mental calculation techniques, memory retention, and number speed.', visibleRoles: ['schooladmin', 'teacher', 'student', 'parent'] },
+            { id: 'SRV-07', name: 'Dance & Music', icon: '', category: 'Performing Arts', status: 'Active', cost: '0/yr', description: 'Classical & contemporary dance, vocal music, keyboard and guitar lessons.', visibleRoles: ['schooladmin', 'student', 'parent'] },
+            { id: 'SRV-08', name: 'Sports & Fitness', icon: '', category: 'Athletics', status: 'Active', cost: '0/yr', description: 'Football, basketball, athletics coaching, yoga and physical agility.', visibleRoles: ['schooladmin', 'principal', 'teacher', 'student', 'parent'] },
           ]).map((s) => ({ ...s, cost: '0/yr' }));
 
           
@@ -783,7 +823,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                           justifyContent: 'center',
                           fontSize: '1.5rem'
                         }}>
-                          {srv.icon || '🌟'}
+                          {srv.icon || ''}
                         </div>
                         <span className="badge badge-success">Enrolled & Active</span>
                       </div>
@@ -899,7 +939,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               >
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#1e293b', fontWeight: 800 }}>
-                    📊 Campus Attendance Reports — Class & Section Directory
+                     Campus Attendance Reports — Class & Section Directory
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
                     Select date to audit daily registers &bull; Click any class to view student-wise attendance
@@ -972,7 +1012,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 <div className="portal-card-header" style={{ marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
                   <div>
                     <span className="portal-card-title" style={{ fontSize: '1.05rem' }}>
-                      📋 Class-Wise Attendance Roster ({formattedDateStr})
+                       Class-Wise Attendance Roster ({formattedDateStr})
                     </span>
                     <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
                       Click on any class name or the <strong>"View Attendance &rarr;"</strong> button to open student-by-student roll call
@@ -1111,7 +1151,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     <span style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.04em' }}>
                       Total Teaching Staff
                     </span>
-                    <span style={{ fontSize: '1.25rem' }}>👩‍🏫</span>
+                    <span style={{ fontSize: '1.25rem' }}></span>
                   </div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: '#b45309', margin: '8px 0 4px 0', lineHeight: 1.1 }}>
                     {(data.teachers?.length || 32) + 2}
@@ -1173,7 +1213,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     <span style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.04em' }}>
                       Non-Teaching Staff
                     </span>
-                    <span style={{ fontSize: '1.25rem' }}>👥</span>
+                    <span style={{ fontSize: '1.25rem' }}></span>
                   </div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: '#0e7490', margin: '8px 0 4px 0', lineHeight: 1.1 }}>
                     {data.nonTeachingStaff?.length || 8}
@@ -1235,7 +1275,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     <span style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.04em' }}>
                       Total Works & Tasks
                     </span>
-                    <span style={{ fontSize: '1.25rem' }}>📋</span>
+                    <span style={{ fontSize: '1.25rem' }}></span>
                   </div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: '#be185d', margin: '8px 0 4px 0', lineHeight: 1.1 }}>
                     {data.operationsWorks?.length || 8}
@@ -1297,7 +1337,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     <span style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.04em' }}>
                       Fee Collection & Dues
                     </span>
-                    <span style={{ fontSize: '1.25rem' }}>💰</span>
+                    <span style={{ fontSize: '1.25rem' }}></span>
                   </div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: '#059669', margin: '8px 0 4px 0', lineHeight: 1.1 }}>
                     ₹42,000
@@ -1345,7 +1385,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               <div className="portal-card" style={{ borderLeftColor: '#1e3a8a', background: '#ffffff', padding: '20px' }}>
                 <div className="portal-card-header" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', marginBottom: '16px' }}>
                   <span className="portal-card-title" style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    📊 Academic Performance & Grading Distribution
+                     Academic Performance & Grading Distribution
                   </span>
                   <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>Term 2 Exam Review</span>
                 </div>
@@ -1398,7 +1438,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               <div className="portal-card-header">
                 <div>
                   <span className="portal-card-title" style={{ fontSize: '1.05rem' }}>
-                    📋 Grade-Wise Academic & Attendance Operational Summary
+                     Grade-Wise Academic & Attendance Operational Summary
                   </span>
                   <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
                     Real-time compilation across all sections for Principal review
@@ -1603,7 +1643,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     }}
                   />
                   <span style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', opacity: 0.6, fontSize: '0.95rem' }}>
-                    🔍
+                    
                   </span>
                   {feeSearch && (
                     <button
@@ -1904,7 +1944,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                           }}
                           title="Click to view weekly faculty timetable"
                         >
-                          📅 {lv.teacher}
+                           {lv.teacher}
                         </button>
                       </td>
                       <td data-label="Department">{lv.subject}</td>
@@ -2020,7 +2060,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                         onClick={() => setTeacherSelectedClass(cls.name)}
                         style={{ cursor: 'pointer' }}
                       >
-                        🏫 {cls.name} (Room {cls.room})
+                         {cls.name} (Room {cls.room})
                       </button>
                     );
                   })}
@@ -2084,7 +2124,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     Students in {currentClassInfo.name} ({totalCount})
                   </h3>
                   <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                    💡 Click on any student row or "View Result & Parent Details"
+                     Click on any student row or "View Result & Parent Details"
                   </span>
                 </div>
 
@@ -2126,7 +2166,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                             </td>
                             <td data-label="Parent / Guardian">
                               <div style={{ fontWeight: 600, color: '#334155', fontSize: '0.88rem' }}>
-                                👨‍👩‍👦 {s.parentName || 'Mr. Guardian'}
+                                 {s.parentName || 'Mr. Guardian'}
                               </div>
                             </td>
                             <td data-label="Parent Phone">
@@ -2143,7 +2183,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                   textDecoration: 'none'
                                 }}
                               >
-                                📞 {s.parentPhone || '+91 98401 22334'}
+                                 {s.parentPhone || '+91 98401 22334'}
                               </a>
                             </td>
                             <td data-label="Standing">
@@ -2169,7 +2209,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                 }}
                                 style={{ padding: '6px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                               >
-                                <span>📊</span>
+                                <span></span>
                                 View Result & Details
                               </button>
                             </td>
@@ -2495,14 +2535,14 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                           )}
                           {hw.attachmentName && (
                             <span style={{ fontSize: '0.75rem', color: '#047857', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
-                              📎 {hw.attachmentName}
+                               {hw.attachmentName}
                             </span>
                           )}
                         </td>
                         <td data-label="Target Class"><span className="badge badge-info">{hw.grade}</span></td>
                         <td data-label="Given Date">
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: '#475569', fontWeight: 500 }}>
-                            📅 {hw.givenDate || hw.assignedDate || '2026-10-24'}
+                             {hw.givenDate || hw.assignedDate || '2026-10-24'}
                           </span>
                         </td>
                         <td data-label="Due Date">
@@ -2597,7 +2637,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
 
                         <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', fontSize: '0.8rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            📄 <strong>{mat.fileName}</strong>
+                             <strong>{mat.fileName}</strong>
                           </span>
                           <span>{mat.fileSize || '2.5 MB'}</span>
                         </div>
@@ -2749,7 +2789,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     Leave History & Principal Approvals Queue ({myLeaves.length})
                   </h4>
                   <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                    💡 Notifications sent to Principal Office immediately upon submission
+                     Notifications sent to Principal Office immediately upon submission
                   </span>
                 </div>
 
@@ -2787,7 +2827,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                             <td data-label="Reason for Absence">{lv.reason}</td>
                             <td data-label="Roster Substitute">
                               <span style={{ fontSize: '0.84rem', color: '#0f172a' }}>
-                                👤 {lv.substituteTeacher || 'Dr. Anandhi Rajan (Physics)'}
+                                 {lv.substituteTeacher || 'Dr. Anandhi Rajan (Physics)'}
                               </span>
                             </td>
                             <td data-label="Principal Decision" style={{ textAlign: 'center' }}>
@@ -2864,7 +2904,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     >
                       <div>
                         <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>
-                          📝 Submit Faculty Leave Application
+                           Submit Faculty Leave Application
                         </h3>
                         <p style={{ margin: '4px 0 0 0', fontSize: '0.84rem', opacity: 0.9 }}>
                           Faculty: {currentTeacherName} (Mathematics) &bull; For Principal Approval
@@ -3096,16 +3136,16 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
         
         
         {role === 'student' && activeTab === 'view-dashboard' && (() => {
-          const studentHw = (data.assignments || []).filter((h) => h.grade === 'Grade 10-A' || h.grade === 'All Grades');
-          const upcomingExams = (data.exams || []).filter((x) => x.grade === 'Grade 10-A' || x.grade === 'All Grades');
+          const studentRoll = currentStudentRoll;
+          const currentStudent = activeStudentRecord || (data.students || []).find((s) => s.roll === studentRoll);
+          const studentClass = currentStudent?.class || 'Grade 10-A';
+          const studentHw = (data.assignments || []).filter((h) => h.grade === studentClass || h.grade === 'All Grades');
+          const upcomingExams = (data.exams || []).filter((x) => x.grade === studentClass || x.grade === 'All Grades');
 
-          
-          const studentRoll = 'S101';
-          const logs = (data.attendanceLogs || []).filter((l) => l.className === 'Grade 10-A');
+          const logs = (data.attendanceLogs || []).filter((l) => l.className === studentClass);
           const studentLogs = logs.filter((l) => l.records && l.records[studentRoll]);
           const totalDays = studentLogs.length;
           const presentDays = studentLogs.filter((l) => l.records[studentRoll] === 'present').length;
-          const currentStudent = (data.students || []).find((s) => s.roll === studentRoll);
           const dynamicRate = totalDays > 0 ? `${Math.round((presentDays / totalDays) * 100)}%` : (currentStudent?.attendance || '96%');
 
           return (
@@ -3115,7 +3155,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 <div className="portal-card" style={{ borderLeft: '4px solid #10b981', margin: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem' }}>My Attendance Rate</h4>
-                    <span style={{ fontSize: '1.4rem' }}>📈</span>
+                    <span style={{ fontSize: '1.4rem' }}></span>
                   </div>
                   <p style={{ fontSize: '2.2rem', fontWeight: 800, color: '#10b981', margin: '8px 0 4px 0' }}>{dynamicRate}</p>
                   <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
@@ -3126,7 +3166,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 <div className="portal-card" style={{ borderLeft: '4px solid #f59e0b', margin: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem' }}>Pending Homework</h4>
-                    <span style={{ fontSize: '1.4rem' }}>📝</span>
+                    <span style={{ fontSize: '1.4rem' }}></span>
                   </div>
                   <p style={{ fontSize: '2.2rem', fontWeight: 800, color: '#f59e0b', margin: '8px 0 4px 0' }}>
                     {studentHw.length} <span style={{ fontSize: '1.1rem', fontWeight: 500, color: '#64748b' }}>Tasks</span>
@@ -3139,7 +3179,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 <div className="portal-card" style={{ borderLeft: '4px solid #3b82f6', margin: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem' }}>Upcoming Exams</h4>
-                    <span style={{ fontSize: '1.4rem' }}>📅</span>
+                    <span style={{ fontSize: '1.4rem' }}></span>
                   </div>
                   <p style={{ fontSize: '2.2rem', fontWeight: 800, color: '#3b82f6', margin: '8px 0 4px 0' }}>
                     {upcomingExams.length} <span style={{ fontSize: '1.1rem', fontWeight: 500, color: '#64748b' }}>Scheduled</span>
@@ -3164,7 +3204,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h4 style={{ margin: 0, color: '#334155', fontSize: '0.95rem' }}>Fee Dues & Status</h4>
-                        <span style={{ fontSize: '1.4rem' }}>💳</span>
+                        <span style={{ fontSize: '1.4rem' }}></span>
                       </div>
                       <p style={{ fontSize: '2.2rem', fontWeight: 800, color: hasDue ? '#ef4444' : '#10b981', margin: '8px 0 4px 0' }}>
                         {hasDue ? dueAmt : 'Cleared ✓'}
@@ -3183,7 +3223,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
                     <h3 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>📝</span> Pending Homework & Assignments
+                      <span></span> Pending Homework & Assignments
                     </h3>
                     <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
                       Review assignments assigned to your class (Grade 10-A) and submit before the deadline.
@@ -3202,7 +3242,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
 
                 {studentHw.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '36px 20px', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🎉</div>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}></div>
                     <h4 style={{ margin: '0 0 6px 0', color: '#1e293b' }}>No Pending Homework</h4>
                     <p style={{ margin: 0, color: '#64748b', fontSize: '0.88rem' }}>You have completed all assigned tasks or none have been assigned yet.</p>
                   </div>
@@ -3263,7 +3303,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
 
                           {hw.attachmentName && (
                             <div style={{ background: '#f1f5f9', padding: '6px 10px', borderRadius: '6px', fontSize: '0.78rem', color: '#0f766e', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>📎</span>
+                              <span></span>
                               <span>Reference doc: <strong>{hw.attachmentName}</strong></span>
                             </div>
                           )}
@@ -3290,7 +3330,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                               }
                             }}
                           >
-                            <span>📤</span> Submit Solution Now
+                            <span></span> Submit Solution Now
                           </button>
                         </div>
                       </div>
@@ -3303,14 +3343,15 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
         })()}
 
         {(role === 'student' || role === 'parent') && (activeTab === 'check-attendance' || activeTab === 'attendance-tracking') && (() => {
-          const studentRoll = 'S101';
-          const logs = (data.attendanceLogs || []).filter((l) => l.className === 'Grade 10-A');
+          const studentRoll = currentStudentRoll;
+          const currentStudent = activeStudentRecord || (data.students || []).find((s) => s.roll === studentRoll);
+          const studentClass = currentStudent?.class || 'Grade 10-A';
+          const logs = (data.attendanceLogs || []).filter((l) => l.className === studentClass);
           const studentLogs = logs.filter((l) => l.records && l.records[studentRoll]);
           const totalDays = studentLogs.length;
           const presentDays = studentLogs.filter((l) => l.records[studentRoll] === 'present').length;
           const absentDays = totalDays - presentDays;
-          const currentStudent = (data.students || []).find((s) => s.roll === studentRoll);
-          const attendancePercent = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 96;
+          const attendancePercent = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : (parseInt(currentStudent?.attendance) || 96);
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -3319,7 +3360,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
                   <div>
                     <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', color: '#0f172a' }}>
-                      📋 Student Attendance & Real-Time Tracking
+                       Student Attendance & Real-Time Tracking
                     </h3>
                     <p style={{ margin: 0, color: '#64748b', fontSize: '0.86rem' }}>
                       Live records recorded and locked by Class Teacher (Grade 10-A).
@@ -3352,7 +3393,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               <div className="portal-card" style={{ margin: 0, padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                   <h4 style={{ margin: 0, color: '#0f172a', fontSize: '1.05rem' }}>
-                    🗓️ Daily Attendance History & Staff Sign-off
+                     Daily Attendance History & Staff Sign-off
                   </h4>
                   <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Showing all verified dates</span>
                 </div>
@@ -3537,7 +3578,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       
                       {hw.attachmentName && (
                         <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', fontSize: '0.82rem', color: '#047857', marginBottom: '12px' }}>
-                          📎 Reference File: <strong>{hw.attachmentName}</strong>
+                           Reference File: <strong>{hw.attachmentName}</strong>
                         </div>
                       )}
 
@@ -3588,7 +3629,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               <div className="sa-schools-header-bar" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                 <div className="sa-filter-segment" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.92rem', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    🎯 Upcoming Examination Schedule
+                     Upcoming Examination Schedule
                   </span>
                   {canManageExams && (
                     <div style={{ display: 'inline-flex', gap: '4px', marginLeft: '6px' }}>
@@ -3634,7 +3675,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               
               {(role === 'student' || role === 'parent') && (
                 <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '1.3rem' }}>📢</span>
+                  <span style={{ fontSize: '1.3rem' }}></span>
                   <div style={{ fontSize: '0.86rem', color: '#1e40af' }}>
                     <strong>Official Notice:</strong> Showing all scheduled board & term tests for <strong>Grade 10-A</strong>. Hall tickets will be issued 3 days prior. Exam starts promptly at designated timings.
                   </div>
@@ -3698,7 +3739,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                 <strong style={{ fontSize: '0.94rem', color: '#0f172a' }}>
                                   {ex.name}
                                 </strong>
-                                <small>👤 By: {ex.uploadedBy || 'Principal Office'}</small>
+                                <small> By: {ex.uploadedBy || 'Principal Office'}</small>
                               </div>
                             </td>
 
@@ -3708,7 +3749,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                   {ex.subject}
                                 </strong>
                                 {ex.syllabus && (
-                                  <small style={{ maxWidth: '280px' }}>📘 <em>{ex.syllabus}</em></small>
+                                  <small style={{ maxWidth: '280px' }}> <em>{ex.syllabus}</em></small>
                                 )}
                               </div>
                             </td>
@@ -3731,7 +3772,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
 
                             <td data-label="Date & Timing" style={{ padding: '14px 16px' }}>
                               <div className="school-meta-line">
-                                <strong style={{ fontSize: '0.9rem' }}>📅 {ex.date}</strong>
+                                <strong style={{ fontSize: '0.9rem' }}> {ex.date}</strong>
                                 <small>⏰ {ex.time || '09:30 AM - 12:30 PM'}</small>
                               </div>
                             </td>
@@ -3750,7 +3791,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                   borderRadius: '6px'
                                 }}
                               >
-                                📍 {ex.room || 'Main Examination Hall'}
+                                 {ex.room || 'Main Examination Hall'}
                               </span>
                             </td>
 
@@ -3811,7 +3852,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                             colSpan={canManageExams ? 8 : 7}
                             style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}
                           >
-                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📅</div>
+                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}></div>
                             <div style={{ fontWeight: 600, color: '#475569', fontSize: '1rem' }}>
                               No upcoming examinations scheduled for {examGradeFilter}.
                             </div>
@@ -3836,18 +3877,22 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div className="portal-card">
               <div className="portal-card-title">Student Profile Summary</div>
-              <p><strong>Name:</strong> Aishwarya Kumar</p>
-              <p><strong>Class:</strong> Grade 10-A (Roll No: S101)</p>
-              <p><strong>Emergency Contact:</strong> Ramesh Kumar (+91 98456 12301)</p>
+              <p><strong>Name:</strong> {activeStudentRecord?.name || 'Aishwarya Kumar'}</p>
+              <p><strong>Class:</strong> {activeStudentRecord?.class || 'Grade 10-A'} (Roll No: {currentStudentRoll})</p>
+              <p><strong>Emergency Contact:</strong> {activeStudentRecord?.emergencyContact || activeStudentRecord?.parentPhone || 'Ramesh Kumar (+91 98456 12301)'}</p>
             </div>
 
             
             {(() => {
-              const myRoll = user?.studentRoll || 'S101';
-              const myFee = feeRecords.find(r => r.roll === myRoll) || feeRecords[0] || {
-                roll: 'S101',
-                name: 'Aishwarya Kumar',
-                class: 'Grade 10-A',
+              const myRoll = currentStudentRoll;
+              const myFee = feeRecords.find(r => r.roll === myRoll) || {
+                roll: myRoll,
+                name: activeStudentRecord?.name || 'Student',
+                class: activeStudentRecord?.class || 'Grade 10-A',
+                parent: activeStudentRecord?.parentName || 'Parent / Guardian',
+                phone: activeStudentRecord?.parentPhone || '+91 98456 12301',
+                totalFee: '₹0',
+                paid: '₹0',
                 due: '₹0',
                 status: 'PAID',
                 dueDate: '2026-10-15'
@@ -3903,7 +3948,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                         }}
                         style={{ padding: '8px 18px', fontWeight: 700 }}
                       >
-                        ⚡ Pay Pending Fee ({dueAmount}) &rarr;
+                         Pay Pending Fee ({dueAmount}) &rarr;
                       </button>
                     ) : (
                       <span className="badge badge-success" style={{ padding: '8px 16px', fontSize: '0.88rem' }}>
@@ -3976,18 +4021,18 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
         {(role === 'parent' || role === 'student') && activeTab === 'fee-reminders' && (
           <div>
             {(() => {
-              const myRoll = role === 'student' ? 'S101' : (user?.studentRoll || 'S101');
-              const myFee = feeRecords.find(r => r.roll === myRoll) || feeRecords[0] || {
-                roll: 'S101',
-                name: 'Aishwarya Kumar',
-                class: 'Grade 10-A',
-                parent: 'Ramesh Kumar',
-                phone: '+91 98456 12301',
-                totalFee: '₹28,000',
-                paid: '₹28,000',
+              const myRoll = currentStudentRoll;
+              const myFee = feeRecords.find(r => r.roll === myRoll) || {
+                roll: myRoll,
+                name: activeStudentRecord?.name || (role === 'student' ? user?.name : 'Student'),
+                class: activeStudentRecord?.class || 'Grade 10-A',
+                parent: activeStudentRecord?.parentName || 'Parent / Guardian',
+                phone: activeStudentRecord?.parentPhone || '+91 98456 12301',
+                totalFee: '₹0',
+                paid: '₹0',
                 due: '₹0',
                 status: 'PAID',
-                invoiceNumber: 'INV-2026-001',
+                invoiceNumber: 'INV-2026-' + myRoll,
                 dueDate: '2026-10-15',
                 billingMonth: 'October'
               };
@@ -4032,7 +4077,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                           }}
                           style={{ padding: '10px 24px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.92rem' }}
                         >
-                          ⚡ Pay Pending Fee ({dueAmount}) via UPI / Gateway
+                           Pay Pending Fee ({dueAmount}) via UPI / Gateway
                         </button>
                       ) : (
                         <span className="badge badge-success" style={{ padding: '10px 20px', fontSize: '0.92rem' }}>
@@ -4045,7 +4090,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   
                   <div className="portal-card" style={{ padding: '20px 24px', marginBottom: '20px' }}>
                     <h4 style={{ margin: '0 0 14px 0', fontSize: '1.05rem', color: '#1e3a8a', fontWeight: 700 }}>
-                      📋 Fee Structure Breakdown ({myFee.billingMonth || 'October'} 2026-2027)
+                       Fee Structure Breakdown ({myFee.billingMonth || 'October'} 2026-2027)
                     </h4>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '18px' }}>
                       <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
@@ -4072,17 +4117,25 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                         Categorized Fee Breakdown & Live Payment Status:
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px' }}>
-                        {[
-                          { name: 'Monthly Fees', defaultAmt: 15000 },
-                          { name: 'Transport Fees', defaultAmt: 5000 },
-                          { name: 'Co-curricular Fees', defaultAmt: 3000 },
-                          { name: 'Term Fees', defaultAmt: 5000 }
-                        ].map((cat) => {
-                          const item = (myFee.feeItems || []).find(f => (f.feeType || '').toLowerCase().includes(cat.name.toLowerCase()));
-                          const amt = item ? Number(item.netAmount || item.amount || 0) : cat.defaultAmt;
-                          const isPaid = item?.status ? item.status === 'Paid' : myFee.status === 'PAID';
+                        {((myFee.feeItems && myFee.feeItems.length > 0)
+                          ? myFee.feeItems.map(it => ({
+                              name: it.feeType,
+                              description: it.description,
+                              amount: Number(it.netAmount || it.amount || 0),
+                              isPaid: it.status ? it.status === 'Paid' : myFee.status === 'PAID'
+                            }))
+                          : [
+                              { name: 'Admission Fees', amount: 5000, isPaid: myFee.status === 'PAID' },
+                              { name: 'Transport Fees', amount: 5000, isPaid: myFee.status === 'PAID' },
+                              { name: 'Books Fees', amount: 4000, isPaid: myFee.status === 'PAID' },
+                              { name: 'Co-curricular Fees', amount: 3000, isPaid: myFee.status === 'PAID' },
+                              { name: 'Exam Fees', amount: 3000, isPaid: myFee.status === 'PAID' }
+                            ]
+                        ).map((cat, catIdx) => {
+                          const amt = cat.amount || 0;
+                          const isPaid = cat.isPaid;
                           return (
-                            <div key={cat.name} style={{
+                            <div key={cat.name + '_' + catIdx} style={{
                               background: '#ffffff',
                               border: `1px solid ${isPaid ? '#bbf7d0' : '#fecaca'}`,
                               borderRadius: '8px',
@@ -4092,10 +4145,17 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                               justifyContent: 'space-between',
                               boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                             }}>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-                                {cat.name}
+                              <div>
+                                <div style={{ fontSize: '0.74rem', color: '#1e3a8a', fontWeight: 700, textTransform: 'uppercase' }}>
+                                  {cat.name}
+                                </div>
+                                {cat.description && (
+                                  <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                                    {cat.description}
+                                  </div>
+                                )}
                               </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
                                 <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
                                   ₹{amt.toLocaleString()}
                                 </span>
@@ -4166,7 +4226,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
             <div className="sa-schools-header-bar" style={{ marginBottom: '16px' }}>
               <div className="sa-filter-segment">
                 <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.92rem', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  🚌 Route #14 &mdash; Kodumudi Central to SSV Girls High School
+                   Route #14 &mdash; Kodumudi Central to SSV Girls High School
                 </span>
               </div>
               <div className="sa-toolbar-right">
@@ -4216,7 +4276,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   <span className="badge badge-success">Completed</span>
                 </div>
                 <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>⚡</div>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}></div>
                   <div style={{ flex: 1 }}>
                     <strong>Stop #5 — Anna Nagar Junction (Your Child's Stop)</strong>
                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Approaching now &bull; Expected at 08:24 AM</div>
@@ -4322,7 +4382,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 }}
               >
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                  👨‍👩‍👦 Parent / Guardian Contact Details
+                   Parent / Guardian Contact Details
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
                   <div>
@@ -4345,7 +4405,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                         textDecoration: 'none'
                       }}
                     >
-                      📞 {selectedStudentDetail.parentPhone || '+91 98401 55210'}
+                       {selectedStudentDetail.parentPhone || '+91 98401 55210'}
                     </a>
                   </div>
                   <div>
@@ -4367,7 +4427,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--color-primary)', fontWeight: 700 }}>
-                    📊 Academic Midterm Exam Results
+                     Academic Midterm Exam Results
                   </h4>
                   <button
                     type="button"
@@ -4379,7 +4439,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     }}
                     style={{ fontSize: '0.8rem', padding: '4px 10px' }}
                   >
-                    ✏️ Edit / Enter Marks
+                     Edit / Enter Marks
                   </button>
                 </div>
 
@@ -4888,7 +4948,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
             >
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
-                  {editingExamId ? '✎ Update Examination Details' : '🎯 Schedule Class Examination Timetable'}
+                  {editingExamId ? '✎ Update Examination Details' : ' Schedule Class Examination Timetable'}
                 </h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', opacity: 0.9 }}>
                   {editingExamId
@@ -4969,7 +5029,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               <div style={{ marginBottom: '18px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <label style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>📚</span> Subject Exam Papers Schedule ({examForm.subjectsList?.length || 0} Subjects for {examForm.grade})
+                    <span></span> Subject Exam Papers Schedule ({examForm.subjectsList?.length || 0} Subjects for {examForm.grade})
                   </label>
                   <button
                     type="button"
@@ -5226,7 +5286,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                             style={{ padding: '10px 4px', fontSize: '0.85rem' }}
                             onClick={() => setPaymentMethod(m)}
                           >
-                            {m === 'UPI' ? '⚡ UPI / GPay' : m === 'Card' ? '💳 Debit/Credit' : '🏦 Net Banking'}
+                            {m === 'UPI' ? ' UPI / GPay' : m === 'Card' ? ' Debit/Credit' : ' Net Banking'}
                           </button>
                         ))}
                       </div>
@@ -5414,12 +5474,12 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
             >
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
-                  {analyticsModal === 'attendance' && '📅 Daily Attendance — Class-Wise Detailed Report'}
-                  {analyticsModal === 'students' && '🎓 Enrolled Students — Section Distribution & Class Strength'}
-                  {analyticsModal === 'staff' && '👩‍🏫 Teaching Faculty — Attendance & Leave Roster'}
-                  {analyticsModal === 'non-teaching' && '👥 Non-Teaching & Administrative Staff — Duty Register'}
-                  {analyticsModal === 'operations-works' && '📋 Campus Operations & Administrative Works Pipeline'}
-                  {analyticsModal === 'results' && '🏆 Board Exam & Academic Performance by Subject'}
+                  {analyticsModal === 'attendance' && ' Daily Attendance — Class-Wise Detailed Report'}
+                  {analyticsModal === 'students' && ' Enrolled Students — Section Distribution & Class Strength'}
+                  {analyticsModal === 'staff' && ' Teaching Faculty — Attendance & Leave Roster'}
+                  {analyticsModal === 'non-teaching' && ' Non-Teaching & Administrative Staff — Duty Register'}
+                  {analyticsModal === 'operations-works' && ' Campus Operations & Administrative Works Pipeline'}
+                  {analyticsModal === 'results' && ' Board Exam & Academic Performance by Subject'}
                 </h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', opacity: 0.9 }}>
                   {analyticsModal === 'attendance' && `Live morning session roll call audit • Date: ${new Date().toLocaleDateString()}`}
@@ -5561,7 +5621,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                           marginBottom: '20px',
                         }}
                       >
-                        <div style={{ fontSize: '2rem', marginBottom: '8px' }}>☀️</div>
+                        <div style={{ fontSize: '2rem', marginBottom: '8px' }}></div>
                         <h4 style={{ margin: '0 0 4px 0', color: '#92400e' }}>School Holiday (Sunday)</h4>
                         <p style={{ margin: 0, fontSize: '0.85rem', color: '#b45309' }}>
                           No classes scheduled for Sunday. Select a weekday (Monday to Saturday) to view class-wise attendance register.
@@ -5806,7 +5866,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#92400e' }}>
-                          📅 Check Teaching Attendance by Date:
+                           Check Teaching Attendance by Date:
                         </span>
                         <input
                           type="date"
@@ -5873,7 +5933,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b' }}>
                         Teaching Faculty Daily Log &bull; <span style={{ color: '#b45309', fontWeight: 800 }}>Click any teacher's name</span> to view past attendance:
                       </h4>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>💡 Click row for timetable / Click name for attendance</span>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}> Click row for timetable / Click name for attendance</span>
                     </div>
 
                     <div className="table-responsive">
@@ -5935,8 +5995,8 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                     }}
                                     title="Click to view full attendance history for this teacher"
                                   >
-                                    👩‍🏫 {t.name}
-                                    <span style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>🔍</span>
+                                     {t.name}
+                                    <span style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}></span>
                                   </div>
                                 </td>
                                 <td data-label="Department">{t.dept}</td>
@@ -5966,7 +6026,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                       gap: '4px'
                                     }}
                                   >
-                                    📅 {isSelected ? 'Viewing Timetable ✓' : 'View Timetable →'}
+                                     {isSelected ? 'Viewing Timetable ✓' : 'View Timetable →'}
                                   </button>
                                 </td>
                               </tr>
@@ -6030,7 +6090,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '1.3rem' }}>📅</span>
+                              <span style={{ fontSize: '1.3rem' }}></span>
                               <div>
                                 <strong style={{ fontSize: '1rem' }}>
                                   Weekly Teaching Timetable &mdash; {staff.name}
@@ -6047,7 +6107,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                 onClick={() => window.print()}
                                 style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', fontSize: '0.78rem' }}
                               >
-                                🖨️ Print
+                                 Print
                               </button>
                               <button
                                 type="button"
@@ -6115,7 +6175,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                                 {slot.subject}
                                               </div>
                                               <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>
-                                                📍 {slot.className}
+                                                 {slot.className}
                                               </div>
                                             </div>
                                           ) : (
@@ -6269,7 +6329,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0e7490' }}>
-                          📅 Check Non-Teaching Attendance by Date:
+                           Check Non-Teaching Attendance by Date:
                         </span>
                         <input
                           type="date"
@@ -6336,7 +6396,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b' }}>
                         Non-Academic Staff Register &bull; <span style={{ color: '#0891b2', fontWeight: 800 }}>Click any name</span> to view attendance record:
                       </h4>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>💡 Click staff name for date-wise attendance log</span>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}> Click staff name for date-wise attendance log</span>
                     </div>
 
                     <div className="table-responsive">
@@ -6382,8 +6442,8 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                   }}
                                   title="Click to view full attendance history for this staff member"
                                 >
-                                  👥 {st.name}
-                                  <span style={{ fontSize: '0.7rem', color: '#0891b2', fontWeight: 600 }}>🔍</span>
+                                   {st.name}
+                                  <span style={{ fontSize: '0.7rem', color: '#0891b2', fontWeight: 600 }}></span>
                                 </div>
                               </td>
                               <td data-label="Role / Title"><strong>{st.role}</strong></td>
@@ -6450,7 +6510,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#9d174d' }}>
-                          📅 Check Operations & Works by Date:
+                           Check Operations & Works by Date:
                         </span>
                         <input
                           type="date"
@@ -6519,7 +6579,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b' }}>
                         Institutional Operations, Safety & Administrative Tasks &bull; <span style={{ color: '#be185d', fontWeight: 800 }}>Click any task</span> to view staff duty:
                       </h4>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>💡 Click task title or staff name for live duty details</span>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}> Click task title or staff name for live duty details</span>
                     </div>
 
                     <div className="table-responsive">
@@ -6557,14 +6617,14 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                             >
                               <td data-label="Work Title">
                                 <span style={{ fontWeight: 800, color: '#be185d', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                  📋 {w.title}
-                                  <span style={{ fontSize: '0.7rem' }}>🔍</span>
+                                   {w.title}
+                                  <span style={{ fontSize: '0.7rem' }}></span>
                                 </span>
                               </td>
                               <td data-label="Department">{w.department}</td>
                               <td data-label="Assigned To">
                                 <span style={{ color: '#1e3a8a', fontWeight: 700 }}>
-                                  👤 {w.assignedTo}
+                                   {w.assignedTo}
                                 </span>
                               </td>
                               <td data-label="Priority">
@@ -6716,7 +6776,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '1.4rem' }}>
-                      {staff.type === 'Teaching Staff' ? '👩‍🏫' : staff.type === 'Non-Teaching Staff' ? '👥' : '📋'}
+                      {staff.type === 'Teaching Staff' ? '' : staff.type === 'Non-Teaching Staff' ? '' : ''}
                     </span>
                     <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
                       {staff.name} &mdash; Attendance & Duty Log
@@ -6902,7 +6962,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
 
                 {staff.extraWork && (
                   <div style={{ marginTop: '16px', padding: '14px', background: '#fdf2f8', borderRadius: '10px', border: '1px solid #fbcfe8' }}>
-                    <strong style={{ fontSize: '0.85rem', color: '#be185d' }}>📋 Attached Operation Work Profile:</strong>
+                    <strong style={{ fontSize: '0.85rem', color: '#be185d' }}> Attached Operation Work Profile:</strong>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#475569' }}>
                       <strong>Work:</strong> {staff.extraWork.title} &bull; <strong>Department:</strong> {staff.extraWork.department} &bull; <strong>Priority:</strong> {staff.extraWork.priority} &bull; <strong>Deadline:</strong> {staff.extraWork.deadline} &bull; <strong>Progress:</strong> {staff.extraWork.progress}%
                     </p>
@@ -6994,7 +7054,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               >
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.4rem' }}>🏫</span>
+                    <span style={{ fontSize: '1.4rem' }}></span>
                     <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
                       {attendanceClassModal.cls} &bull; Daily Attendance Register
                     </h3>
@@ -7097,7 +7157,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                           <td data-label="Notification" style={{ textAlign: 'center' }}>
                             {st.status === 'Absent' ? (
                               <span style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 600 }}>
-                                📲 SMS Alert Sent
+                                 SMS Alert Sent
                               </span>
                             ) : (
                               <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 600 }}>
@@ -7129,7 +7189,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   onClick={() => window.print()}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  🖨️ Print Class Roll Call
+                   Print Class Roll Call
                 </button>
                 <button
                   type="button"
@@ -7213,7 +7273,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               >
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '1.6rem' }}>👩‍🏫</span>
+                    <span style={{ fontSize: '1.6rem' }}></span>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800 }}>
                         {staff.name} &bull; Weekly Teaching Timetable
@@ -7268,7 +7328,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       gap: '12px',
                     }}
                   >
-                    <span style={{ fontSize: '1.5rem' }}>📚</span>
+                    <span style={{ fontSize: '1.5rem' }}></span>
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: 700, textTransform: 'uppercase' }}>
                         Weekly Teaching Hours
@@ -7290,7 +7350,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       gap: '12px',
                     }}
                   >
-                    <span style={{ fontSize: '1.5rem' }}>☕</span>
+                    <span style={{ fontSize: '1.5rem' }}></span>
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 700, textTransform: 'uppercase' }}>
                         Preparation & Free Slots
@@ -7312,7 +7372,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       gap: '12px',
                     }}
                   >
-                    <span style={{ fontSize: '1.5rem' }}>🏫</span>
+                    <span style={{ fontSize: '1.5rem' }}></span>
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#92400e', fontWeight: 700, textTransform: 'uppercase' }}>
                         Department / Lab Assigned
@@ -7377,7 +7437,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                       {slot.subject}
                                     </div>
                                     <div style={{ fontSize: '0.74rem', color: '#2563eb', fontWeight: 600, marginTop: '2px' }}>
-                                      📍 {slot.className}
+                                       {slot.className}
                                     </div>
                                   </div>
                                 ) : (
@@ -7393,7 +7453,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                                       fontStyle: 'italic'
                                     }}
                                   >
-                                    ☕ Free / Prep Period
+                                     Free / Prep Period
                                   </div>
                                 )}
                               </td>
@@ -7423,7 +7483,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   onClick={() => window.print()}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                  🖨️ Print Faculty Timetable
+                   Print Faculty Timetable
                 </button>
                 <button
                   type="button"

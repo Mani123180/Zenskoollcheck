@@ -57,14 +57,14 @@ export default function About() {
           </div>
           <div className="grid-2">
             <div className="card">
-              <div style={{ fontSize: '2.5rem', marginBottom: '14px' }}>☉</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '14px' }}></div>
               <h3 className="card-title">Our Vision</h3>
               <p className="card-desc">
                 To be a leading center of educational excellence that inspires girls to lead, create, and succeed in a dynamic world.
               </p>
             </div>
             <div className="card">
-              <div style={{ fontSize: '2.5rem', marginBottom: '14px' }}>⚬</div>
+              <div style={{ fontSize: '2.5rem', marginBottom: '14px' }}></div>
               <h3 className="card-title">Our Mission</h3>
               <p className="card-desc">
                 Empowering students through tailored learning modules, comprehensive support, state-of-the-art laboratory work, and value-based personal growth.

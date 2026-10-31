@@ -30,7 +30,7 @@ export default function Academics() {
 
             <div className="feature-list" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '1.6rem', color: 'var(--color-primary)' }}>⚛</div>
+                <div style={{ fontSize: '1.6rem', color: 'var(--color-primary)' }}></div>
                 <div>
                   <strong style={{ display: 'block', color: 'var(--color-primary)', fontSize: '1.05rem' }}>
                     Science Stream
@@ -42,7 +42,7 @@ export default function Academics() {
               </div>
 
               <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '1.6rem', color: 'var(--color-primary)' }}>⚖</div>
+                <div style={{ fontSize: '1.6rem', color: 'var(--color-primary)' }}></div>
                 <div>
                   <strong style={{ display: 'block', color: 'var(--color-primary)', fontSize: '1.05rem' }}>
                     Commerce Stream
@@ -54,7 +54,7 @@ export default function Academics() {
               </div>
 
               <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '1.6rem', color: 'var(--color-primary)' }}>🎨</div>
+                <div style={{ fontSize: '1.6rem', color: 'var(--color-primary)' }}></div>
                 <div>
                   <strong style={{ display: 'block', color: 'var(--color-primary)', fontSize: '1.05rem' }}>
                     Humanities & Arts Stream

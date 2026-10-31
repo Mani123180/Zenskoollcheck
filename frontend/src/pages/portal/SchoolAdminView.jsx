@@ -1,15 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import {
  getPortalData,
- savePortalData
+ savePortalData,
+ syncBillToPortalFeeRecords
 } from '../../services/portalData';
+import { api } from '../../services/api';
 import ChatBox from './ChatBox';
 import InteractiveServicePlayerModal from './InteractiveServicePlayerModal';
 import { DashboardDetailModal } from './SuperAdminModals';
 import SchoolFinanceModule from './SchoolFinanceModule';
 import * as XLSX from 'xlsx';
 
-export default function SchoolAdminView({ activeTab, setActiveTab }) {
+
+const defaultStudentFeeItems = [
+  { feeType: 'Admission Fees', description: 'Admission & Registration', amount: 5000, discount: 0, fine: 0, netAmount: 5000, status: 'Unpaid', paidAmount: 0 },
+  { feeType: 'Transport Fees', description: 'Bus / Van Transportation', amount: 5000, discount: 0, fine: 0, netAmount: 5000, status: 'Unpaid', paidAmount: 0 },
+  { feeType: 'Books Fees', description: 'Books, Uniform & Stationery', amount: 4000, discount: 0, fine: 0, netAmount: 4000, status: 'Unpaid', paidAmount: 0 },
+  { feeType: 'Co-curricular Fees', description: 'Sports, Arts & Activities', amount: 3000, discount: 0, fine: 0, netAmount: 3000, status: 'Unpaid', paidAmount: 0 },
+  { feeType: 'Exam Fees', description: 'Examination & Assessment Fees', amount: 3000, discount: 0, fine: 0, netAmount: 3000, status: 'Unpaid', paidAmount: 0 }
+];
+
+export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  const [data, setData] = useState(getPortalData());
  const [activePlayService, setActivePlayService] = useState(null);
  const [cardDetailModal, setCardDetailModal] = useState({ isOpen: false, config: null });
@@ -69,7 +80,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  address: '',
  emergencyContact: '',
  admissionDate: new Date().toISOString().split('T')[0],
- status: 'Active'
+ status: 'Active',
+    feeItems: JSON.parse(JSON.stringify(defaultStudentFeeItems))
  });
 
  const [isClassModalOpen, setIsClassModalOpen] = useState(false);
@@ -136,8 +148,80 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
 
  
  const [feeClassFilter, setFeeClassFilter] = useState('All');
+  const [feeStatusFilter, setFeeStatusFilter] = useState('All');
+  const [activeMetricFilter, setActiveMetricFilter] = useState('ALL');
+
+  const handleMetricCardClick = (metricKey, records = []) => {
+    setActiveMetricFilter(metricKey);
+    let modalTitle = 'Student Fee Overview';
+    let modalSubtitle = `All student fee allocations and invoices for ${currentSchoolName}`;
+    let badgeColor = '#2563eb';
+    let filtered = records;
+
+    if (metricKey === 'FEES_COLLECTED') {
+      setFeeStatusFilter('PAID');
+      modalTitle = 'Total Fees Collected (Paid Invoices)';
+      modalSubtitle = `Cleared and fully paid fee records for ${currentSchoolName}`;
+      badgeColor = '#10b981';
+      filtered = records.filter((r) => r.status === 'PAID' || r.paymentStatus === 'Paid');
+    } else if (metricKey === 'PENDING_FEES') {
+      setFeeStatusFilter('PENDING');
+      modalTitle = 'Total Pending & Overdue Fees';
+      modalSubtitle = `Students with outstanding fee balances for ${currentSchoolName}`;
+      badgeColor = '#ef4444';
+      filtered = records.filter((r) => r.status === 'OVERDUE' || r.status === 'PARTIAL' || (r.due && r.due !== '₹0') || (r.pendingAmount && r.pendingAmount > 0));
+    } else if (metricKey === 'MONTHLY' || metricKey === 'TUITION') {
+      modalTitle = 'Monthly Tuition Fees Breakdown';
+      modalSubtitle = `Academic tuition fee schedules (₹4,000/student) for ${currentSchoolName}`;
+      badgeColor = '#f59e0b';
+    } else if (metricKey === 'TRANSPORT') {
+      modalTitle = 'Transport & Bus Transit Fees';
+      modalSubtitle = `Bus route and commute fee schedules (₹5,000/student) for ${currentSchoolName}`;
+      badgeColor = '#06b6d4';
+    } else if (metricKey === 'CO_CURRICULAR') {
+      modalTitle = 'Co-Curricular & Sports Fees';
+      modalSubtitle = `Extracurricular and athletic enrichment fee schedules (₹3,000/student) for ${currentSchoolName}`;
+      badgeColor = '#8b5cf6';
+    } else if (metricKey === 'EXAMS') {
+      modalTitle = 'Examination & Semester Kits';
+      modalSubtitle = `Semester exam and lab assessment fee schedules (₹3,000/student) for ${currentSchoolName}`;
+      badgeColor = '#ec4899';
+    } else if (metricKey === 'EFFICIENCY') {
+      modalTitle = 'Fee Collection Realization & Efficiency';
+      modalSubtitle = `Collection rate and fee recovery statistics for ${currentSchoolName}`;
+      badgeColor = '#6366f1';
+    } else {
+      setFeeStatusFilter('All');
+    }
+
+    setCardDetailModal({
+      isOpen: true,
+      config: {
+        title: modalTitle,
+        subtitle: modalSubtitle,
+        badgeColor: badgeColor,
+        count: filtered.length,
+        type: 'fees',
+        items: filtered,
+        targetTab: 'financial-manage',
+        targetTabLabel: 'Financial Manage',
+      },
+    });
+  };
  const [feeSearch, setFeeSearch] = useState('');
- const [feeReminderModal, setFeeReminderModal] = useState(null); 
+ const [feeReminderModal, setFeeReminderModal] = useState(null);
+  const [selectedInvoiceModal, setSelectedInvoiceModal] = useState(null);
+
+  const currentUser = user || (() => {
+    try {
+      const u = localStorage.getItem('user');
+      return u ? JSON.parse(u) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+  const currentSchoolId = currentUser?.schoolId || 'SCHOOL002';
+  const currentSchoolName = currentUser?.schoolName || 'Sri Sankara Vidhyasala Girls High School'; 
  const [feeRecords, setFeeRecords] = useState(() => {
    const cur = getPortalData();
    return (cur && cur.feeRecords && cur.feeRecords.length > 0) ? cur.feeRecords : [
@@ -589,7 +673,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  'manage-parents': 'Manage Parents',
  'manage-classes': 'Manage Classes',
  'manage-subjects': 'Manage Subjects',
- 'fee-collection-tracker': 'Student Fee Collection & Overdue Tracker',
+ 'fee-collection-tracker': 'Financial Management',
+      'financial-manage': 'Financial Management',
  'publish-announcements': 'School Announcements',
  'view-reports': 'Academic & Enrollment Reports',
  'secure-messaging': 'Secure Messaging'
@@ -1021,149 +1106,276 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  };
 
  
- const handleOpenStudentModal = (student = null) => {
- setEditingStudent(student);
- if (student) {
- 
- const linkedParent = (data.parents || []).find((p) => p.studentRoll === student.roll);
- setStudentForm({
- name: student.name || '',
- class: student.class || 'Grade 10-A',
- gender: student.gender || 'Female',
- dob: student.dob || '2010-05-15',
- bloodGroup: student.bloodGroup || 'B+',
- parentName: student.parentName || (linkedParent ? linkedParent.name : ''),
- parentPhone: student.parentPhone || (linkedParent ? linkedParent.phone : ''),
- parentEmail: student.parentEmail || (linkedParent ? linkedParent.email : ''),
- address: student.address || '',
- emergencyContact: student.emergencyContact || (linkedParent ? linkedParent.phone : ''),
- admissionDate: student.admissionDate || new Date().toISOString().split('T')[0],
- status: student.status || 'Active'
- });
- } else {
- setStudentForm({
- name: '',
- class: 'Grade 10-A',
- gender: 'Female',
- dob: '2010-05-15',
- bloodGroup: 'B+',
- parentName: '',
- parentPhone: '',
- parentEmail: '',
- address: '',
- emergencyContact: '',
- admissionDate: new Date().toISOString().split('T')[0],
- status: 'Active'
- });
- }
- setIsStudentModalOpen(true);
- };
+  const handleOpenStudentModal = (student = null) => {
+    setEditingStudent(student);
+    const portal = getPortalData();
+    const studentsList = portal.students || [];
+    if (student) {
+      const linkedParent = (data.parents || []).find((p) => p.studentRoll === student.roll);
+      let existingFees = student.feeItems;
+      if (!existingFees || !existingFees.length) {
+        const foundRecord = (portal.feeRecords || []).find((r) => r.roll === student.roll);
+        if (foundRecord && foundRecord.feeItems && foundRecord.feeItems.length) {
+          existingFees = foundRecord.feeItems;
+        }
+      }
+      if (!existingFees || !existingFees.length) {
+        existingFees = JSON.parse(JSON.stringify(defaultStudentFeeItems));
+      }
 
- const handleSaveStudent = (e) => {
- e.preventDefault();
- const current = getPortalData();
- if (!current.students) current.students = [];
- if (!current.parents) current.parents = [];
- if (!current.users) current.users = [];
+      setStudentForm({
+        roll: student.roll || '',
+        regNo: student.regNo || ('REG-' + student.roll),
+        name: student.name || '',
+        class: student.class || 'Grade 10-A',
+        gender: student.gender || 'Female',
+        dob: student.dob || '2010-05-15',
+        bloodGroup: student.bloodGroup || 'B+',
+        parentName: student.parentName || (linkedParent ? linkedParent.name : ''),
+        parentPhone: student.parentPhone || (linkedParent ? linkedParent.phone : ''),
+        parentEmail: student.parentEmail || (linkedParent ? linkedParent.email : ''),
+        address: student.address || '',
+        emergencyContact: student.emergencyContact || (linkedParent ? linkedParent.phone : ''),
+        admissionDate: student.admissionDate || new Date().toISOString().split('T')[0],
+        status: student.status || 'Active',
+        feeItems: JSON.parse(JSON.stringify(existingFees))
+      });
+    } else {
+      const nextRollNum = studentsList.length + 101;
+      const autoRoll = 'S' + nextRollNum;
+      const autoReg = 'REG-SSV-' + nextRollNum;
+      setStudentForm({
+        roll: autoRoll,
+        regNo: autoReg,
+        name: '',
+        class: 'Grade 10-A',
+        gender: 'Female',
+        dob: '2010-05-15',
+        bloodGroup: 'B+',
+        parentName: '',
+        parentPhone: '',
+        parentEmail: '',
+        address: '',
+        emergencyContact: '',
+        admissionDate: new Date().toISOString().split('T')[0],
+        status: 'Active',
+        feeItems: JSON.parse(JSON.stringify(defaultStudentFeeItems))
+      });
+    }
+    setIsStudentModalOpen(true);
+  };
 
- const rollNo = editingStudent ? editingStudent.roll : 'S' + (current.students.length + 101);
+  const handleStudentFeeItemChange = (index, field, value) => {
+    const updated = [...(studentForm.feeItems || [])];
+    updated[index] = { ...updated[index], [field]: value };
 
- if (editingStudent) {
- const idx = current.students.findIndex((s) => s.roll === editingStudent.roll);
- if (idx > -1) {
- current.students[idx] = {
- ...current.students[idx],
- name: studentForm.name,
- class: studentForm.class,
- gender: studentForm.gender,
- dob: studentForm.dob,
- bloodGroup: studentForm.bloodGroup,
- parentName: studentForm.parentName,
- parentPhone: studentForm.parentPhone,
- parentEmail: studentForm.parentEmail,
- address: studentForm.address,
- emergencyContact: studentForm.emergencyContact || studentForm.parentPhone,
- admissionDate: studentForm.admissionDate,
- status: studentForm.status
- };
- }
- } else {
- current.students.push({
- roll: rollNo,
- name: studentForm.name,
- class: studentForm.class,
- gender: studentForm.gender,
- dob: studentForm.dob,
- bloodGroup: studentForm.bloodGroup,
- parentName: studentForm.parentName,
- parentPhone: studentForm.parentPhone,
- parentEmail: studentForm.parentEmail,
- address: studentForm.address,
- emergencyContact: studentForm.emergencyContact || studentForm.parentPhone,
- admissionDate: studentForm.admissionDate,
- status: studentForm.status,
- schoolId: 'SCHOOL002',
- attendance: '100%',
- performance: 'Outstanding',
- marks: [
- { subject: 'Mathematics', max: 100, scored: 85, grade: 'A' },
- { subject: 'Physics', max: 100, scored: 85, grade: 'A' },
- { subject: 'Chemistry', max: 100, scored: 85, grade: 'A' },
- { subject: 'Tamil', max: 100, scored: 85, grade: 'A' },
- { subject: 'English', max: 100, scored: 85, grade: 'A' }
- ]
- });
+    const amt = parseFloat(updated[index].amount) || 0;
+    const disc = parseFloat(updated[index].discount) || 0;
+    const fn = parseFloat(updated[index].fine) || 0;
+    updated[index].netAmount = Math.max(0, amt - disc + fn);
 
- 
- const studentUsername = studentForm.name.toLowerCase().replace(/[^a-z0-9]/g, '') || `student${rollNo}`;
- current.users.push({
- id: 'USR0' + (current.users.length + 1),
- name: studentForm.name,
- role: 'STUDENT',
- phone: studentForm.parentPhone || '+91 98401 23456',
- email: studentForm.parentEmail || `${studentUsername}@ssvschool.com`,
- username: studentUsername,
- status: 'Active',
- createdDate: new Date().toISOString().split('T')[0],
- schoolId: 'SCHOOL002'
- });
- }
+    setStudentForm({ ...studentForm, feeItems: updated });
+  };
 
- 
- if (studentForm.parentName) {
- const parentIdx = current.parents.findIndex((p) => p.studentRoll === rollNo);
- if (parentIdx > -1) {
- current.parents[parentIdx] = {
- ...current.parents[parentIdx],
- name: studentForm.parentName,
- phone: studentForm.parentPhone || current.parents[parentIdx].phone,
- email: studentForm.parentEmail || current.parents[parentIdx].email,
- studentName: studentForm.name
- };
- } else {
- current.parents.push({
- id: 'PAR' + String(current.parents.length + 101),
- name: studentForm.parentName,
- relationship: 'Parent / Guardian',
- phone: studentForm.parentPhone || '+91 98401 99000',
- email: studentForm.parentEmail || 'parent@domain.com',
- studentName: studentForm.name,
- studentRoll: rollNo,
- schoolId: 'SCHOOL002'
- });
- }
- }
+  const handleAddStudentFeeItemRow = () => {
+    const newItem = {
+      feeType: 'Miscellaneous Fees',
+      description: 'Custom Fee Category',
+      amount: 1000,
+      discount: 0,
+      fine: 0,
+      netAmount: 1000,
+      status: 'Unpaid',
+      paidAmount: 0
+    };
+    setStudentForm({
+      ...studentForm,
+      feeItems: [...(studentForm.feeItems || []), newItem]
+    });
+  };
 
- savePortalData(current);
- refreshData();
- setIsStudentModalOpen(false);
- setFeedback({
- title: editingStudent ? 'Student Profile Updated' : 'Student Enrolled Successfully',
- body: `Complete record for ${studentForm.name} (Roll: ${rollNo}, Class: ${studentForm.class}) has been saved into the school student directory.`
- });
- };
+  const handleRemoveStudentFeeItemRow = (index) => {
+    const updated = (studentForm.feeItems || []).filter((_, i) => i !== index);
+    setStudentForm({ ...studentForm, feeItems: updated });
+  };
 
- 
+  const handleSaveStudent = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    try {
+      const current = getPortalData() || {};
+      if (!current.students) current.students = [];
+      if (!current.parents) current.parents = [];
+      if (!current.users) current.users = [];
+
+      const studentName = (studentForm.name && studentForm.name.trim()) ? studentForm.name.trim() : 'New Student';
+      const rollNo = (studentForm.roll && studentForm.roll.trim())
+        ? studentForm.roll.trim().toUpperCase()
+        : (editingStudent ? editingStudent.roll : 'S' + (current.students.length + 101));
+      const regNo = (studentForm.regNo && studentForm.regNo.trim())
+        ? studentForm.regNo.trim().toUpperCase()
+        : ('REG-' + rollNo);
+
+      const feeItems = (studentForm.feeItems && studentForm.feeItems.length > 0)
+        ? studentForm.feeItems
+        : JSON.parse(JSON.stringify(defaultStudentFeeItems));
+      const totalFees = feeItems.reduce((sum, item) => sum + (Number(item.netAmount) || 0), 0);
+
+      const parts = (studentForm.class || 'Grade 10-A').split('-');
+      const gradePart = parts[0]?.trim() || 'Grade 10';
+      const sectionPart = parts[1]?.trim() || 'A';
+
+      if (editingStudent) {
+        const idx = current.students.findIndex((s) => s.roll === editingStudent.roll);
+        if (idx > -1) {
+          current.students[idx] = {
+            ...current.students[idx],
+            roll: rollNo,
+            regNo: regNo,
+            name: studentName,
+            class: studentForm.class || 'Grade 10-A',
+            gender: studentForm.gender || 'Female',
+            dob: studentForm.dob || '2010-05-15',
+            bloodGroup: studentForm.bloodGroup || 'B+',
+            parentName: studentForm.parentName || '',
+            parentPhone: studentForm.parentPhone || '',
+            parentEmail: studentForm.parentEmail || '',
+            address: studentForm.address || '',
+            emergencyContact: studentForm.emergencyContact || studentForm.parentPhone || '',
+            admissionDate: studentForm.admissionDate || new Date().toISOString().split('T')[0],
+            status: studentForm.status || 'Active',
+            feeItems: feeItems,
+            totalFees: totalFees
+          };
+        }
+      } else {
+        current.students.push({
+          roll: rollNo,
+          regNo: regNo,
+          name: studentName,
+          class: studentForm.class || 'Grade 10-A',
+          gender: studentForm.gender || 'Female',
+          dob: studentForm.dob || '2010-05-15',
+          bloodGroup: studentForm.bloodGroup || 'B+',
+          parentName: studentForm.parentName || '',
+          parentPhone: studentForm.parentPhone || '',
+          parentEmail: studentForm.parentEmail || '',
+          address: studentForm.address || '',
+          emergencyContact: studentForm.emergencyContact || studentForm.parentPhone || '',
+          admissionDate: studentForm.admissionDate || new Date().toISOString().split('T')[0],
+          status: studentForm.status || 'Active',
+          feeItems: feeItems,
+          totalFees: totalFees,
+          schoolId: 'SCHOOL002',
+          attendance: '100%',
+          performance: 'Outstanding',
+          marks: [
+            { subject: 'Mathematics', max: 100, scored: 85, grade: 'A' },
+            { subject: 'Physics', max: 100, scored: 85, grade: 'A' },
+            { subject: 'Chemistry', max: 100, scored: 85, grade: 'A' },
+            { subject: 'Tamil', max: 100, scored: 85, grade: 'A' },
+            { subject: 'English', max: 100, scored: 85, grade: 'A' }
+          ]
+        });
+
+        const studentUsername = studentName.toLowerCase().replace(/[^a-z0-9]/g, '') || `student${rollNo}`;
+        current.users.push({
+          id: 'USR0' + (current.users.length + 1),
+          name: studentName,
+          role: 'STUDENT',
+          phone: studentForm.parentPhone || '+91 98401 23456',
+          email: studentForm.parentEmail || `${studentUsername}@ssvschool.com`,
+          username: studentUsername,
+          status: 'Active',
+          createdDate: new Date().toISOString().split('T')[0],
+          schoolId: 'SCHOOL002'
+        });
+      }
+
+      if (studentForm.parentName) {
+        const parentIdx = current.parents.findIndex((p) => p.studentRoll === rollNo);
+        if (parentIdx > -1) {
+          current.parents[parentIdx] = {
+            ...current.parents[parentIdx],
+            name: studentForm.parentName,
+            phone: studentForm.parentPhone || current.parents[parentIdx].phone,
+            email: studentForm.parentEmail || current.parents[parentIdx].email,
+            studentName: studentName
+          };
+        } else {
+          current.parents.push({
+            id: 'PAR' + String(current.parents.length + 101),
+            name: studentForm.parentName,
+            relationship: 'Parent / Guardian',
+            phone: studentForm.parentPhone || '+91 98401 99000',
+            email: studentForm.parentEmail || 'parent@domain.com',
+            studentName: studentName,
+            studentRoll: rollNo,
+            schoolId: 'SCHOOL002'
+          });
+        }
+      }
+
+      let existingPaidAmount = 0;
+      if (editingStudent) {
+        const existingBill = (current.feeRecords || []).find((r) => r.roll === rollNo || r.studentId === rollNo);
+        if (existingBill) {
+          const rawPaid = String(existingBill.paid || existingBill.paidAmount || '0').replace(/[^0-9.]/g, '');
+          existingPaidAmount = parseFloat(rawPaid) || 0;
+        }
+      }
+
+      const billPayload = {
+        studentName: studentName,
+        studentId: rollNo,
+        admissionNumber: rollNo,
+        rollNo: rollNo,
+        grade: gradePart,
+        section: sectionPart,
+        academicYear: '2026-2027',
+        billingMonth: new Date().toLocaleString('en-US', { month: 'long' }),
+        billingDate: studentForm.admissionDate || new Date().toISOString().split('T')[0],
+        dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+        parentName: studentForm.parentName || 'Parent / Guardian',
+        parentPhone: studentForm.parentPhone || '+91 98401 23456',
+        feeItems: feeItems,
+        totalFees: totalFees,
+        paidAmount: existingPaidAmount,
+        paymentMethod: 'Cash',
+        remarks: 'Configured during student admission / profile update'
+      };
+
+      try {
+        if (typeof syncBillToPortalFeeRecords === 'function') {
+          syncBillToPortalFeeRecords(billPayload);
+        }
+      } catch (errSync) {
+        console.warn('syncBillToPortalFeeRecords notice:', errSync);
+      }
+
+      try {
+        if (typeof api !== 'undefined' && api) {
+          if (editingStudent && typeof api.updateStudentBill === 'function') {
+            api.updateStudentBill(rollNo, billPayload).catch((e) => console.warn('Sync update bill:', e));
+          } else if (typeof api.createStudentBill === 'function') {
+            api.createStudentBill(billPayload).catch((e) => console.warn('Sync create bill:', e));
+          }
+        }
+      } catch (errApi) {
+        console.warn('api bill sync notice:', errApi);
+      }
+
+      savePortalData(current);
+      refreshData();
+      setIsStudentModalOpen(false);
+      setFeedback({
+        title: editingStudent ? 'Student Profile Updated' : 'Student Enrolled Successfully',
+        body: `Complete record for ${studentName} (Roll: ${rollNo}, Class: ${studentForm.class}) and fee line items have been saved and synced to Finance Manage.`
+      });
+    } catch (err) {
+      console.error('Error saving student:', err);
+      setIsStudentModalOpen(false);
+    }
+  };
  const handleOpenMarks = (student) => {
  setMarksStudent(student);
  const initial = {};
@@ -1838,11 +2050,16 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  
  
  {activeTab === 'school-admin-users' && (() => {
- const totalStudentsCount = (data.students || []).length;
- const totalTeachersCount = (data.teachers || []).length;
- const totalClassesCount = (data.classes || []).length;
- const totalParentsCount = (data.parents || []).length;
- const totalUsersCount = (data.users || []).length;
+ const schoolStudents = (data.students || []).filter((s) => !currentSchoolId || currentSchoolId === 'ALL' || s.schoolId === currentSchoolId || (currentSchoolName && s.schoolName === currentSchoolName));
+ const schoolTeachers = (data.teachers || []).filter((t) => !currentSchoolId || currentSchoolId === 'ALL' || t.schoolId === currentSchoolId || (currentSchoolName && t.schoolName === currentSchoolName));
+ const schoolParents = (data.parents || []).filter((p) => !currentSchoolId || currentSchoolId === 'ALL' || p.schoolId === currentSchoolId);
+ const schoolUsers = (data.users || []).filter((u) => !currentSchoolId || currentSchoolId === 'ALL' || u.schoolId === currentSchoolId);
+ const totalStudentsCount = schoolStudents.length || 10;
+ const totalTeachersCount = schoolTeachers.length || 5;
+ const distinctClasses = new Set(schoolStudents.map((s) => s.class).filter(Boolean));
+ const totalClassesCount = distinctClasses.size || 3;
+ const totalParentsCount = schoolParents.length || schoolStudents.length || 10;
+ const totalUsersCount = schoolUsers.length || (totalStudentsCount + totalTeachersCount + 2);
  const totalSubjectsCount = (data.subjects || []).length;
  const activeServicesCount = (data.services || []).filter((s) => s.status === 'Active').length;
  const announcementsCount = (data.announcements || []).length;
@@ -1861,11 +2078,11 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
      title="Click to view faculty duty and leave roster"
      onClick={() => setAnalyticsModal('staff')}
    >
-     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
        <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-light)', fontWeight: 700 }}>
          Total Teaching Staff
        </div>
-       <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 600 }}>View &rarr;</span>
+       <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
      </div>
      <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#b45309', margin: '4px 0' }}>5</p>
      <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>3 On Duty &bull; 2 On Leave</span>
@@ -1878,11 +2095,11 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
      title="Click to view non-teaching & administrative staff roster"
      onClick={() => setAnalyticsModal('non-teaching')}
    >
-     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
        <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-light)', fontWeight: 700 }}>
          Non-Teaching Staff
        </div>
-       <span style={{ fontSize: '0.72rem', color: '#0891b2', fontWeight: 600 }}>View &rarr;</span>
+       <span style={{ fontSize: '0.72rem', color: '#0891b2', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
      </div>
      <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0e7490', margin: '4px 0' }}>8</p>
      <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600 }}>7 Active Today &bull; 1 Leave</span>
@@ -1895,11 +2112,11 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
      title="Click to view daily school operations & task pipeline"
      onClick={() => setAnalyticsModal('operations-works')}
    >
-     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
        <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-light)', fontWeight: 700 }}>
          Total Works & Tasks
        </div>
-       <span style={{ fontSize: '0.72rem', color: '#be185d', fontWeight: 600 }}>View &rarr;</span>
+       <span style={{ fontSize: '0.72rem', color: '#be185d', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
      </div>
      <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#be185d', margin: '4px 0' }}>8</p>
      <span style={{ fontSize: '0.75rem', color: '#db2777', fontWeight: 600 }}>4 Completed &bull; 3 In Progress</span>
@@ -1920,18 +2137,18 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  title: 'Enrolled Campus Students',
  subtitle: 'Complete student directory with attendance & performance tracking',
  badgeColor: '#3b82f6',
- count: (data.students || []).length,
+ count: schoolStudents.length,
  type: 'students',
- items: data.students || [],
+ items: schoolStudents,
  targetTab: 'manage-students',
  targetTabLabel: 'Students Management',
  },
  })
  }
  >
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+ <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
  <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-light)', fontWeight: 700 }}>Total Students</div>
- <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600 }}>View &rarr;</span>
+ <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
  </div>
  <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#1e3a8a', margin: '4px 0' }}>{totalStudentsCount}</p>
  <span style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600 }}>Active Enrolled</span>
@@ -1949,18 +2166,18 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  title: 'Campus Faculty Members',
  subtitle: 'Teaching staff, subject assignments and class responsibility',
  badgeColor: '#8b5cf6',
- count: (data.teachers || []).length,
+ count: schoolTeachers.length,
  type: 'teachers',
- items: data.teachers || [],
+ items: schoolTeachers,
  targetTab: 'manage-staff',
  targetTabLabel: 'Manage Staff',
  },
  })
  }
  >
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+ <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
  <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-light)', fontWeight: 700 }}>Total Teachers</div>
- <span style={{ fontSize: '0.72rem', color: '#6d28d9', fontWeight: 600 }}>View &rarr;</span>
+ <span style={{ fontSize: '0.72rem', color: '#6d28d9', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
  </div>
  <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#6d28d9', margin: '4px 0' }}>{totalTeachersCount}</p>
  <span style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600 }}>Active Faculty</span>
@@ -1987,9 +2204,9 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  })
  }
  >
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+ <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
  <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-light)', fontWeight: 700 }}>Total Classes</div>
- <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 600 }}>View &rarr;</span>
+ <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
  </div>
  <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#047857', margin: '4px 0' }}>{totalClassesCount}</p>
  <span style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600 }}>Operational Sections</span>
@@ -2017,9 +2234,9 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  });
  }}
  >
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+ <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
  <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-light)', fontWeight: 700 }}>Total Parents</div>
- <span style={{ fontSize: '0.72rem', color: '#be185d', fontWeight: 600 }}>View &rarr;</span>
+ <span style={{ fontSize: '0.72rem', color: '#be185d', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
  </div>
  <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#be185d', margin: '4px 0' }}>{totalParentsCount}</p>
  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-light)' }}>Linked Guardians</span>
@@ -2037,18 +2254,18 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  title: 'Campus Portal User Accounts',
  subtitle: 'Principals, teachers, students, and parents with platform access',
  badgeColor: '#f59e0b',
- count: (data.users || []).length,
+ count: schoolUsers.length,
  type: 'users',
- items: data.users || [],
+ items: schoolUsers,
  targetTab: 'school-admin-users',
  targetTabLabel: 'DashBoard Users',
  },
  })
  }
  >
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+ <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
  <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-light)', fontWeight: 700 }}>Total Users</div>
- <span style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 600 }}>View &rarr;</span>
+ <span style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
  </div>
  <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#b45309', margin: '4px 0' }}>{totalUsersCount}</p>
  <span style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600 }}>Portal Logins</span>
@@ -2076,9 +2293,9 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  });
  }}
  >
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+ <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
  <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-text-light)', fontWeight: 700 }}>Principal</div>
- <span style={{ fontSize: '0.72rem', color: '#4338ca', fontWeight: 600 }}>View &rarr;</span>
+ <span style={{ fontSize: '0.72rem', color: '#4338ca', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
  </div>
  <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#4338ca', margin: '4px 0' }}>{(data.principals || []).length || 1}</p>
  <span style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600 }}>Campus Head</span>
@@ -2237,7 +2454,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  margin: 0
  }}
  >
- <span>📥</span> Bulk Import (Excel)
+ Bulk Import (Excel)
  </button>
  <button
  className="btn btn-primary btn-sm"
@@ -2337,12 +2554,12 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
    title="Click to view full attendance history, clock-in logs and work duties"
  >
    <span>{staff.name}</span>
-   <span style={{ fontSize: '0.7rem', color: '#059669', background: '#dcfce7', padding: '1px 5px', borderRadius: '4px' }}>📊 View Log</span>
+   <span style={{ fontSize: '0.7rem', color: '#059669', background: '#dcfce7', padding: '1px 5px', borderRadius: '4px' }}> View Log</span>
  </button>
  </td>
  <td data-label="Role">
  <span className={`badge ${staff.roleType === 'Principal' ? 'badge-primary' : staff.roleType === 'Teacher' ? 'badge-info' : staff.roleType === 'Non-Teaching' ? 'badge-amber' : 'badge-purple'}`} style={{ fontWeight: 700 }}>
- {staff.roleType === 'Principal' ? '👨‍🏫 Principal' : staff.roleType === 'Teacher' ? '👩‍🏫 Teacher' : staff.roleType === 'Non-Teaching' ? '👥 Non-Teaching' : '📋 Operations Works'}
+ {staff.roleType === 'Principal' ? ' Principal' : staff.roleType === 'Teacher' ? ' Teacher' : staff.roleType === 'Non-Teaching' ? ' Non-Teaching' : ' Operations Works'}
  </span>
  </td>
  <td data-label="Phone Number">{staff.phone || '—'}</td>
@@ -2354,7 +2571,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  </strong>
  {staff.workAssigned ? (
    <div style={{ marginTop: '3px', fontSize: '0.78rem', color: '#047857', background: '#f0fdf4', padding: '2px 6px', borderRadius: '4px', border: '1px solid #bbf7d0', lineHeight: 1.3 }}>
-     📌 <strong>Work:</strong> {staff.workAssigned}
+      <strong>Work:</strong> {staff.workAssigned}
    </div>
  ) : staff.class ? (
    <small style={{ color: '#64748b' }}>Assigned: {staff.class}</small>
@@ -2432,7 +2649,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
    title="View staff attendance & work history"
    style={{ color: '#059669', borderColor: '#a7f3d0', background: '#ecfdf5' }}
  >
- 📊 Log
+  Log
  </button>
  <button
  className="sa-tbl-action edit"
@@ -2658,7 +2875,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  </div>
  <div className="sa-toolbar-right" style={{ display: 'flex', gap: '8px' }}>
  <button className="btn btn-outline btn-sm" onClick={() => setIsBulkStudentOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
- <span>📥</span> Bulk Import (Excel)
+ Bulk Import (Excel)
  </button>
  <button className="btn btn-primary btn-sm" onClick={() => handleOpenStudentModal()}>
  + Add Student
@@ -2681,29 +2898,32 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  marginBottom: '16px'
  }}
  >
- <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
- <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
- 🎓 <span>Class:</span>
- </span>
- <button
- type="button"
- className={`btn btn-sm ${studentGradeFilter === 'All' ? 'btn-primary' : 'btn-outline'}`}
- onClick={() => setStudentGradeFilter('All')}
- style={{ padding: '4px 12px', fontSize: '0.82rem', borderRadius: '20px' }}
+  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+ <label htmlFor="student-class-select" style={{ fontSize: '0.84rem', fontWeight: 700, color: '#475569' }}>
+ Class:
+ </label>
+ <select
+ id="student-class-select"
+ value={studentGradeFilter}
+ onChange={(e) => setStudentGradeFilter(e.target.value)}
+ style={{
+ padding: '5px 12px',
+ borderRadius: '8px',
+ border: '1.5px solid #cbd5e1',
+ fontWeight: 700,
+ fontSize: '0.85rem',
+ color: '#1e3a8a',
+ background: '#ffffff',
+ cursor: 'pointer'
+ }}
  >
- All Classes
- </button>
+ <option value="All">All Classes (Grade 6 to 12)</option>
  {availableGrades.map((grade) => (
- <button
- key={grade}
- type="button"
- className={`btn btn-sm ${studentGradeFilter === grade ? 'btn-primary' : 'btn-outline'}`}
- onClick={() => setStudentGradeFilter(grade)}
- style={{ padding: '4px 12px', fontSize: '0.82rem', borderRadius: '20px' }}
- >
+ <option key={grade} value={grade}>
  {grade}
- </button>
+ </option>
  ))}
+ </select>
  </div>
 
  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2781,7 +3001,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  {filteredStudents.length === 0 ? (
  <tr>
  <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
- <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>🔍</div>
+ 
  <strong>No students found matching the selected Class / Section filters.</strong>
  </td>
  </tr>
@@ -2886,7 +3106,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
           </div>
           <div className="sa-toolbar-right" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span className="badge badge-purple" style={{ padding: '6px 14px', fontSize: '0.84rem', fontWeight: 700 }}>
-              👨‍👩‍👧 Total Enrolled Parents: {parentList.length}
+               Total Enrolled Parents: {parentList.length}
             </span>
           </div>
         </div>
@@ -2906,30 +3126,33 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
             marginBottom: '16px'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              🎓 <span>Class:</span>
-            </span>
-            <button
-              type="button"
-              className={`btn btn-sm ${parentGradeFilter === 'All' ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setParentGradeFilter('All')}
-              style={{ padding: '4px 12px', fontSize: '0.82rem', borderRadius: '20px' }}
-            >
-              All Classes
-            </button>
-            {availableGrades.map((grade) => (
-              <button
-                key={grade}
-                type="button"
-                className={`btn btn-sm ${parentGradeFilter === grade ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setParentGradeFilter(grade)}
-                style={{ padding: '4px 12px', fontSize: '0.82rem', borderRadius: '20px' }}
-              >
-                {grade}
-              </button>
-            ))}
-          </div>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+ <label htmlFor="parent-class-select" style={{ fontSize: '0.84rem', fontWeight: 700, color: '#475569' }}>
+ Class:
+ </label>
+ <select
+ id="parent-class-select"
+ value={parentGradeFilter}
+ onChange={(e) => setParentGradeFilter(e.target.value)}
+ style={{
+ padding: '5px 12px',
+ borderRadius: '8px',
+ border: '1.5px solid #cbd5e1',
+ fontWeight: 700,
+ fontSize: '0.85rem',
+ color: '#1e3a8a',
+ background: '#ffffff',
+ cursor: 'pointer'
+ }}
+ >
+ <option value="All">All Classes (Grade 6 to 12)</option>
+ {availableGrades.map((grade) => (
+ <option key={grade} value={grade}>
+ {grade}
+ </option>
+ ))}
+ </select>
+ </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -3004,7 +3227,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  {filteredParents.length === 0 ? (
  <tr>
  <td colSpan="6" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
- <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>🔍</div>
+ 
  <strong>No parent records found for the selected Class filter.</strong>
  </td>
  </tr>
@@ -3342,7 +3565,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  >
  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
  <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
- 📖 <span>Subjects:</span>
+  <span>Subjects:</span>
  </span>
  <button
  type="button"
@@ -3409,7 +3632,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  {filteredSubjects.length === 0 ? (
  <tr>
  <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
- <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>🔍</div>
+ 
  <strong>No subjects found for the selected filter.</strong>
  </td>
  </tr>
@@ -3449,10 +3672,10 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  </div>
  <div>
  <div style={{ fontWeight: 800, color: '#1e3a8a', fontSize: '0.88rem' }}>
- 👩‍🏫 {s.teacher}
+  {s.teacher}
  </div>
  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
- 📞 {staffObj ? staffObj.phone : '+91 98401 23450'} • {staffObj ? (staffObj.subject || 'Faculty') : 'Instructor'}
+  {staffObj ? staffObj.phone : '+91 98401 23450'} • {staffObj ? (staffObj.subject || 'Faculty') : 'Instructor'}
  </div>
  </div>
  </div>
@@ -3485,391 +3708,952 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  
  
  
- {activeTab === 'fee-collection-tracker' && (
- <div>
- 
- {(() => {
- const totalPending = feeRecords.reduce((acc, r) => {
- const num = parseInt(r.due.replace(/[^0-9]/g, ''), 10) || 0;
- return acc + num;
- }, 0);
- const pendingCount = feeRecords.filter((r) => r.status !== 'PAID').length;
+ {(activeTab === 'fee-collection-tracker' || activeTab === 'financial-manage') && (
+        <div>
+          <div style={{
+            background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)',
+            color: '#ffffff',
+            borderRadius: '16px',
+            padding: '20px 24px',
+            marginBottom: '22px',
+            boxShadow: '0 4px 14px rgba(30, 58, 138, 0.15)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '14px'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 900, color: '#ffffff' }}>
+                   {currentSchoolName}
+                </h3>
+                <span style={{ background: '#dbeafe', color: '#1e40af', padding: '4px 12px', borderRadius: '20px', fontSize: '0.76rem', fontWeight: 800 }}>
+                  PARTITION: {currentSchoolId}
+                </span>
+                <span style={{ background: '#ecfdf5', color: '#047857', padding: '4px 12px', borderRadius: '20px', fontSize: '0.76rem', fontWeight: 800 }}>
+                  ROLE: SCHOOL ADMINISTRATOR
+                </span>
+              </div>
+              <div style={{ fontSize: '0.86rem', color: '#cbd5e1', marginTop: '6px' }}>
+                Campus Financial Management &bull; Executive Student Fee Register & Revenue Oversight
+              </div>
+            </div>
 
- return (
- <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
- 
- <div style={{
- background: 'linear-gradient(135deg, #065f46 0%, #059669 100%)',
- color: '#ffffff',
- borderRadius: '16px',
- padding: '22px 24px',
- display: 'flex',
- alignItems: 'center',
- gap: '18px',
- boxShadow: '0 8px 20px rgba(5, 150, 105, 0.18)',
- border: '1px solid #10b981'
- }}>
- <div style={{
- width: '56px',
- height: '56px',
- borderRadius: '14px',
- background: 'rgba(255, 255, 255, 0.2)',
- display: 'flex',
- alignItems: 'center',
- justifyContent: 'center',
- fontSize: '1.8rem',
- fontWeight: 900,
- backdropFilter: 'blur(4px)'
- }}>
- ₹
- </div>
- <div>
- <div style={{ fontSize: '0.82rem', opacity: 0.9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
- Total Fee Collect Today
- </div>
- <div style={{ fontSize: '2rem', fontWeight: 900, margin: '2px 0 4px', letterSpacing: '-0.5px' }}>
- ₹42,000
- </div>
- <div style={{ fontSize: '0.78rem', opacity: 0.85, display: 'flex', alignItems: 'center', gap: '5px' }}>
- <span> 3 Payments Received Today</span> &bull; <span>Verified</span>
- </div>
- </div>
- </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ background: 'rgba(255,255,255,0.18)', padding: '7px 16px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, backdropFilter: 'blur(4px)' }}>
+                Academic Year: 2026-2027
+              </span>
+            </div>
+          </div>
 
- 
- <div style={{
- background: 'linear-gradient(135deg, #991b1b 0%, #dc2626 100%)',
- color: '#ffffff',
- borderRadius: '16px',
- padding: '22px 24px',
- display: 'flex',
- alignItems: 'center',
- gap: '18px',
- boxShadow: '0 8px 20px rgba(220, 38, 38, 0.18)',
- border: '1px solid #ef4444'
- }}>
- <div style={{
- width: '56px',
- height: '56px',
- borderRadius: '14px',
- background: 'rgba(255, 255, 255, 0.2)',
- display: 'flex',
- alignItems: 'center',
- justifyContent: 'center',
- fontSize: '1.8rem',
- fontWeight: 900,
- backdropFilter: 'blur(4px)'
- }}>
- ⏳
- </div>
- <div>
- <div style={{ fontSize: '0.82rem', opacity: 0.9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
- Pending Fees
- </div>
- <div style={{ fontSize: '2rem', fontWeight: 900, margin: '2px 0 4px', letterSpacing: '-0.5px' }}>
- ₹{totalPending.toLocaleString('en-IN')}
- </div>
- <div style={{ fontSize: '0.78rem', opacity: 0.85, display: 'flex', alignItems: 'center', gap: '5px' }}>
- <span> {pendingCount} Students with Outstanding Dues</span>
- </div>
- </div>
- </div>
- </div>
- );
- })()}
+          {(() => {
+            let schoolRecords = (feeRecords || []).filter((r) => {
+              if (!currentSchoolId || currentSchoolId === 'ALL') return true;
+              return r.schoolId === currentSchoolId || (currentSchoolName && r.schoolName === currentSchoolName);
+            });
 
- 
- <div className="sa-schools-header-bar" style={{ display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
- <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
- 
- <div style={{ position: 'relative', minWidth: '240px' }}>
- <input
- type="text"
- value={feeSearch}
- onChange={(e) => setFeeSearch(e.target.value)}
- placeholder="Search by student, roll no, parent..."
- style={{
- width: '100%',
- padding: '9px 12px 9px 36px',
- borderRadius: '8px',
- border: '1px solid #cbd5e1',
- background: '#ffffff',
- color: '#0f172a',
- fontSize: '0.88rem',
- fontWeight: 500,
- outline: 'none',
- boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
- }}
- />
- <span style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', opacity: 0.85, fontSize: '0.95rem' }}>
- 
- </span>
- {feeSearch && (
- <button
- type="button"
- onClick={() => setFeeSearch('')}
- style={{
- position: 'absolute',
- right: '10px',
- top: '50%',
- transform: 'translateY(-50%)',
- background: 'transparent',
- border: 'none',
- cursor: 'pointer',
- color: '#64748b',
- fontSize: '0.9rem',
- fontWeight: 'bold',
- padding: '2px'
- }}
- title="Clear search"
- >
- 
- </button>
- )}
- </div>
+            if (schoolRecords.length === 0) {
+              const prefix = (currentSchoolId === 'SCHOOL003' ? 'STM' : currentSchoolId === 'SCHOOL001' ? 'ABC' : currentSchoolId === 'SCHOOL004' ? 'DPW' : currentSchoolId === 'SCHOOL005' ? 'OXF' : 'SCH');
+              const campusNames = {
+                'SCHOOL001': 'ABC Matriculation School',
+                'SCHOOL003': 'St. Marys Academy',
+                'SCHOOL004': 'Delhi Public World School',
+                'SCHOOL005': 'Oxford International Academy',
+              };
+              const actualCampus = campusNames[currentSchoolId] || currentSchoolName || 'School Campus';
 
- 
- <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
- <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Class:</span>
- <select
- className="sa-filter-select"
- value={feeClassFilter}
- onChange={(e) => setFeeClassFilter(e.target.value)}
- style={{ minWidth: '150px' }}
- >
- <option value="All">All Classes (Grade 10-A, 10-B, 9-A)</option>
- <option value="Grade 10-A">Grade 10-A</option>
- <option value="Grade 10-B">Grade 10-B</option>
- <option value="Grade 9-A">Grade 9-A</option>
- </select>
- </div>
- </div>
+              const demoConfigs = [
+                { num: '01', name: 'Aarav Sundaram', grade: 'Grade 10-A', parent: 'Mr. Sundaram K.', phone: '+91 98401 55101', total: 20000, paid: 20000, status: 'PAID' },
+                { num: '02', name: 'Divya Prakash', grade: 'Grade 10-A', parent: 'Mr. Prakash R.', phone: '+91 98401 55102', total: 20000, paid: 10000, status: 'PARTIAL' },
+                { num: '03', name: 'Karthik Venkat', grade: 'Grade 10-A', parent: 'Mrs. Venkat L.', phone: '+91 98401 55103', total: 20000, paid: 0, status: 'OVERDUE' },
+                { num: '04', name: 'Harini Saravanan', grade: 'Grade 10-B', parent: 'Mr. Saravanan M.', phone: '+91 98401 55104', total: 20000, paid: 20000, status: 'PAID' },
+                { num: '05', name: 'Manoj Kumar', grade: 'Grade 10-B', parent: 'Mr. Kumarasamy', phone: '+91 98401 55105', total: 20000, paid: 5000, status: 'PARTIAL' },
+                { num: '06', name: 'Nandhini R', grade: 'Grade 11-A', parent: 'Mrs. Radha R.', phone: '+91 98401 55106', total: 20000, paid: 20000, status: 'PAID' },
+                { num: '07', name: 'Pradeep Raj', grade: 'Grade 11-A', parent: 'Mr. Rajendran P.', phone: '+91 98401 55107', total: 20000, paid: 0, status: 'OVERDUE' },
+                { num: '08', name: 'Sneha Murugan', grade: 'Grade 11-B', parent: 'Mr. Murugan V.', phone: '+91 98401 55108', total: 20000, paid: 12000, status: 'PARTIAL' },
+                { num: '09', name: 'Vigneshwaran S', grade: 'Grade 12-A', parent: 'Mr. Sivakumar T.', phone: '+91 98401 55109', total: 20000, paid: 20000, status: 'PAID' },
+                { num: '10', name: 'Varsha Balaji', grade: 'Grade 12-A', parent: 'Mrs. Balaji K.', phone: '+91 98401 55110', total: 20000, paid: 10000, status: 'PARTIAL' },
+              ];
 
- 
- <div className="sa-toolbar-right" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
- 
- <label
- className="btn btn-outline btn-sm"
- style={{
- display: 'inline-flex',
- alignItems: 'center',
- gap: '6px',
- cursor: 'pointer',
- borderColor: '#2563eb',
- color: '#2563eb',
- fontWeight: 600,
- margin: 0
- }}
- title="Upload student fee register spreadsheet (.xlsx / .xls)"
- >
- Upload Excel
- <input
- type="file"
- accept=".xlsx, .xls, .csv"
- style={{ display: 'none' }}
- onChange={handleFeeExcelUpload}
- />
- </label>
+              schoolRecords = demoConfigs.map((cfg) => {
+                const due = cfg.total - cfg.paid;
+                return {
+                  id: `FEE-${prefix}-${cfg.num}`,
+                  roll: `${prefix}-S${cfg.num}`,
+                  studentId: `${prefix}-S${cfg.num}`,
+                  name: cfg.name,
+                  class: cfg.grade,
+                  parent: cfg.parent,
+                  phone: cfg.phone,
+                  totalFee: `₹${cfg.total.toLocaleString('en-IN')}`,
+                  totalFees: cfg.total,
+                  paid: `₹${cfg.paid.toLocaleString('en-IN')}`,
+                  paidAmount: cfg.paid,
+                  due: `₹${due.toLocaleString('en-IN')}`,
+                  pendingAmount: due,
+                  status: cfg.status,
+                  invoiceNumber: `INV-2026-${prefix}-${cfg.num}`,
+                  dueDate: '2026-11-15',
+                  billingMonth: 'October',
+                  schoolId: currentSchoolId,
+                  schoolName: actualCampus,
+                  feeItems: [
+                    { feeType: 'Admission Fees', amount: 5000, status: cfg.paid >= 5000 ? 'Paid' : 'Unpaid' },
+                    { feeType: 'Transport Fees', amount: 5000, status: cfg.paid >= 10000 ? 'Paid' : 'Unpaid' },
+                    { feeType: 'Monthly Fees', amount: 4000, status: cfg.paid >= 14000 ? 'Paid' : 'Unpaid' },
+                    { feeType: 'Co-curricular Fees', amount: 3000, status: cfg.paid >= 17000 ? 'Paid' : 'Unpaid' },
+                    { feeType: 'Exam Fees', amount: 3000, status: cfg.paid === cfg.total ? 'Paid' : 'Unpaid' },
+                  ]
+                };
+              });
+            }
 
- 
- <button
- type="button"
- className="btn btn-primary btn-sm"
- onClick={handleExportFeeExcel}
- style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
- title="Download fee register spreadsheet as Excel"
- >
- Export Fee Register
- </button>
+            const totalStudentFees = schoolRecords.reduce((acc, r) => {
+              const val = typeof r.totalFees === 'number' ? r.totalFees : parseInt(String(r.totalFee || r.total || 0).replace(/[^0-9]/g, ''), 10) || 0;
+              return acc + val;
+            }, 0);
 
- 
- <button
- type="button"
- className="btn btn-outline btn-sm"
- style={{ borderColor: '#25D366', color: '#128C7E', fontWeight: 600 }}
- onClick={() => {
- const pendingList = feeRecords.filter((r) => r.status !== 'PAID');
- setFeedback({
- title: `Bulk WhatsApp Dispatched to ${pendingList.length} Parents!`,
- body: `Automated fee due notifications and secure UPI payment links were sent to all ${pendingList.length} pending parents via WhatsApp Business API.`,
- });
- }}
- >
- Bulk WhatsApp
- </button>
- </div>
- </div>
+            const totalFeesCollected = schoolRecords.reduce((acc, r) => {
+              const val = typeof r.paidAmount === 'number' ? r.paidAmount : parseInt(String(r.paid || 0).replace(/[^0-9]/g, ''), 10) || 0;
+              return acc + val;
+            }, 0);
 
- 
- <div className="table-responsive">
- <table className="sa-schools-table">
- <thead>
- <tr>
- <th style={{ minWidth: '85px' }}>Roll No</th>
- <th style={{ minWidth: '160px' }}>Student Name</th>
- <th style={{ minWidth: '110px' }}>Class</th>
- <th style={{ minWidth: '150px' }}>Parent / Guardian</th>
- <th style={{ minWidth: '100px' }}>Total Fee</th>
- <th style={{ minWidth: '100px' }}>Paid</th>
- <th style={{ minWidth: '100px' }}>Due Amount</th>
- <th style={{ minWidth: '110px', textAlign: 'center' }}>Fee Status</th>
- <th style={{ minWidth: '180px', textAlign: 'center' }}>Reminder Actions</th>
- </tr>
- </thead>
- <tbody>
- {feeRecords
- .filter((r) => feeClassFilter === 'All' || r.class === feeClassFilter)
- .filter((r) => {
- if (!feeSearch) return true;
- const q = feeSearch.toLowerCase();
- return (
- (r.name && r.name.toLowerCase().includes(q)) ||
- (r.roll && r.roll.toLowerCase().includes(q)) ||
- (r.parent && r.parent.toLowerCase().includes(q)) ||
- (r.phone && r.phone.toLowerCase().includes(q)) ||
- (r.class && r.class.toLowerCase().includes(q))
- );
- })
- .map((r) => (
- <tr key={r.id}>
- <td data-label="Roll No"><code>{r.roll}</code></td>
- <td data-label="Student Name"><strong>{r.name}</strong></td>
- <td data-label="Class"><span className="badge badge-info">{r.class}</span></td>
- <td data-label="Parent">
- <div className="school-meta-line">
- <strong>{r.parent}</strong>
- <small>{r.phone}</small>
- </div>
- </td>
- <td data-label="Total Fee"><strong>{r.totalFee}</strong></td>
- <td data-label="Paid" style={{ color: '#059669', fontWeight: 600 }}>{r.paid}</td>
- <td data-label="Due Amount" style={{ color: r.due !== '₹0' ? '#dc2626' : '#64748b', fontWeight: 700 }}>
- {r.due}
- </td>
- <td data-label="Fee Status" style={{ textAlign: 'center' }}>
- <span className={`badge ${r.status === 'PAID' ? 'badge-active' : r.status === 'PARTIAL' ? 'badge-warning' : 'badge-danger'}`}>
- {r.status}
- </span>
- </td>
- <td data-label="Reminder Actions" style={{ textAlign: 'center' }}>
- {r.status === 'PAID' ? (
- <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
- <span></span> Cleared (Receipt Sent)
- </span>
- ) : (
- <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
- 
- <button
- className="btn btn-sm btn-outline"
- style={{
- padding: '4px 9px',
- fontSize: '0.75rem',
- borderColor: '#25D366',
- color: '#128C7E',
- fontWeight: 600,
- display: 'inline-flex',
- alignItems: 'center',
- gap: '4px'
- }}
- onClick={() => {
- const defaultMsg = `Dear ${r.parent}, this is a gentle reminder from Zen School regarding pending fee of ${r.due} for student ${r.name} (${r.class}). Kindly pay using our instant UPI link: https://pay.zenschool.in/${r.roll.toLowerCase()}`;
- setFeeReminderModal({
- record: r,
- channel: 'whatsapp',
- message: defaultMsg,
- sent: false,
- });
- }}
- title="Open WhatsApp Composer"
- >
- WhatsApp
- </button>
+            const totalPendingStudentFees = schoolRecords.reduce((acc, r) => {
+              const dueVal = typeof r.pendingAmount === 'number' ? r.pendingAmount : parseInt(String(r.due || 0).replace(/[^0-9]/g, ''), 10) || 0;
+              return acc + dueVal;
+            }, 0);
 
- 
- <button
- className="btn btn-sm btn-outline"
- style={{
- padding: '4px 9px',
- fontSize: '0.75rem',
- borderColor: '#3b82f6',
- color: '#1d4ed8',
- fontWeight: 600,
- display: 'inline-flex',
- alignItems: 'center',
- gap: '4px'
- }}
- onClick={() => {
- const defaultMsg = `Zen School Alert: Dear ${r.parent}, Fee of ${r.due} is pending for ${r.name} (${r.roll}). Pay before due date: https://pay.zenschool.in/${r.roll.toLowerCase()}`;
- setFeeReminderModal({
- record: r,
- channel: 'sms',
- message: defaultMsg,
- sent: false,
- });
- }}
- title="Open SMS Composer"
- >
- SMS
- </button>
+            const pendingCount = schoolRecords.filter((r) => {
+              const dueVal = typeof r.pendingAmount === 'number' ? r.pendingAmount : parseInt(String(r.due || 0).replace(/[^0-9]/g, ''), 10) || 0;
+              return dueVal > 0;
+            }).length;
 
- 
- <button
- className="btn btn-sm btn-outline"
- style={{
- padding: '4px 9px',
- fontSize: '0.75rem',
- borderColor: '#f59e0b',
- color: '#b45309',
- fontWeight: 600,
- display: 'inline-flex',
- alignItems: 'center',
- gap: '4px'
- }}
- onClick={() => {
- setFeeReminderModal({
- record: r,
- channel: 'call',
- message: `Automated Voice Call Script: "Hello ${r.parent}, this is an automated fee reminder call from Zen School. A pending balance of ${r.due} is due for your ward ${r.name} (${r.class}). Press 1 to receive payment link via WhatsApp or SMS."`,
- sent: false,
- });
- }}
- title="Place Call / IVR Reminder"
- >
- Call
- </button>
- </div>
- )}
- </td>
- </tr>
- ))}
- {feeRecords
- .filter((r) => feeClassFilter === 'All' || r.class === feeClassFilter)
- .filter((r) => {
- if (!feeSearch) return true;
- const q = feeSearch.toLowerCase();
- return (
- (r.name && r.name.toLowerCase().includes(q)) ||
- (r.roll && r.roll.toLowerCase().includes(q)) ||
- (r.parent && r.parent.toLowerCase().includes(q)) ||
- (r.phone && r.phone.toLowerCase().includes(q)) ||
- (r.class && r.class.toLowerCase().includes(q))
- );
- }).length === 0 && (
- <tr>
- <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
- <div style={{ fontSize: '1.4rem', marginBottom: '8px' }}></div>
- <div>No matching student fee records found for "<strong>{feeSearch}</strong>"</div>
- </td>
- </tr>
- )}
- </tbody>
- </table>
- </div>
- </div>
- )}
+            const paidCount = schoolRecords.filter((r) => r.status === 'PAID' || r.paymentStatus === 'Paid').length;
+            const collectionRate = totalStudentFees > 0 ? Math.round((totalFeesCollected / totalStudentFees) * 100) : 0;
 
- 
- {false && activeTab === 'attendance-calendar' && (
+            const monthlyTuitionTotal = schoolRecords.length * 4000;
+            const transportTotal = schoolRecords.length * 5000;
+            const coCurricularTotal = schoolRecords.length * 3000;
+            const examFeesTotal = schoolRecords.length * 3000;
+
+            const filteredRecords = schoolRecords
+              .filter((r) => feeClassFilter === 'All' || r.class === feeClassFilter)
+              .filter((r) => {
+                if (feeStatusFilter === 'All') return true;
+                if (feeStatusFilter === 'PAID') return r.status === 'PAID' || r.paymentStatus === 'Paid';
+                if (feeStatusFilter === 'PARTIAL') return r.status === 'PARTIAL' || r.paymentStatus === 'Partially Paid';
+                if (feeStatusFilter === 'PENDING' || feeStatusFilter === 'OVERDUE') {
+                  return r.status === 'OVERDUE' || r.status === 'PARTIAL' || (r.due && r.due !== '₹0');
+                }
+                return true;
+              })
+              .filter((r) => {
+                if (!feeSearch) return true;
+                const q = feeSearch.toLowerCase();
+                return (
+                  (r.name && r.name.toLowerCase().includes(q)) ||
+                  (r.roll && r.roll.toLowerCase().includes(q)) ||
+                  (r.parent && r.parent.toLowerCase().includes(q)) ||
+                  (r.phone && r.phone.toLowerCase().includes(q)) ||
+                  (r.class && r.class.toLowerCase().includes(q)) ||
+                  (r.status && r.status.toLowerCase().includes(q))
+                );
+              });
+
+            return (
+              <>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: '18px',
+                  marginBottom: '24px'
+                }}>
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: '4px solid #2563eb',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: activeMetricFilter === 'ALL' ? '0 4px 14px rgba(37, 99, 235, 0.18)' : '0 2px 6px rgba(0,0,0,0.03)',
+                      outline: activeMetricFilter === 'ALL' ? '2px solid #2563eb' : 'none',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    title="Click to view all enrolled students with assigned fees"
+                    onClick={() => handleMetricCardClick('ALL', schoolRecords)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        TOTAL STUDENT FEES
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMetricCardClick('ALL', schoolRecords); }}
+                        style={{ background: 'transparent', border: 'none', fontSize: '0.82rem', fontWeight: 800, color: '#2563eb', cursor: 'pointer', padding: 0 }}
+                      >
+                        View &rarr;
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#1e3a8a', margin: '2px 0 6px', letterSpacing: '-0.5px' }}>
+                      ₹{totalStudentFees.toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 700 }}>
+                      Active Enrolled ({schoolRecords.length} Students)
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: '4px solid #10b981',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: activeMetricFilter === 'FEES_COLLECTED' ? '0 4px 14px rgba(16, 185, 129, 0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+                      outline: activeMetricFilter === 'FEES_COLLECTED' ? '2px solid #10b981' : 'none',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    title="Click to view cleared and fully paid student invoices"
+                    onClick={() => handleMetricCardClick('FEES_COLLECTED', schoolRecords)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        TOTAL FEES COLLECTED
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMetricCardClick('FEES_COLLECTED', schoolRecords); }}
+                        style={{ background: 'transparent', border: 'none', fontSize: '0.82rem', fontWeight: 800, color: '#10b981', cursor: 'pointer', padding: 0 }}
+                      >
+                        View &rarr;
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#047857', margin: '2px 0 6px', letterSpacing: '-0.5px' }}>
+                      ₹{totalFeesCollected.toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700 }}>
+                      {collectionRate}% Realized &bull; {paidCount} Paid Full
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: '4px solid #ef4444',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: activeMetricFilter === 'PENDING_FEES' ? '0 4px 14px rgba(239, 68, 68, 0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+                      outline: activeMetricFilter === 'PENDING_FEES' ? '2px solid #ef4444' : 'none',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    title="Click to view pending student fee balances and dues"
+                    onClick={() => handleMetricCardClick('PENDING_FEES', schoolRecords)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        TOTAL PENDING FEES
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMetricCardClick('PENDING_FEES', schoolRecords); }}
+                        style={{ background: 'transparent', border: 'none', fontSize: '0.82rem', fontWeight: 800, color: '#ef4444', cursor: 'pointer', padding: 0 }}
+                      >
+                        View &rarr;
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#dc2626', margin: '2px 0 6px', letterSpacing: '-0.5px' }}>
+                      ₹{totalPendingStudentFees.toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 700 }}>
+                      {pendingCount} Students with Dues
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: '4px solid #f59e0b',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: activeMetricFilter === 'MONTHLY' ? '0 4px 14px rgba(245, 158, 11, 0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+                      outline: activeMetricFilter === 'MONTHLY' ? '2px solid #f59e0b' : 'none',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    title="Standard monthly curriculum tuition assigned"
+                    onClick={() => handleMetricCardClick('MONTHLY', schoolRecords)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        MONTHLY TUITION FEES
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMetricCardClick('MONTHLY', schoolRecords); }}
+                        style={{ background: 'transparent', border: 'none', fontSize: '0.82rem', fontWeight: 800, color: '#f59e0b', cursor: 'pointer', padding: 0 }}
+                      >
+                        View &rarr;
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#b45309', margin: '2px 0 6px', letterSpacing: '-0.5px' }}>
+                      ₹{monthlyTuitionTotal.toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>
+                      Core Classroom Academic Plan
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: '4px solid #06b6d4',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: activeMetricFilter === 'TRANSPORT' ? '0 4px 14px rgba(6, 182, 212, 0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+                      outline: activeMetricFilter === 'TRANSPORT' ? '2px solid #06b6d4' : 'none',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    title="Campus bus route and transport allocation"
+                    onClick={() => handleMetricCardClick('TRANSPORT', schoolRecords)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        TRANSPORT & BUS FEES
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMetricCardClick('TRANSPORT', schoolRecords); }}
+                        style={{ background: 'transparent', border: 'none', fontSize: '0.82rem', fontWeight: 800, color: '#06b6d4', cursor: 'pointer', padding: 0 }}
+                      >
+                        View &rarr;
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#0891b2', margin: '2px 0 6px', letterSpacing: '-0.5px' }}>
+                      ₹{transportTotal.toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>
+                      Bus Fleet Routes Assigned
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: '4px solid #8b5cf6',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: activeMetricFilter === 'CO_CURRICULAR' ? '0 4px 14px rgba(139, 92, 246, 0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+                      outline: activeMetricFilter === 'CO_CURRICULAR' ? '2px solid #8b5cf6' : 'none',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    title="Robotics, chess, arts & sports enrichment"
+                    onClick={() => handleMetricCardClick('CO_CURRICULAR', schoolRecords)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        CO-CURRICULAR & LABS
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMetricCardClick('CO_CURRICULAR', schoolRecords); }}
+                        style={{ background: 'transparent', border: 'none', fontSize: '0.82rem', fontWeight: 800, color: '#8b5cf6', cursor: 'pointer', padding: 0 }}
+                      >
+                        View &rarr;
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#6d28d9', margin: '2px 0 6px', letterSpacing: '-0.5px' }}>
+                      ₹{coCurricularTotal.toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>
+                      Enrichment Labs & STEM
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: '4px solid #ec4899',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: activeMetricFilter === 'EXAMS' ? '0 4px 14px rgba(236, 72, 153, 0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+                      outline: activeMetricFilter === 'EXAMS' ? '2px solid #ec4899' : 'none',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    title="Examinations and semester kits"
+                    onClick={() => handleMetricCardClick('EXAMS', schoolRecords)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        EXAMS & ASSESSMENTS
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMetricCardClick('EXAMS', schoolRecords); }}
+                        style={{ background: 'transparent', border: 'none', fontSize: '0.82rem', fontWeight: 800, color: '#ec4899', cursor: 'pointer', padding: 0 }}
+                      >
+                        View &rarr;
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#be185d', margin: '2px 0 6px', letterSpacing: '-0.5px' }}>
+                      ₹{examFeesTotal.toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>
+                      Term Exam Evaluation Fee
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderLeft: '4px solid #6366f1',
+                      borderRadius: '12px',
+                      padding: '18px 20px',
+                      boxShadow: activeMetricFilter === 'EFFICIENCY' ? '0 4px 14px rgba(99, 102, 241, 0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+                      outline: activeMetricFilter === 'EFFICIENCY' ? '2px solid #6366f1' : 'none',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    title="Realized fee percentage against total billed"
+                    onClick={() => handleMetricCardClick('EFFICIENCY', schoolRecords)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        COLLECTION EFFICIENCY
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMetricCardClick('EFFICIENCY', schoolRecords); }}
+                        style={{ background: 'transparent', border: 'none', fontSize: '0.82rem', fontWeight: 800, color: '#6366f1', cursor: 'pointer', padding: 0 }}
+                      >
+                        View &rarr;
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#4338ca', margin: '2px 0 6px', letterSpacing: '-0.5px' }}>
+                      {collectionRate}%
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#4338ca', fontWeight: 700 }}>
+                      {paidCount} Settled &bull; {schoolRecords.length - paidCount} In Progress
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '16px 20px', marginBottom: '22px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e293b' }}>
+                       {currentSchoolName} — Overall Fee Recovery Progress
+                    </span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#059669' }}>
+                      {collectionRate}% Realized ({paidCount} of {schoolRecords.length} Students)
+                    </span>
+                  </div>
+                  <div style={{ width: '100%', height: '10px', background: '#fee2e2', borderRadius: '5px', overflow: 'hidden', display: 'flex' }}>
+                    <div style={{ width: `${collectionRate}%`, background: '#10b981', transition: 'width 0.4s ease' }}></div>
+                    <div style={{ width: `${100 - collectionRate}%`, background: '#ef4444' }}></div>
+                  </div>
+                </div>
+
+                {activeMetricFilter !== 'ALL' && (
+                  <div style={{
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '10px',
+                    padding: '12px 18px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem' }}></span>
+                      <span style={{ fontSize: '0.88rem', color: '#1e40af', fontWeight: 800 }}>
+                        Active Filter View: {
+                          activeMetricFilter === 'FEES_COLLECTED' ? 'Cleared & Fully Paid Fees' :
+                          activeMetricFilter === 'PENDING_FEES' ? 'Pending & Overdue Balances' :
+                          activeMetricFilter === 'MONTHLY' ? 'Monthly Tuition Fee Register' :
+                          activeMetricFilter === 'TRANSPORT' ? 'Transport & Bus Fee Register' :
+                          activeMetricFilter === 'CO_CURRICULAR' ? 'Co-curricular & Enrichment Labs' :
+                          activeMetricFilter === 'EXAMS' ? 'Examinations & Assessments' :
+                          activeMetricFilter === 'EFFICIENCY' ? 'Collection Efficiency Breakdown' : 'All Student Accounts'
+                        }
+                      </span>
+                      <span style={{ background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 700 }}>
+                        {filteredRecords.length} Students Matching
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveMetricFilter('ALL');
+                        setFeeStatusFilter('All');
+                        setFeeClassFilter('All');
+                        setFeeSearch('');
+                      }}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #93c5fd',
+                        color: '#1d4ed8',
+                        padding: '4px 12px',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ✕ Reset to All
+                    </button>
+                  </div>
+                )}
+
+                <div id="school-fee-register-table-section" className="sa-schools-header-bar" style={{
+                  display: 'flex',
+                  gap: '14px',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  marginBottom: '16px',
+                  background: '#ffffff',
+                  padding: '14px 18px',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', minWidth: '240px' }}>
+                      <input
+                        type="text"
+                        value={feeSearch}
+                        onChange={(e) => setFeeSearch(e.target.value)}
+                        placeholder="Search student, roll, parent..."
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px 9px 36px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          fontSize: '0.88rem',
+                          fontWeight: 600,
+                          outline: 'none',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                        }}
+                      />
+                      <span style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', opacity: 0.85, fontSize: '0.95rem' }}>
+                        
+                      </span>
+                      {feeSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setFeeSearch('')}
+                          style={{
+                            position: 'absolute',
+                            right: '10px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            fontSize: '0.9rem',
+                            fontWeight: 'bold',
+                            padding: '2px'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#f8fafc',
+                      padding: '5px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1'
+                    }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Class:</span>
+                      <select
+                        value={feeClassFilter}
+                        onChange={(e) => setFeeClassFilter(e.target.value)}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#0f172a',
+                          fontSize: '0.88rem',
+                          fontWeight: 700,
+                          outline: 'none',
+                          cursor: 'pointer',
+                          minWidth: '130px',
+                          padding: '4px 0'
+                        }}
+                      >
+                        <option value="All">All Classes</option>
+                        <option value="Grade 10-A">Grade 10-A</option>
+                        <option value="Grade 10-B">Grade 10-B</option>
+                        <option value="Grade 11-A">Grade 11-A</option>
+                        <option value="Grade 11-B">Grade 11-B</option>
+                        <option value="Grade 12-A">Grade 12-A</option>
+                      </select>
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#f8fafc',
+                      padding: '5px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1'
+                    }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Status:</span>
+                      <select
+                        value={feeStatusFilter}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFeeStatusFilter(val);
+                          setActiveMetricFilter(val === 'PAID' ? 'FEES_COLLECTED' : val === 'PENDING' ? 'PENDING_FEES' : 'ALL');
+                        }}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#0f172a',
+                          fontSize: '0.88rem',
+                          fontWeight: 700,
+                          outline: 'none',
+                          cursor: 'pointer',
+                          minWidth: '140px',
+                          padding: '4px 0'
+                        }}
+                      >
+                        <option value="All">All Statuses</option>
+                        <option value="PAID">Paid (Cleared)</option>
+                        <option value="PARTIAL">Partially Paid</option>
+                        <option value="PENDING">Pending / Overdue</option>
+                      </select>
+                    </div>
+
+                    {(feeClassFilter !== 'All' || feeStatusFilter !== 'All' || feeSearch || activeMetricFilter !== 'ALL') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFeeClassFilter('All');
+                          setFeeStatusFilter('All');
+                          setActiveMetricFilter('ALL');
+                          setFeeSearch('');
+                        }}
+                        style={{
+                          background: '#fee2e2',
+                          border: '1px solid #fca5a5',
+                          color: '#dc2626',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        ✕ Reset
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="sa-toolbar-right" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={handleExportFeeExcel}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontWeight: 700,
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        background: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e40af'
+                      }}
+                    >
+                      Export Fee Register
+                    </button>
+                  </div>
+                </div>
+
+                <div className="table-responsive" style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                  <table className="sa-schools-table">
+                    <thead>
+                      <tr>
+                        <th style={{ minWidth: '85px' }}>Roll No</th>
+                        <th style={{ minWidth: '160px' }}>Student Name</th>
+                        <th style={{ minWidth: '110px' }}>Class</th>
+                        <th style={{ minWidth: '150px' }}>Parent / Guardian</th>
+                        <th style={{ minWidth: '100px' }}>Total Fee</th>
+                        <th style={{ minWidth: '100px' }}>Paid</th>
+                        <th style={{ minWidth: '100px' }}>Pending Amount</th>
+                        <th style={{ minWidth: '110px', textAlign: 'center' }}>Fee Status</th>
+                        <th style={{ minWidth: '200px', textAlign: 'center' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRecords.map((r) => (
+                        <tr key={r.id}>
+                          <td data-label="Roll No"><code>{r.roll}</code></td>
+                          <td data-label="Student Name"><strong>{r.name}</strong></td>
+                          <td data-label="Class"><span className="badge badge-info">{r.class}</span></td>
+                          <td data-label="Parent">
+                            <div className="school-meta-line">
+                              <strong>{r.parent}</strong>
+                              <small>{r.phone}</small>
+                            </div>
+                          </td>
+                          <td data-label="Total Fee"><strong>{r.totalFee}</strong></td>
+                          <td data-label="Paid" style={{ color: '#059669', fontWeight: 700 }}>{r.paid}</td>
+                          <td data-label="Pending Amount" style={{ color: r.due !== '₹0' ? '#dc2626' : '#64748b', fontWeight: 800 }}>
+                            {r.due}
+                          </td>
+                          <td data-label="Fee Status" style={{ textAlign: 'center' }}>
+                            <span className={`badge ${r.status === 'PAID' ? 'badge-active' : r.status === 'PARTIAL' ? 'badge-warning' : 'badge-danger'}`}>
+                              {r.status}
+                            </span>
+                          </td>
+                          <td data-label="Actions" style={{ textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline"
+                                style={{
+                                  padding: '5px 12px',
+                                  fontSize: '0.78rem',
+                                  borderColor: '#1e40af',
+                                  color: '#1e40af',
+                                  fontWeight: 700,
+                                  borderRadius: '6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                onClick={() => setSelectedInvoiceModal(r)}
+                                title="View full invoice & fee breakdown"
+                              >
+                                View Invoice
+                              </button>
+
+                              {r.status !== 'PAID' && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline"
+                                  style={{
+                                    padding: '5px 10px',
+                                    fontSize: '0.78rem',
+                                    borderColor: '#25D366',
+                                    color: '#128C7E',
+                                    fontWeight: 700,
+                                    borderRadius: '6px'
+                                  }}
+                                  onClick={() => {
+                                    const defaultMsg = `Dear ${r.parent}, gentle reminder from ${currentSchoolName} regarding pending fee of ${r.due} for ${r.name} (${r.class}). Kindly pay via our online portal.`;
+                                    setFeeReminderModal({
+                                      record: r,
+                                      channel: 'whatsapp',
+                                      message: defaultMsg,
+                                      sent: false,
+                                    });
+                                  }}
+                                  title="Send WhatsApp notice"
+                                >
+                                  WhatsApp
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {filteredRecords.length === 0 && (
+                        <tr>
+                          <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                            
+                            <div>No student fee records found matching your query for <strong>{currentSchoolName}</strong>.</div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFeeClassFilter('All');
+                                setFeeStatusFilter('All');
+                                setActiveMetricFilter('ALL');
+                                setFeeSearch('');
+                              }}
+                              style={{
+                                marginTop: '10px',
+                                background: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                color: '#1e40af',
+                                padding: '4px 12px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Show All Students
+                            </button>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            );
+          })()}
+
+          {selectedInvoiceModal && (
+            <div className="modal-backdrop" onClick={() => setSelectedInvoiceModal(null)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+              <div
+                className="modal-container"
+                onClick={(e) => e.stopPropagation()}
+                style={{ maxWidth: '640px', width: '94%', borderRadius: '16px', background: '#ffffff', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }}
+              >
+                <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#1e3a8a' }}>
+                      {selectedInvoiceModal.name}
+                    </h3>
+                    <div style={{ fontSize: '0.84rem', color: '#64748b', marginTop: '4px' }}>
+                      Roll No: <strong>{selectedInvoiceModal.roll}</strong> &bull; Invoice No: <strong>{selectedInvoiceModal.invoiceNumber || `INV-2026-${selectedInvoiceModal.roll}`}</strong> &bull; <strong>{currentSchoolName}</strong>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span className={`badge ${selectedInvoiceModal.status === 'PAID' ? 'badge-success' : selectedInvoiceModal.status === 'PARTIAL' ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: '0.82rem', padding: '4px 12px' }}>
+                      {selectedInvoiceModal.status}
+                    </span>
+                    <div style={{ fontSize: '0.76rem', color: '#dc2626', fontWeight: 700, marginTop: '4px' }}>
+                      Due Date: {selectedInvoiceModal.dueDate || '2026-11-15'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '24px' }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '18px', marginBottom: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px', paddingBottom: '14px', borderBottom: '1px dashed #cbd5e1' }}>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>GRADE / CLASS</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>{selectedInvoiceModal.class ? selectedInvoiceModal.class.split('-')[0] : 'Grade 10'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>SECTION</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>{selectedInvoiceModal.class && selectedInvoiceModal.class.includes('-') ? selectedInvoiceModal.class.split('-')[1] : 'A'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>BILLING MONTH</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>October</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px', paddingBottom: '14px', borderBottom: '1px dashed #cbd5e1' }}>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>MONTHLY FEES</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                          ₹4,000 <span style={{ fontSize: '0.72rem', color: selectedInvoiceModal.status === 'PAID' ? '#059669' : '#dc2626', fontWeight: 600 }}>{selectedInvoiceModal.status === 'PAID' ? 'Paid' : 'Unpaid'}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>TRANSPORT FEES</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                          ₹5,000 <span style={{ fontSize: '0.72rem', color: selectedInvoiceModal.status === 'PAID' ? '#059669' : '#dc2626', fontWeight: 600 }}>{selectedInvoiceModal.status === 'PAID' ? 'Paid' : 'Unpaid'}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>CO-CURRICULAR FEES</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                          ₹3,000 <span style={{ fontSize: '0.72rem', color: selectedInvoiceModal.status === 'PAID' ? '#059669' : '#dc2626', fontWeight: 600 }}>{selectedInvoiceModal.status === 'PAID' ? 'Paid' : 'Unpaid'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>TOTAL FEES</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e3a8a' }}>{selectedInvoiceModal.totalFee}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#059669', textTransform: 'uppercase', fontWeight: 700 }}>PAID AMOUNT</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#059669' }}>{selectedInvoiceModal.paid}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', color: '#dc2626', textTransform: 'uppercase', fontWeight: 700 }}>PENDING AMOUNT</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#dc2626' }}>{selectedInvoiceModal.due}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => {
+                          window.print();
+                        }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        Download / Print PDF
+                      </button>
+                      {selectedInvoiceModal.status !== 'PAID' && (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          style={{ borderColor: '#25D366', color: '#128C7E', fontWeight: 700 }}
+                          onClick={() => {
+                            const defaultMsg = `Dear ${selectedInvoiceModal.parent}, invoice ${selectedInvoiceModal.invoiceNumber || 'INV-2026'} of ${selectedInvoiceModal.due} is pending for ${selectedInvoiceModal.name} at ${currentSchoolName}.`;
+                            setFeeReminderModal({
+                              record: selectedInvoiceModal,
+                              channel: 'whatsapp',
+                              message: defaultMsg,
+                              sent: false,
+                            });
+                            setSelectedInvoiceModal(null);
+                          }}
+                        >
+                          Send WhatsApp Reminder
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => setSelectedInvoiceModal(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+{false && activeTab === 'attendance-calendar' && (
  <div>
  <div className="sa-schools-header-bar">
  <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -4943,12 +5727,12 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
    {editingStaff
      ? `Edit ${staffForm.role} Profile`
      : staffForm.role === 'Non-Teaching'
-     ? '👥 Onboard Non-Teaching Staff'
+     ? ' Onboard Non-Teaching Staff'
      : staffForm.role === 'Operations Works'
-     ? '📋 Create & Assign Operational Work Duty'
+     ? ' Create & Assign Operational Work Duty'
      : staffForm.role === 'Principal'
-     ? '👨‍🏫 Onboard School Principal'
-     : '👩‍🏫 Onboard Teaching Faculty'}
+     ? ' Onboard School Principal'
+     : ' Onboard Teaching Faculty'}
  </h3>
  <button className="modal-close" onClick={() => setIsStaffModalOpen(false)}>&times;</button>
  </div>
@@ -4976,7 +5760,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
          : '#6d28d9',
    }}
  >
-   {staffForm.role === 'Non-Teaching' ? '👥' : staffForm.role === 'Operations Works' ? '📋' : staffForm.role === 'Principal' ? '👨‍🏫' : '👩‍🏫'}
+   {staffForm.role === 'Non-Teaching' ? '' : staffForm.role === 'Operations Works' ? '' : staffForm.role === 'Principal' ? '' : ''}
  </div>
  <div className="wizard-header-titles">
  <h4>
@@ -5354,7 +6138,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
   
   {isStudentModalOpen && (
     <div className="modal-overlay" style={{ display: 'flex' }}>
-      <div className="modal-content wizard-modal-lg" style={{ maxWidth: '680px' }}>
+      <div className="modal-content wizard-modal-lg" style={{ maxWidth: '840px', width: '95vw' }}>
         <div className="modal-header">
           <h3>{editingStudent ? 'Edit Student Profile' : 'Enroll New Student'}</h3>
           <button className="modal-close" onClick={() => setIsStudentModalOpen(false)}>&times;</button>
@@ -5468,10 +6252,9 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
               </div>
 
               <div className="wizard-field">
-                <label>Parent / Guardian Name <span className="req">*</span></label>
+                <label>Parent / Guardian Name</label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. Ramesh Kumar (Father)"
                   value={studentForm.parentName}
                   onChange={(e) => setStudentForm({ ...studentForm, parentName: e.target.value })}
@@ -5479,10 +6262,9 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
               </div>
 
               <div className="wizard-field">
-                <label>Parent Contact Phone <span className="req">*</span></label>
+                <label>Parent Contact Phone</label>
                 <input
                   type="text"
-                  required
                   placeholder="+91 98456 12301"
                   value={studentForm.parentPhone}
                   onChange={(e) => setStudentForm({ ...studentForm, parentPhone: e.target.value })}
@@ -5519,11 +6301,155 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
                 />
               </div>
             </div>
+            <div style={{ marginTop: '20px', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '16px', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.96rem', color: '#1e3a8a' }}>
+                    Fee Line Items (Allowing Standard & Custom Fee Categories)
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                    Default & custom fee structure: Admission, Transport, Books, Co-curricular, Exam fees. Editable per student.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={handleAddStudentFeeItemRow}
+                  style={{ fontSize: '0.8rem', padding: '5px 12px', fontWeight: 600 }}
+                >
+                  + Add Fee Item
+                </button>
+              </div>
+
+              <datalist id="student-standard-fees">
+                <option value="Admission Fees" />
+                <option value="Transport Fees" />
+                <option value="Books Fees" />
+                <option value="Co-curricular Fees" />
+                <option value="Exam Fees" />
+                <option value="Monthly Fees" />
+                <option value="Term Fees" />
+                <option value="Registration Fees" />
+                <option value="Uniform Fees" />
+                <option value="Sports Fees" />
+                <option value="Laboratory Fees" />
+                <option value="Computer Fees" />
+                <option value="Miscellaneous Fees" />
+              </datalist>
+
+              <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                <table style={{ width: '100%', minWidth: '720px', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                  <thead>
+                    <tr style={{ background: '#e2e8f0', borderBottom: '1px solid #cbd5e1' }}>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#1e293b', width: '22%' }}>Fee Type</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#1e293b', width: '28%' }}>Description</th>
+                      <th style={{ padding: '10px 10px', width: '110px', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>Amount (₹)</th>
+                      <th style={{ padding: '10px 10px', width: '95px', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>Discount (₹)</th>
+                      <th style={{ padding: '10px 10px', width: '90px', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>Fine (₹)</th>
+                      <th style={{ padding: '10px 12px', width: '105px', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>Net (₹)</th>
+                      <th style={{ padding: '10px 8px', width: '40px', textAlign: 'center' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(studentForm.feeItems || []).map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '8px 10px' }}>
+                          <input
+                            type="text"
+                            list="student-standard-fees"
+                            className="form-control"
+                            value={item.feeType}
+                            onChange={(e) => handleStudentFeeItemChange(idx, 'feeType', e.target.value)}
+                            style={{ padding: '6px 10px', fontSize: '0.84rem', width: '100%', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                            required
+                          />
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={item.description}
+                            onChange={(e) => handleStudentFeeItemChange(idx, 'description', e.target.value)}
+                            style={{ padding: '6px 10px', fontSize: '0.84rem', width: '100%', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                          />
+                        </td>
+                        <td style={{ padding: '8px 8px' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            className="form-control"
+                            value={item.amount}
+                            onChange={(e) => handleStudentFeeItemChange(idx, 'amount', e.target.value)}
+                            style={{ padding: '6px 8px', fontSize: '0.84rem', width: '100%', textAlign: 'right', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                            required
+                          />
+                        </td>
+                        <td style={{ padding: '8px 8px' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            className="form-control"
+                            value={item.discount}
+                            onChange={(e) => handleStudentFeeItemChange(idx, 'discount', e.target.value)}
+                            style={{ padding: '6px 8px', fontSize: '0.84rem', width: '100%', textAlign: 'right', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                          />
+                        </td>
+                        <td style={{ padding: '8px 8px' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            className="form-control"
+                            value={item.fine || 0}
+                            onChange={(e) => handleStudentFeeItemChange(idx, 'fine', e.target.value)}
+                            style={{ padding: '6px 8px', fontSize: '0.84rem', width: '100%', textAlign: 'right', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                          />
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                          ₹{Number(item.netAmount || 0).toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                          {(studentForm.feeItems || []).length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveStudentFeeItemRow(idx)}
+                              style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: '1.2rem', padding: '2px 6px' }}
+                              title="Remove Fee Item"
+                            >
+                              &times;
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#f8fafc', fontWeight: 700, borderTop: '2px solid #cbd5e1' }}>
+                      <td colSpan="5" style={{ padding: '10px 14px', textAlign: 'right', color: '#1e3a8a', fontSize: '0.9rem' }}>
+                        Total Net Student Fees:
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#16a34a', fontSize: '0.96rem', whiteSpace: 'nowrap' }}>
+                        ₹{(studentForm.feeItems || []).reduce((sum, it) => sum + (Number(it.netAmount) || 0), 0).toLocaleString('en-IN')}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setIsStudentModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary btn-sm" style={{ padding: '8px 22px' }}>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              style={{ padding: '8px 22px' }}
+              onClick={(e) => {
+                if (studentForm.name && studentForm.name.trim()) {
+                  handleSaveStudent(e);
+                }
+              }}
+            >
               {editingStudent ? 'Save Changes' : 'Enroll Student'}
             </button>
           </div>
@@ -5538,7 +6464,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
       <div className="modal-content wizard-modal-lg" style={{ maxWidth: '600px' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.3rem' }}>📝</span>
+            <span style={{ fontSize: '1.3rem' }}></span>
             <div>
               <h3 style={{ margin: 0 }}>Exam Marks & Assessment</h3>
               <small style={{ color: '#64748b' }}>{marksStudent.name} (Roll: {marksStudent.roll}) • {marksStudent.class}</small>
@@ -5778,7 +6704,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
       <div className="modal-content wizard-modal-lg" style={{ maxWidth: '540px' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.3rem' }}>📅</span>
+            <span style={{ fontSize: '1.3rem' }}></span>
             <div>
               <h3 style={{ margin: 0 }}>Assign Subject & Teacher</h3>
               <small style={{ color: '#64748b', fontWeight: 600 }}>
@@ -7115,7 +8041,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  <div>
  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
  <span style={{ fontSize: '1.4rem' }}>
- {staff.type === 'Teaching Staff' ? '👩‍🏫' : staff.type === 'Non-Teaching Staff' ? '👥' : '📋'}
+ {staff.type === 'Teaching Staff' ? '' : staff.type === 'Non-Teaching Staff' ? '' : ''}
  </span>
  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
  {staff.name} &mdash; Attendance & Duty Log
@@ -7226,17 +8152,17 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  {staff.extraWork && (
  <div style={{ marginBottom: '20px', padding: '16px', background: '#f0fdf4', borderRadius: '12px', border: '1.5px solid #86efac' }}>
  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
- <span style={{ fontSize: '1.1rem' }}>📌</span>
+ <span style={{ fontSize: '1.1rem' }}></span>
  <strong style={{ fontSize: '0.95rem', color: '#166534' }}>Currently Assigned Daily Operational Work:</strong>
  </div>
  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#14532d', marginBottom: '6px' }}>
  {staff.extraWork.title}
  </div>
  <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '0.8rem', color: '#15803d' }}>
- <span>🏢 <strong>Department:</strong> {staff.extraWork.department}</span>
+ <span> <strong>Department:</strong> {staff.extraWork.department}</span>
  <span>⏰ <strong>Shift / Schedule:</strong> {staff.extraWork.deadline}</span>
- <span>⚡ <strong>Priority:</strong> <span className="badge badge-success">{staff.extraWork.priority}</span></span>
- <span>✅ <strong>Status:</strong> Completed & Verified</span>
+ <span> <strong>Priority:</strong> <span className="badge badge-success">{staff.extraWork.priority}</span></span>
+ <span> <strong>Status:</strong> Completed & Verified</span>
  </div>
  </div>
  )}
@@ -7393,9 +8319,9 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  >
  <div>
  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
- {analyticsModal === 'staff' && '👩‍🏫 Teaching Faculty — Attendance & Leave Roster'}
- {analyticsModal === 'non-teaching' && '👥 Non-Teaching & Administrative Staff — Duty Register'}
- {analyticsModal === 'operations-works' && '📋 Campus Operations & Administrative Works Pipeline'}
+ {analyticsModal === 'staff' && ' Teaching Faculty — Attendance & Leave Roster'}
+ {analyticsModal === 'non-teaching' && ' Non-Teaching & Administrative Staff — Duty Register'}
+ {analyticsModal === 'operations-works' && ' Campus Operations & Administrative Works Pipeline'}
  </h3>
  <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', opacity: 0.9 }}>
  {analyticsModal === 'staff' && 'Daily faculty attendance log and substitute coverage map'}
@@ -7486,7 +8412,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  >
  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#92400e' }}>
- 📅 Check Teaching Attendance by Date:
+  Check Teaching Attendance by Date:
  </span>
  <input
  type="date"
@@ -7553,7 +8479,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b' }}>
  Teaching Faculty Daily Log &bull; <span style={{ color: '#b45309', fontWeight: 800 }}>Click any teacher's name</span> to view past attendance:
  </h4>
- <span style={{ fontSize: '0.78rem', color: '#64748b' }}>💡 Click teacher name for full attendance history</span>
+ <span style={{ fontSize: '0.78rem', color: '#64748b' }}> Click teacher name for full attendance history</span>
  </div>
 
  <div className="table-responsive">
@@ -7600,8 +8526,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  }}
  title="Click to view full attendance history for this teacher"
  >
- 👩‍🏫 {t.name}
- <span style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>🔍</span>
+  {t.name}
+ <span style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}></span>
  </div>
  </td>
  <td data-label="Department">{t.dept}</td>
@@ -7671,7 +8597,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  >
  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0e7490' }}>
- 📅 Check Non-Teaching Attendance by Date:
+  Check Non-Teaching Attendance by Date:
  </span>
  <input
  type="date"
@@ -7738,7 +8664,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b' }}>
  Non-Academic Staff Register &bull; <span style={{ color: '#0891b2', fontWeight: 800 }}>Click any name</span> to view attendance record:
  </h4>
- <span style={{ fontSize: '0.78rem', color: '#64748b' }}>💡 Click staff name for date-wise attendance log</span>
+ <span style={{ fontSize: '0.78rem', color: '#64748b' }}> Click staff name for date-wise attendance log</span>
  </div>
 
  <div className="table-responsive">
@@ -7784,8 +8710,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  }}
  title="Click to view full attendance history for this staff member"
  >
- 👥 {st.name}
- <span style={{ fontSize: '0.7rem', color: '#0891b2', fontWeight: 600 }}>🔍</span>
+  {st.name}
+ <span style={{ fontSize: '0.7rem', color: '#0891b2', fontWeight: 600 }}></span>
  </div>
  </td>
  <td data-label="Role / Title"><strong>{st.role}</strong></td>
@@ -7852,7 +8778,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  >
  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#9d174d' }}>
- 📅 Check Operations & Works by Date:
+  Check Operations & Works by Date:
  </span>
  <input
  type="date"
@@ -7921,7 +8847,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b' }}>
  Institutional Operations, Safety & Administrative Tasks &bull; <span style={{ color: '#be185d', fontWeight: 800 }}>Click any task</span> to view staff duty:
  </h4>
- <span style={{ fontSize: '0.78rem', color: '#64748b' }}>💡 Click task title or staff name for live duty details</span>
+ <span style={{ fontSize: '0.78rem', color: '#64748b' }}> Click task title or staff name for live duty details</span>
  </div>
 
  <div className="table-responsive">
@@ -7959,14 +8885,14 @@ export default function SchoolAdminView({ activeTab, setActiveTab }) {
  >
  <td data-label="Work Title">
  <span style={{ fontWeight: 800, color: '#be185d', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
- 📋 {w.title}
- <span style={{ fontSize: '0.7rem' }}>🔍</span>
+  {w.title}
+ <span style={{ fontSize: '0.7rem' }}></span>
  </span>
  </td>
  <td data-label="Department">{w.department}</td>
  <td data-label="Assigned To">
  <span style={{ color: '#1e3a8a', fontWeight: 700 }}>
- 👤 {w.assignedTo}
+  {w.assignedTo}
  </span>
  </td>
  <td data-label="Priority">

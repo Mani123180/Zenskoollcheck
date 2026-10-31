@@ -80,7 +80,7 @@ export default function InteractiveServicePlayerModal({ isOpen, service, onClose
         
         <div style={{ padding: '14px 22px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '0 0 14px 14px' }}>
           <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-            ⚡ Live Student Practice Simulator &bull; Interactive Sandbox
+             Live Student Practice Simulator &bull; Interactive Sandbox
           </span>
           <button type="button" className="btn btn-primary btn-sm" onClick={onClose}>
             Close Lab
@@ -161,7 +161,7 @@ function ChessInteractiveLab() {
               }
             }}
           >
-            🧩 {puzzleMode ? 'Puzzle Mode Active' : 'Tactics Puzzle'}
+             {puzzleMode ? 'Puzzle Mode Active' : 'Tactics Puzzle'}
           </button>
         </div>
       </div>
@@ -206,7 +206,7 @@ function ChessInteractiveLab() {
         
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
           <h4 style={{ margin: '0 0 10px', fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-primary, #1e3a8a)' }}>
-            ♟️ Move Log & Lesson Notes
+            ♟ Move Log & Lesson Notes
           </h4>
           <div style={{ maxHeight: '160px', overflowY: 'auto', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '10px', fontSize: '0.82rem', marginBottom: '14px' }}>
             {moveHistory.map((m, idx) => (
@@ -237,7 +237,7 @@ function CodingInteractiveLab() {
 function drawShape(sides) {
   let output = "Drawing polygon with " + sides + " sides: ";
   for (let i = 1; i <= sides; i++) {
-    output += " ★ [Side " + i + "]";
+    output += "  [Side " + i + "]";
   }
   return output;
 }
@@ -260,7 +260,7 @@ drawShape(5);`);
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>
-          💻 Live Code Editor & Scratch Sandbox
+           Live Code Editor & Scratch Sandbox
         </span>
         <button type="button" className="btn btn-sm btn-primary" onClick={runCode}>
           ▶ Run Code
@@ -320,7 +320,7 @@ function RoboticsInteractiveLab() {
     <div>
       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '18px', marginBottom: '18px' }}>
         <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary, #1e3a8a)' }}>
-          🤖 Arduino Microbot Telemetry & Sensor Simulation
+           Arduino Microbot Telemetry & Sensor Simulation
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px' }}>
           <div style={{ background: '#ffffff', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -368,7 +368,7 @@ function RoboticsInteractiveLab() {
                 const dist = Number(e.target.value);
                 setSensorDistance(dist);
                 if (dist < 20) {
-                  setRobotStatus('⚠️ OBSTACLE DETECTED! Reverse Servo & Steering Left');
+                  setRobotStatus('OBSTACLE DETECTED! Reverse Servo & Steering Left');
                 } else {
                   setRobotStatus('Path Clear. Forward Cruising.');
                 }
@@ -420,7 +420,7 @@ function DrawingInteractiveLab() {
           className="btn btn-sm btn-outline"
           onClick={() => setShapes([...shapes, { type: 'star', x: Math.random() * 300 + 40, y: Math.random() * 150 + 20, color }])}
         >
-          ✨ Stamp Star
+           Stamp Star
         </button>
         <button type="button" className="btn btn-sm btn-outline" onClick={() => setShapes([])}>Clear Canvas</button>
       </div>
@@ -445,7 +445,7 @@ function DrawingInteractiveLab() {
               userSelect: 'none'
             }}
           >
-            {s.type === 'sun' ? '☀️' : s.type === 'mountain' ? '⛰️' : s.type === 'tree' ? '🌲' : '⭐'}
+            {s.type}
           </div>
         ))}
         <div style={{ position: 'absolute', bottom: '10px', left: '14px', fontSize: '0.78rem', color: '#94a3b8' }}>
@@ -465,7 +465,7 @@ function SpokenEnglishInteractiveLab() {
     <div>
       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px', marginBottom: '14px' }}>
         <h4 style={{ margin: '0 0 10px', fontSize: '0.96rem', fontWeight: 800, color: 'var(--color-primary, #1e3a8a)' }}>
-          🗣️ Pronunciation & Public Speaking Simulator
+           Pronunciation & Public Speaking Simulator
         </h4>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
           {[
@@ -492,7 +492,7 @@ function SpokenEnglishInteractiveLab() {
           </p>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <button type="button" className="btn btn-sm btn-outline" onClick={() => setQuizScore('Fluency: 94% | Phonetics: 90% | Vocabulary: Grade A')}>
-              🎙️ Test Pronunciation & Fluency
+               Test Pronunciation & Fluency
             </button>
             {quizScore && (
               <span className="badge badge-success" style={{ fontSize: '0.82rem', padding: '6px 12px' }}>
@@ -515,9 +515,9 @@ function AbacusInteractiveLab() {
 
   const checkSum = () => {
     if (Number(userAns) === num1 + num2) {
-      setFeedback('✅ Correct! Mental Math speed: 1.8 seconds!');
+      setFeedback('Correct! Mental Math speed: 1.8 seconds!');
     } else {
-      setFeedback(`❌ Incorrect. Correct answer is ${num1 + num2}`);
+      setFeedback(`Incorrect. Correct answer is ${num1 + num2}`);
     }
   };
 
@@ -532,7 +532,7 @@ function AbacusInteractiveLab() {
     <div>
       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '18px' }}>
         <h4 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary, #1e3a8a)' }}>
-          🧮 Fast Mental Math & Abacus Speed Challenge
+           Fast Mental Math & Abacus Speed Challenge
         </h4>
         <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#1e293b', textAlign: 'center', margin: '20px 0' }}>
           {num1} + {num2} = ?
@@ -567,7 +567,7 @@ function MusicDanceInteractiveLab() {
     <div>
       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
         <h4 style={{ margin: '0 0 10px', fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary, #1e3a8a)' }}>
-          🎵 Rhythmic Tala & Keyboard Pitch Practice
+           Rhythmic Tala & Keyboard Pitch Practice
         </h4>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
           {['Bharatanatyam Adavu 1', 'Western Contemporary Beat', 'Carnatic Vocal Swaras (Sa Ri Ga Ma)', 'Keyboard Chords (C Major)'].map((b) => (
@@ -582,7 +582,7 @@ function MusicDanceInteractiveLab() {
           ))}
         </div>
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '18px', textAlign: 'center' }}>
-          <div style={{ fontSize: '1.8rem', margin: '10px 0' }}>🎶 🥁 🎹 💃</div>
+          
           <strong>Lesson: {activeBeat}</strong>
           <p style={{ fontSize: '0.84rem', color: '#64748b', marginTop: '6px' }}>
             Rhythm metronome active at 90 BPM. Posture alignment and beat coordination practicing.
@@ -601,7 +601,7 @@ function SportsFitnessInteractiveLab() {
     <div>
       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
         <h4 style={{ margin: '0 0 10px', fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary, #1e3a8a)' }}>
-          ⚽ Athletic Performance & Physical Training Plan
+           Athletic Performance & Physical Training Plan
         </h4>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
           {['Shuttle Run Agility Drill', 'Basketball Free-Throw Practice', 'Athletics 100m Sprint Stride', 'Surya Namaskar & Yoga Flow'].map((d) => (

@@ -28,6 +28,20 @@ export const api = {
     return handleResponse(res);
   },
 
+  syncAuthUser: async (userData) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/sync-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+      return handleResponse(res);
+    } catch (e) {
+      console.warn('syncAuthUser failed:', e);
+      return { success: false, message: e.message };
+    }
+  },
+
   getMe: async () => {
     const res = await fetch(`${API_BASE}/auth/me`, {
       headers: getAuthHeaders(),

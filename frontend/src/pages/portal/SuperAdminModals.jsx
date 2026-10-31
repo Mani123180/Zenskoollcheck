@@ -2,8 +2,45 @@ import React, { useState, useEffect } from 'react';
 import { downloadInvoicePDF } from '../../services/pdfDownloadUtil';
 
 
-export function CampusOverviewModal({ isOpen, school, onClose, onEdit, onEnterSchool }) {
+export function CampusOverviewModal({ isOpen, school, onClose, onEdit, onEnterSchool, onUpdateCredentials }) {
   if (!isOpen || !school) return null;
+
+  const [adminPass, setAdminPass] = useState(school.password || school.adminPassword || 'Admin@12345');
+  const [financePass, setFinancePass] = useState(school.financePassword || 'Finance@12345');
+  const [editingAdminPass, setEditingAdminPass] = useState(false);
+  const [editingFinancePass, setEditingFinancePass] = useState(false);
+  const [newAdminPass, setNewAdminPass] = useState('');
+  const [newFinancePass, setNewFinancePass] = useState('');
+  const [toastMsg, setToastMsg] = useState(null);
+
+  useEffect(() => {
+    if (school) {
+      setAdminPass(school.password || school.adminPassword || 'Admin@12345');
+      setFinancePass(school.financePassword || 'Finance@12345');
+      setEditingAdminPass(false);
+      setEditingFinancePass(false);
+      setToastMsg(null);
+    }
+  }, [school]);
+
+  const handleSavePassword = (role, newPass) => {
+    if (!newPass || !newPass.trim()) return;
+    const cleanPass = newPass.trim();
+    if (role === 'schooladmin') {
+      setAdminPass(cleanPass);
+      setEditingAdminPass(false);
+    } else {
+      setFinancePass(cleanPass);
+      setEditingFinancePass(false);
+    }
+
+    if (typeof onUpdateCredentials === 'function') {
+      onUpdateCredentials(school.id || school.schoolId, { role, newPassword: cleanPass });
+    }
+
+    setToastMsg(`✓ ${role === 'schooladmin' ? 'School Administrator' : 'Finance Manager'} password updated to "${cleanPass}" successfully!`);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
 
   return (
     <div className="modal-overlay" style={{ display: 'flex' }}>
@@ -94,6 +131,251 @@ export function CampusOverviewModal({ isOpen, school, onClose, onEdit, onEnterSc
               <div className="review-row"><span className="review-label">Active License Tier:</span><span className="review-value"><strong>{school.subscription || school.plan || 'Pro Plan'}</strong></span></div>
               <div className="review-row"><span className="review-label">Modules Included:</span><span className="review-value">Student Info System (SIS), Attendance, Fees & Invoicing, Exam Results, SMS/WhatsApp Gateway</span></div>
               <div className="review-row"><span className="review-label">Sync Status:</span><span className="review-value"><span className="badge badge-success">Active & Synchronized</span></span></div>
+            </div>
+
+            <div className="review-card span-2" style={{ background: '#f8fafc', border: '1px solid #bfdbfe', borderRadius: '10px' }}>
+              <div className="review-card-title" style={{ color: '#1e3a8a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <span>Permanent Campus Login Credentials (ID & Password)</span>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: 600 }}>
+                   Live Credentials for Campus Portals
+                </span>
+              </div>
+
+              {toastMsg && (
+                <div style={{
+                  background: '#dcfce7',
+                  border: '1px solid #86efac',
+                  color: '#166534',
+                  padding: '9px 14px',
+                  borderRadius: '6px',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  marginTop: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  animation: 'fadeIn 0.3s ease'
+                }}>
+                  <span>✓</span>
+                  <span>{toastMsg}</span>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginTop: '12px' }}>
+                <div style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: '8px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                  <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '0.9rem', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span> School Administrator</span>
+                    <span className="badge badge-primary" style={{ fontSize: '0.68rem' }}>ROLE: SCHOOLADMIN</span>
+                  </div>
+                  
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>User ID / Username:</div>
+                  <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '10px', wordBreak: 'break-all' }}>
+                    <code>{school.username || school.adminUsername || `admin_${(school.code || 'school').toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8)}`}</code>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '6px' }}>({school.admin || school.email})</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 700 }}>Permanent Password:</div>
+                    {!editingAdminPass && (
+                      <button
+                        type="button"
+                        onClick={() => { setEditingAdminPass(true); setNewAdminPass(adminPass); }}
+                        style={{
+                          background: '#f0fdf4',
+                          border: '1px solid #86efac',
+                          color: '#15803d',
+                          padding: '3px 10px',
+                          borderRadius: '5px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                         Change Password
+                      </button>
+                    )}
+                  </div>
+
+                  {!editingAdminPass ? (
+                    <div style={{ marginTop: '4px' }}>
+                      <code style={{ fontSize: '0.96rem', background: '#ecfdf5', color: '#065f46', padding: '4px 12px', borderRadius: '5px', border: '1px solid #a7f3d0', fontWeight: 800, letterSpacing: '0.5px', display: 'inline-block' }}>
+                        {adminPass}
+                      </code>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '6px', background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #94a3b8' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase' }}>
+                        Set New Admin Password:
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input
+                          type="text"
+                          value={newAdminPass}
+                          onChange={(e) => setNewAdminPass(e.target.value)}
+                          placeholder="e.g. Admin@2026"
+                          style={{
+                            flex: 1,
+                            minWidth: '130px',
+                            padding: '6px 10px',
+                            fontSize: '0.88rem',
+                            border: '1px solid #64748b',
+                            borderRadius: '5px',
+                            fontFamily: 'monospace',
+                            fontWeight: 700
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSavePassword('schooladmin', newAdminPass)}
+                          style={{
+                            background: '#16a34a',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '5px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Save ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingAdminPass(false)}
+                          style={{
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            border: '1px solid #cbd5e1',
+                            padding: '6px 10px',
+                            borderRadius: '5px',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ background: '#ffffff', border: '1px solid #fef3c7', borderRadius: '8px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                  <div style={{ fontWeight: 800, color: '#b45309', fontSize: '0.9rem', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span> Finance Manager</span>
+                    <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>ROLE: FINANCE</span>
+                  </div>
+
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>User ID / Username:</div>
+                  <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '10px', wordBreak: 'break-all' }}>
+                    <code>{school.financeUsername || `finance_${(school.code || 'school').toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8)}`}</code>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '6px' }}>({school.financeEmail || `finance@${(school.code || 'school').toLowerCase().replace(/[^a-z0-9]/g, '')}.edu`})</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 700 }}>Permanent Password:</div>
+                    {!editingFinancePass && (
+                      <button
+                        type="button"
+                        onClick={() => { setEditingFinancePass(true); setNewFinancePass(financePass); }}
+                        style={{
+                          background: '#fffbeb',
+                          border: '1px solid #fcd34d',
+                          color: '#b45309',
+                          padding: '3px 10px',
+                          borderRadius: '5px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                         Change Password
+                      </button>
+                    )}
+                  </div>
+
+                  {!editingFinancePass ? (
+                    <div style={{ marginTop: '4px' }}>
+                      <code style={{ fontSize: '0.96rem', background: '#ecfdf5', color: '#065f46', padding: '4px 12px', borderRadius: '5px', border: '1px solid #a7f3d0', fontWeight: 800, letterSpacing: '0.5px', display: 'inline-block' }}>
+                        {financePass}
+                      </code>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '6px', background: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #94a3b8' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase' }}>
+                        Set New Finance Password:
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input
+                          type="text"
+                          value={newFinancePass}
+                          onChange={(e) => setNewFinancePass(e.target.value)}
+                          placeholder="e.g. Finance@2026"
+                          style={{
+                            flex: 1,
+                            minWidth: '130px',
+                            padding: '6px 10px',
+                            fontSize: '0.88rem',
+                            border: '1px solid #64748b',
+                            borderRadius: '5px',
+                            fontFamily: 'monospace',
+                            fontWeight: 700
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSavePassword('finance', newFinancePass)}
+                          style={{
+                            background: '#16a34a',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '5px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Save ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingFinancePass(false)}
+                          style={{
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            border: '1px solid #cbd5e1',
+                            padding: '6px 10px',
+                            borderRadius: '5px',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -253,10 +535,32 @@ export function EditSchoolModal({ isOpen, school, onClose, onSave }) {
 }
 
 
-export function AdminProfileModal({ isOpen, admin, onClose }) {
+export function AdminProfileModal({ isOpen, admin, onClose, onUpdateCredentials }) {
   if (!isOpen || !admin) return null;
 
+  const [editingPass, setEditingPass] = useState(false);
+  const [newPass, setNewPass] = useState(admin.password || 'Admin@12345');
+  const [currentPass, setCurrentPass] = useState(admin.password || 'Admin@12345');
+
+  useEffect(() => {
+    setEditingPass(false);
+    setCurrentPass(admin.password || 'Admin@12345');
+    setNewPass(admin.password || 'Admin@12345');
+  }, [admin]);
+
   const initial = (admin.name || 'A')[0].toUpperCase();
+
+  const handleSave = () => {
+    const trimmed = (newPass || '').trim();
+    if (!trimmed) return;
+    setCurrentPass(trimmed);
+    admin.password = trimmed;
+    setEditingPass(false);
+    if (typeof onUpdateCredentials === 'function') {
+      const isFin = (admin.role || '').toLowerCase().includes('finance');
+      onUpdateCredentials(admin.schoolId, { role: isFin ? 'finance' : 'schooladmin', newPassword: trimmed });
+    }
+  };
 
   return (
     <div className="modal-overlay" style={{ display: 'flex' }}>
@@ -293,6 +597,83 @@ export function AdminProfileModal({ isOpen, admin, onClose }) {
 
           <div className="review-grid" style={{ gridTemplateColumns: '1fr', gap: '10px', marginBottom: '15px' }}>
             <div className="review-row"><span>Login Username:</span><code>{admin.username || '—'}</code></div>
+            <div className="review-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Permanent Password:</span>
+              {!editingPass ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <code style={{ color: '#047857', fontWeight: 800, background: '#ecfdf5', padding: '2px 8px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                    {currentPass}
+                  </code>
+                  {onUpdateCredentials && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingPass(true)}
+                      style={{
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        color: '#1d4ed8',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                       Change Password
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={newPass}
+                    onChange={(e) => setNewPass(e.target.value)}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '0.84rem',
+                      border: '1px solid #64748b',
+                      borderRadius: '4px',
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      width: '140px'
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    style={{
+                      background: '#16a34a',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Save ✓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingPass(false)}
+                    style={{
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.76rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="review-row"><span>Official Email:</span><strong>{admin.email}</strong></div>
             <div className="review-row"><span>Assigned Campus:</span><strong>{admin.schoolName || 'All Campuses'}</strong></div>
             <div className="review-row"><span>Campus ID:</span><span className="badge badge-info">{admin.schoolId || 'None'}</span></div>
@@ -308,7 +689,6 @@ export function AdminProfileModal({ isOpen, admin, onClose }) {
     </div>
   );
 }
-
 
 export function AddAdminModal({ isOpen, schools = [], onClose, onSave }) {
   const [name, setName] = useState('');
@@ -584,27 +964,93 @@ export function CreateInvoiceModal({ isOpen, schools = [], onClose, onSave }) {
 }
 
 
-export function FeedbackModal({ isOpen, title, message, onClose }) {
+export function FeedbackModal({ isOpen, title, message, credentials, onClose }) {
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" style={{ display: 'flex' }}>
-      <div className="modal-content" style={{ maxWidth: '440px' }}>
+      <div className="modal-content" style={{ maxWidth: credentials ? '580px' : '440px' }}>
         <div className="modal-header">
           <h3 id="modal-title">{title}</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <div style={{ color: 'var(--color-success)', fontSize: '3rem', marginBottom: '15px' }}>✓</div>
-          <p style={{ color: 'var(--color-text-dark)', marginBottom: '20px', whiteSpace: 'pre-line' }}>{message}</p>
-          <button className="btn btn-primary btn-sm" onClick={onClose}>Close</button>
+        <div style={{ textAlign: credentials ? 'left' : 'center', padding: '20px' }}>
+          <div style={{ textAlign: 'center', color: 'var(--color-success)', fontSize: '2.5rem', marginBottom: '8px' }}>✓</div>
+          <p style={{ color: 'var(--color-text-dark)', marginBottom: '16px', whiteSpace: 'pre-line', fontSize: '0.92rem' }}>{message}</p>
+          
+          {credentials && (
+            <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
+              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#1e3a8a', textTransform: 'uppercase', marginBottom: '14px', borderBottom: '2px solid #e2e8f0', paddingBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span></span> Provisioned Campus Login Credentials
+              </div>
+
+              {credentials.schoolAdmin && (
+                <div style={{ background: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '14px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '0.94rem' }}>
+                       School Administrator Account
+                    </div>
+                    <span className="badge badge-primary" style={{ fontSize: '0.72rem' }}>Role: schooladmin</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.86rem' }}>
+                    <div style={{ background: '#f0f9ff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #bae6fd' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#0369a1', fontWeight: 700, textTransform: 'uppercase' }}>User ID / Username</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0c4a6e', marginTop: '2px' }}>
+                        <code>{credentials.schoolAdmin.username}</code>
+                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500, marginLeft: '8px' }}>({credentials.schoolAdmin.email})</span>
+                      </div>
+                    </div>
+                    <div style={{ background: '#ecfdf5', padding: '8px 12px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 700, textTransform: 'uppercase' }}>Password</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#065f46', marginTop: '2px', letterSpacing: '0.5px' }}>
+                        <code>{credentials.schoolAdmin.password}</code>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {credentials.financeManager && (
+                <div style={{ background: '#ffffff', border: '1px solid #fde68a', borderRadius: '8px', padding: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ fontWeight: 800, color: '#b45309', fontSize: '0.94rem' }}>
+                       School Finance Manager Account
+                    </div>
+                    <span className="badge badge-warning" style={{ fontSize: '0.72rem' }}>Role: finance</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.86rem' }}>
+                    <div style={{ background: '#fffbeb', padding: '8px 12px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#92400e', fontWeight: 700, textTransform: 'uppercase' }}>User ID / Username</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#78350f', marginTop: '2px' }}>
+                        <code>{credentials.financeManager.username}</code>
+                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500, marginLeft: '8px' }}>({credentials.financeManager.email})</span>
+                      </div>
+                    </div>
+                    <div style={{ background: '#ecfdf5', padding: '8px 12px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 700, textTransform: 'uppercase' }}>Password</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#065f46', marginTop: '2px', letterSpacing: '0.5px' }}>
+                        <code>{credentials.financeManager.password}</code>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+              {credentials ? '✓ Generated accounts have also been registered in Auth Directory.' : ''}
+            </span>
+            <button className="btn btn-primary btn-sm" onClick={onClose} style={{ padding: '8px 24px', fontWeight: 700 }}>
+              Got It & Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
-
 export function ConfirmationModal({ isOpen, title, message, confirmText = 'Confirm', onConfirm, onClose }) {
   if (!isOpen) return null;
 

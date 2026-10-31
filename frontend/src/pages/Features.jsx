@@ -29,32 +29,32 @@ export default function Features() {
     {
       title: 'Smart Academic Administration',
       desc: 'Centralized control for class timetables, batch subject examination schedules, syllabus dissemination, and faculty allocations.',
-      icon: '🎓'
+      icon: ''
     },
     {
       title: 'Finance Manage & Payroll',
       desc: 'End-to-end fee invoices, automated dues calculation, staff salary disbursement with slip downloads, and institutional expense registers.',
-      icon: '💼'
+      icon: ''
     },
     {
       title: 'Instant Parent-Student Sync',
       desc: 'Live examination schedules, term marks report cards, digital homework submissions, and real-time attendance rate tracking.',
-      icon: '⚡'
+      icon: ''
     },
     {
       title: 'Faculty & Leave Workflow',
       desc: 'Teachers submit leave applications with substitute faculty tagging; principals review and approve requests with one click.',
-      icon: '📝'
+      icon: ''
     },
     {
       title: 'Bulk Data Imports & Analytics',
       desc: 'Seamless Excel import for hundreds of students and staff payroll records with instant validation and ledger reconciliation.',
-      icon: '📊'
+      icon: ''
     },
     {
       title: 'Multi-Role Secure Access',
       desc: 'Role-based authorization and dashboard view customization for Super Admin, School Admin, Principals, Teachers, Students, and Parents.',
-      icon: '🛡️'
+      icon: ''
     }
   ];
 

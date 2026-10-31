@@ -97,7 +97,7 @@ export default function Pricing() {
             >
               {p.highlight && (
                 <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#0f172a', padding: '4px 18px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 800, letterSpacing: '0.5px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.35)' }}>
-                  ★ MOST POPULAR
+                   MOST POPULAR
                 </div>
               )}
               <div>
@@ -112,7 +112,7 @@ export default function Pricing() {
                   <span style={{ color: '#64748b', fontSize: '0.92rem', fontWeight: 600 }}>{p.period}</span>
                 </div>
                 <div style={{ background: '#f8fafc', padding: '6px 12px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#334155', display: 'inline-block', marginBottom: '24px' }}>
-                  👥 {p.students}
+                   {p.students}
                 </div>
 
                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>

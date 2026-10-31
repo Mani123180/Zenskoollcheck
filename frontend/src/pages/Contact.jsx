@@ -58,7 +58,7 @@ export default function Contact() {
 
             <div className="feature-list" style={{ marginTop: '30px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '1.5rem' }}>📍</div>
+                <div style={{ fontSize: '1.5rem' }}></div>
                 <div>
                   <strong style={{ display: 'block', color: 'var(--color-primary)' }}>Mailing Address</strong>
                   <span style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
@@ -68,7 +68,7 @@ export default function Contact() {
               </div>
 
               <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '1.5rem' }}>📞</div>
+                <div style={{ fontSize: '1.5rem' }}></div>
                 <div>
                   <strong style={{ display: 'block', color: 'var(--color-primary)' }}>Telephone Enquiries</strong>
                   <span style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
@@ -78,7 +78,7 @@ export default function Contact() {
               </div>
 
               <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '1.5rem' }}>✉</div>
+                <div style={{ fontSize: '1.5rem' }}></div>
                 <div>
                   <strong style={{ display: 'block', color: 'var(--color-primary)' }}>Email Directory</strong>
                   <span style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
@@ -88,7 +88,7 @@ export default function Contact() {
               </div>
 
               <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '1.5rem' }}>🕒</div>
+                <div style={{ fontSize: '1.5rem' }}></div>
                 <div>
                   <strong style={{ display: 'block', color: 'var(--color-primary)' }}>Office Hours</strong>
                   <span style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>

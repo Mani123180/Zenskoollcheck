@@ -167,7 +167,7 @@ export async function downloadStudyMaterialPDF(material) {
 
     <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 22px; margin-bottom: 30px; background: #ffffff;">
       <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 14px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
-        📘 Key Study Concepts & Learning Objectives
+         Key Study Concepts & Learning Objectives
       </h3>
       <ol style="margin: 0; padding-left: 20px; font-size: 13px; color: #334155; line-height: 1.8;">
         <li>Review and memorize fundamental identities, equations, and definitions outlined in chapter notes.</li>

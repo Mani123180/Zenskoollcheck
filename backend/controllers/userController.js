@@ -1,8 +1,6 @@
 const User = require('../models/User');
-const { initialUsers } = require('../seed/seedData');
 const { getDBStatus } = require('../config/db');
-
-let memUsers = [...initialUsers];
+const { memUsers } = require('./authController');
 
 const getUsers = async (req, res) => {
   try {
@@ -21,7 +19,7 @@ const getUsers = async (req, res) => {
       filtered = filtered.filter((u) => u.schoolId === schoolId || u.schoolId === 'ALL');
     }
     if (role) {
-      filtered = filtered.filter((u) => u.role === role);
+      filtered = filtered.filter((u) => (u.role || '').toLowerCase() === role.toLowerCase());
     }
 
     const safeUsers = filtered.map(({ password, ...rest }) => rest);
@@ -42,21 +40,32 @@ const createUser = async (req, res) => {
     const newUser = {
       userId,
       username: username.toLowerCase().trim(),
-      password: password || 'Welcome@123',
+      password: (password || 'Welcome@123').trim(),
       name,
-      email,
+      email: email.toLowerCase().trim(),
       phone: phone || '',
-      role,
-      schoolId: schoolId || req.user.schoolId || 'SCH001',
-      schoolName: schoolName || req.user.schoolName || 'Zenith International Girls Higher Secondary School',
+      role: (role || 'schooladmin').toLowerCase(),
+      schoolId: schoolId || (req.user && req.user.schoolId) || 'SCH001',
+      schoolName: schoolName || (req.user && req.user.schoolName) || 'Campus',
       status: 'Active',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
     };
 
     if (getDBStatus()) {
-      await User.create(newUser);
+      await User.create(newUser).catch(() => {});
     }
-    memUsers.unshift(newUser);
+
+    const existingIdx = memUsers.findIndex(
+      (u) =>
+        (u.username && u.username.toLowerCase() === newUser.username) ||
+        (u.email && u.email.toLowerCase() === newUser.email)
+    );
+
+    if (existingIdx !== -1) {
+      memUsers[existingIdx] = { ...memUsers[existingIdx], ...newUser };
+    } else {
+      memUsers.unshift(newUser);
+    }
 
     const { password: _, ...userSafe } = newUser;
     return res.status(201).json({ success: true, message: 'User created successfully', data: userSafe });
@@ -73,7 +82,7 @@ const updateUser = async (req, res) => {
       if (updated) return res.json({ success: true, data: updated });
     }
 
-    const idx = memUsers.findIndex((u) => u.userId === id);
+    const idx = memUsers.findIndex((u) => u.userId === id || u.id === id);
     if (idx !== -1) {
       memUsers[idx] = { ...memUsers[idx], ...req.body };
       const { password, ...userSafe } = memUsers[idx];
@@ -91,7 +100,10 @@ const deleteUser = async (req, res) => {
     if (getDBStatus()) {
       await User.findOneAndDelete({ userId: id });
     }
-    memUsers = memUsers.filter((u) => u.userId !== id);
+    const idx = memUsers.findIndex((u) => u.userId === id || u.id === id);
+    if (idx !== -1) {
+      memUsers.splice(idx, 1);
+    }
     return res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

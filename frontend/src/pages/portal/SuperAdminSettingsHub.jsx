@@ -162,7 +162,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
           >
             <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div className="wizard-header-strip" style={{ marginBottom: '20px' }}>
-                <div className="wizard-header-icon" style={{ background: 'rgba(30, 58, 138, 0.08)', color: 'var(--color-primary)' }}>⚙️</div>
+                <div className="wizard-header-icon" style={{ background: 'rgba(30, 58, 138, 0.08)', color: 'var(--color-primary)' }}></div>
                 <div className="wizard-header-titles">
                   <h4>General Platform Settings</h4>
                   <p>Central institutional identity, platform naming, primary contact endpoints, and maintenance toggles.</p>
@@ -244,7 +244,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
           >
             <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div className="wizard-header-strip" style={{ marginBottom: '20px' }}>
-                <div className="wizard-header-icon" style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#dc2626' }}>🔒</div>
+                <div className="wizard-header-icon" style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#dc2626' }}></div>
                 <div className="wizard-header-titles">
                   <h4>Security & Authentication Controls</h4>
                   <p>MFA policies, session lifespans, brute force lockouts, IP whitelists, and platform lockdown.</p>
@@ -290,7 +290,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
                     onChange={(e) => setSettings({ ...settings, security: { ...settings.security, emergencyLockdown: e.target.value === 'Active' } })}
                   >
                     <option value="Inactive">Normal Operations (Unlocked)</option>
-                    <option value="Active">🚨 Engaged (Only Super Admin Allowed)</option>
+                    <option value="Active"> Engaged (Only Super Admin Allowed)</option>
                   </select>
                 </div>
                 <div className="wizard-field span-2">
@@ -321,7 +321,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
           >
             <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div className="wizard-header-strip" style={{ marginBottom: '20px' }}>
-                <div className="wizard-header-icon" style={{ background: 'rgba(59, 130, 246, 0.08)', color: '#2563eb' }}>👥</div>
+                <div className="wizard-header-icon" style={{ background: 'rgba(59, 130, 246, 0.08)', color: '#2563eb' }}></div>
                 <div className="wizard-header-titles">
                   <h4>Role-Based Access Control (RBAC) Permissions</h4>
                   <p>Configure permission gates and actionable abilities across each institutional portal role.</p>
@@ -375,7 +375,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
           >
             <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div className="wizard-header-strip" style={{ marginBottom: '20px' }}>
-                <div className="wizard-header-icon" style={{ background: 'rgba(234, 179, 8, 0.08)', color: '#ca8a04' }}>🔔</div>
+                <div className="wizard-header-icon" style={{ background: 'rgba(234, 179, 8, 0.08)', color: '#ca8a04' }}></div>
                 <div className="wizard-header-titles">
                   <h4>Notification Channels & Alert Rules</h4>
                   <p>Enable/disable automated alerts, SMS gateways, email dispatches, and webhook integrations.</p>
@@ -449,7 +449,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
           >
             <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div className="wizard-header-strip" style={{ marginBottom: '20px' }}>
-                <div className="wizard-header-icon" style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#059669' }}>💳</div>
+                <div className="wizard-header-icon" style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#059669' }}></div>
                 <div className="wizard-header-titles">
                   <h4>Subscription & Payment Gateway Configuration</h4>
                   <p>Global billing cadence, default licensing rate (0/yr), payment processor, and invoice automation.</p>
@@ -516,7 +516,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
           >
             <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div className="wizard-header-strip" style={{ marginBottom: '20px' }}>
-                <div className="wizard-header-icon" style={{ background: 'rgba(99, 102, 241, 0.08)', color: '#4f46e5' }}>🏫</div>
+                <div className="wizard-header-icon" style={{ background: 'rgba(99, 102, 241, 0.08)', color: '#4f46e5' }}></div>
                 <div className="wizard-header-titles">
                   <h4>Default Campus & School Configuration</h4>
                   <p>Standard educational defaults applied automatically whenever a new campus is onboarded.</p>
@@ -591,7 +591,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
         {activeTab === 'dataBackup' && (
           <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
             <div className="wizard-header-strip" style={{ marginBottom: '20px' }}>
-              <div className="wizard-header-icon" style={{ background: 'rgba(14, 165, 233, 0.08)', color: '#0284c7' }}>💾</div>
+              <div className="wizard-header-icon" style={{ background: 'rgba(14, 165, 233, 0.08)', color: '#0284c7' }}></div>
               <div className="wizard-header-titles">
                 <h4>Database Backup & Recovery Services</h4>
                 <p>Scheduled cloud automated snapshots, retention terms, and instant manual database archives.</p>
@@ -612,7 +612,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
                   onClick={handleTriggerBackup}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
-                  ⚡ Start Backup Now
+                   Start Backup Now
                 </button>
               </div>
               <div style={{ marginTop: '12px', fontSize: '0.82rem', color: '#475569' }}>
@@ -669,7 +669,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
         {activeTab === 'auditLogs' && (
           <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
             <div className="wizard-header-strip" style={{ marginBottom: '16px' }}>
-              <div className="wizard-header-icon" style={{ background: 'rgba(100, 116, 139, 0.08)', color: '#475569' }}>📋</div>
+              <div className="wizard-header-icon" style={{ background: 'rgba(100, 116, 139, 0.08)', color: '#475569' }}></div>
               <div className="wizard-header-titles">
                 <h4>System Audit & Forensic Activity Logs</h4>
                 <p>Immutable record of configuration updates, administrative events, and authentication changes.</p>
@@ -734,7 +734,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
           >
             <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div className="wizard-header-strip" style={{ marginBottom: '20px' }}>
-                <div className="wizard-header-icon" style={{ background: 'rgba(236, 72, 153, 0.08)', color: '#db2777' }}>🌐</div>
+                <div className="wizard-header-icon" style={{ background: 'rgba(236, 72, 153, 0.08)', color: '#db2777' }}></div>
                 <div className="wizard-header-titles">
                   <h4>Localization, Regional & Language Settings</h4>
                   <p>Configure time zones, date formats, primary institutional languages, and translation fallbacks.</p>
@@ -807,7 +807,7 @@ export default function SuperAdminSettingsHub({ showFeedback }) {
           >
             <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <div className="wizard-header-strip" style={{ marginBottom: '20px' }}>
-                <div className="wizard-header-icon" style={{ background: 'rgba(79, 70, 229, 0.08)', color: '#4338ca' }}>🖥️</div>
+                <div className="wizard-header-icon" style={{ background: 'rgba(79, 70, 229, 0.08)', color: '#4338ca' }}></div>
                 <div className="wizard-header-titles">
                   <h4>Core Engine & System Architecture Settings</h4>
                   <p>Fine-tune API rate limits, worker threads, CDN caches, and developer debug tracing.</p>

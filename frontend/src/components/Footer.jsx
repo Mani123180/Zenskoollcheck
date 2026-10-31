@@ -42,15 +42,15 @@ export default function Footer() {
           <h4 className="footer-title">Contact</h4>
           <ul className="footer-contact">
             <li>
-              <span className="footer-contact-icon">📞</span>
+              <span className="footer-contact-icon"></span>
               <span>+91 98765 43210</span>
             </li>
             <li>
-              <span className="footer-contact-icon">✉️</span>
+              <span className="footer-contact-icon"></span>
               <span>info@zenskooll.com</span>
             </li>
             <li>
-              <span className="footer-contact-icon">🌐</span>
+              <span className="footer-contact-icon"></span>
               <span>www.zenskooll.com</span>
             </li>
           </ul>

@@ -5,6 +5,7 @@ import { getPortalData, savePortalData } from '../../services/portalData';
 import NewSchoolWizardModal from './NewSchoolWizardModal';
 import SubscriptionModal from './SubscriptionModal';
 import SchoolAdminView from './SchoolAdminView';
+import SchoolFinanceModule from './SchoolFinanceModule';
 import AcademicRolesView from './AcademicRolesView';
 import ChatBox from './ChatBox';
 import {
@@ -36,6 +37,14 @@ const defaultSchools = [
     academicYear: '2026-2027',
     admin: 'admin@ssvschool.com',
     adminName: 'Mrs. Savithri Raman',
+    username: 'admin_ssv',
+    adminUsername: 'admin_ssv',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_ssv',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@ssvschool.com',
+    financeName: 'School Finance Manager',
     status: 'Active',
     studentsCount: 482,
     teachersCount: 34,
@@ -55,6 +64,14 @@ const defaultSchools = [
     academicYear: '2026-2027',
     admin: 'admin@abcschool.com',
     adminName: 'Admin Rajesh',
+    username: 'admin_abcche',
+    adminUsername: 'admin_abcche',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_abcche',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@abcschool.com',
+    financeName: 'Finance Manager (ABC)',
     status: 'Active',
     studentsCount: 520,
     teachersCount: 28,
@@ -74,6 +91,14 @@ const defaultSchools = [
     academicYear: '2026-2027',
     admin: 'admin@stmarys.com',
     adminName: 'Admin Joseph',
+    username: 'admin_stmerd',
+    adminUsername: 'admin_stmerd',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_stmerd',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@stmerd.edu',
+    financeName: 'Finance Manager (St. Marys)',
     status: 'Active',
     studentsCount: 650,
     teachersCount: 42,
@@ -81,25 +106,6 @@ const defaultSchools = [
     subscription: 'Pro Plan',
     createdDate: '2026-03-01',
     board: 'ICSE',
-  },
-  {
-    id: 'SCHOOL005',
-    name: 'Oxford International Academy',
-    code: 'OXF-CHN',
-    city: 'Chennai',
-    phone: '+91 91234 56789',
-    email: 'admin@oxford.edu',
-    principal: 'Mr. David Paul',
-    academicYear: '2026-2027',
-    admin: 'admin@oxford.edu',
-    adminName: 'Admin Vikram',
-    status: 'Inactive',
-    studentsCount: 320,
-    teachersCount: 22,
-    parentsCount: 310,
-    subscription: 'Basic Plan',
-    createdDate: '2025-08-12',
-    board: 'CBSE',
   },
   {
     id: 'SCHOOL004',
@@ -112,6 +118,14 @@ const defaultSchools = [
     academicYear: '2026-2027',
     admin: 'admin@dpwschool.edu',
     adminName: 'Admin Anitha',
+    username: 'admin_dpwcbe',
+    adminUsername: 'admin_dpwcbe',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_dpwcbe',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@dpwschool.edu',
+    financeName: 'Finance Manager (DPW)',
     status: 'Active',
     studentsCount: 710,
     teachersCount: 45,
@@ -120,14 +134,47 @@ const defaultSchools = [
     createdDate: '2026-02-01',
     board: 'CBSE',
   },
+  {
+    id: 'SCHOOL005',
+    name: 'Oxford International Academy',
+    code: 'OXF-CHN',
+    city: 'Chennai',
+    phone: '+91 91234 56789',
+    email: 'admin@oxford.edu',
+    principal: 'Mr. David Paul',
+    academicYear: '2026-2027',
+    admin: 'admin@oxford.edu',
+    adminName: 'Admin Vikram',
+    username: 'admin_oxfchn',
+    adminUsername: 'admin_oxfchn',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_oxfchn',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@oxford.edu',
+    financeName: 'Finance Manager (Oxford)',
+    status: 'Active',
+    studentsCount: 320,
+    teachersCount: 22,
+    parentsCount: 310,
+    subscription: 'Basic Plan',
+    createdDate: '2025-08-12',
+    board: 'CBSE',
+  },
 ];
 
 const defaultUsers = [
-  { id: 'USR001', name: 'Super Administrator', email: 'superadmin@zenschool.com', phone: '+91 98401 11001', username: 'superadmin', role: 'SUPER_ADMIN', schoolId: null, schoolName: '', status: 'Active', createdDate: '2025-01-01' },
-  { id: 'USR003', name: 'School Administrator (SSV)', email: 'admin@ssvschool.com', phone: '+91 98401 22002', username: 'admin_ssv', role: 'SCHOOL_ADMIN', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', createdDate: '2026-02-15' },
-  { id: 'USR002', name: 'Admin Rajesh (ABC School)', email: 'admin@abcschool.com', phone: '+91 98401 33003', username: 'admin_abc', role: 'SCHOOL_ADMIN', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', createdDate: '2026-01-10' },
-  { id: 'USR004', name: 'Admin Joseph (St. Marys)', email: 'admin@stmarys.com', phone: '+91 98401 44004', username: 'admin_stm', role: 'SCHOOL_ADMIN', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', createdDate: '2026-03-01' },
-  { id: 'USR005', name: 'Admin Vikram (Oxford)', email: 'admin@oxford.edu', phone: '+91 98401 55005', username: 'admin_oxf', role: 'SCHOOL_ADMIN', schoolId: 'SCHOOL005', schoolName: 'Oxford International Academy', status: 'Inactive', createdDate: '2025-08-12' },
+  { id: 'USR001', name: 'Super Administrator', email: 'superadmin@zenschool.com', phone: '+91 98401 11001', username: 'superadmin', password: 'SuperAdmin@123', role: 'SUPER_ADMIN', schoolId: null, schoolName: '', status: 'Active', createdDate: '2025-01-01', aliases: ['superadmin'] },
+  { id: 'USR003', name: 'School Administrator (SSV)', email: 'admin@ssvschool.com', phone: '+91 98401 22002', username: 'admin_ssv', password: 'Admin@12345', role: 'SCHOOL_ADMIN', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', createdDate: '2026-02-15', aliases: ['admin_ssv', 'admin_ssvkod', 'admin@ssvschool.com'] },
+  { id: 'USR005', name: 'School Finance Manager (SSV)', email: 'finance@ssvschool.com', phone: '+91 98401 22005', username: 'finance_ssv', password: 'Finance@12345', role: 'FINANCE', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', createdDate: '2026-02-15', aliases: ['finance_ssv', 'finance_ssvkod', 'finance@ssvschool.com'] },
+  { id: 'USR002', name: 'Admin Rajesh (ABC School)', email: 'admin@abcschool.com', phone: '+91 98401 33003', username: 'admin_abcche', password: 'Admin@12345', role: 'SCHOOL_ADMIN', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', createdDate: '2026-01-10', aliases: ['admin_abcche', 'admin_abc', 'admin@abcschool.com'] },
+  { id: 'USR012', name: 'Finance Manager (ABC School)', email: 'finance@abcschool.com', phone: '+91 98401 33012', username: 'finance_abcche', password: 'Finance@12345', role: 'FINANCE', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', createdDate: '2026-01-10', aliases: ['finance_abcche', 'finance_abc', 'finance@abcschool.com'] },
+  { id: 'USR004', name: 'Admin Joseph (St. Marys)', email: 'admin@stmarys.com', phone: '+91 98401 44004', username: 'admin_stmerd', password: 'Admin@12345', role: 'SCHOOL_ADMIN', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', createdDate: '2026-03-01', aliases: ['admin_stmerd', 'admin_stm', 'admin@stmarys.com'] },
+  { id: 'USR014', name: 'Finance Manager (St. Marys)', email: 'finance@stmerd.edu', phone: '+91 98401 44014', username: 'finance_stmerd', password: 'Finance@12345', role: 'FINANCE', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', createdDate: '2026-03-01', aliases: ['finance_stmerd', 'finance_stm', 'finance@stmerd.edu'] },
+  { id: 'USR006', name: 'Admin Anitha (DPW School)', email: 'admin@dpwschool.edu', phone: '+91 98401 55004', username: 'admin_dpwcbe', password: 'Admin@12345', role: 'SCHOOL_ADMIN', schoolId: 'SCHOOL004', schoolName: 'Delhi Public World School', status: 'Active', createdDate: '2026-02-01', aliases: ['admin_dpwcbe', 'admin_dpw', 'admin@dpwschool.edu'] },
+  { id: 'USR016', name: 'Finance Manager (DPW School)', email: 'finance@dpwschool.edu', phone: '+91 98401 55016', username: 'finance_dpwcbe', password: 'Finance@12345', role: 'FINANCE', schoolId: 'SCHOOL004', schoolName: 'Delhi Public World School', status: 'Active', createdDate: '2026-02-01', aliases: ['finance_dpwcbe', 'finance_dpw', 'finance@dpwschool.edu'] },
+  { id: 'USR005', name: 'Admin Vikram (Oxford)', email: 'admin@oxford.edu', phone: '+91 98401 55005', username: 'admin_oxfchn', password: 'Admin@12345', role: 'SCHOOL_ADMIN', schoolId: 'SCHOOL005', schoolName: 'Oxford International Academy', status: 'Active', createdDate: '2025-08-12', aliases: ['admin_oxfchn', 'admin_oxf', 'admin@oxford.edu'] },
+  { id: 'USR015', name: 'Finance Manager (Oxford)', email: 'finance@oxford.edu', phone: '+91 98401 55015', username: 'finance_oxfchn', password: 'Finance@12345', role: 'FINANCE', schoolId: 'SCHOOL005', schoolName: 'Oxford International Academy', status: 'Active', createdDate: '2025-08-12', aliases: ['finance_oxfchn', 'finance_oxf', 'finance@oxford.edu'] },
 ];
 
 const defaultServices = [
@@ -203,7 +250,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
     try {
       const store = getPortalData();
       if (store && store.users && store.users.length > 0) {
-        const storedAdmins = store.users.filter((u) => u.role === 'SCHOOL_ADMIN' || u.role === 'SUPER_ADMIN');
+        const storedAdmins = store.users.filter((u) => { const r = (u.role || '').toLowerCase(); return r.includes('admin') || r.includes('finance'); });
         if (storedAdmins.length > 0) {
           const storedIds = new Set(storedAdmins.map((u) => u.id));
           const remainingDefaults = defaultUsers.filter((u) => !storedIds.has(u.id));
@@ -309,7 +356,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
   const [subModalTab, setSubModalTab] = useState('subscription');
   const [selectedPlanObj, setSelectedPlanObj] = useState(null);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
-  const [feedback, setFeedback] = useState({ isOpen: false, title: '', message: '' });
+  const [feedback, setFeedback] = useState({ isOpen: false, title: '', message: '', credentials: null });
   const [cardDetailModal, setCardDetailModal] = useState({ isOpen: false, config: null });
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState(null);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
@@ -423,8 +470,8 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
     fetchData();
   }, []);
 
-  const showFeedback = (title, message) => {
-    setFeedback({ isOpen: true, title, message });
+  const showFeedback = (title, message, credentials = null) => {
+    setFeedback({ isOpen: true, title, message, credentials });
   };
 
   
@@ -473,7 +520,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
   const totalSchools = schools.length;
   const activeSchools = schools.filter((s) => s.status === 'Active').length;
   const inactiveSchools = schools.filter((s) => s.status !== 'Active').length;
-  const schoolAdmins = users.filter((u) => u.role === 'SCHOOL_ADMIN');
+  const schoolAdmins = users.filter((u) => { const r = (u.role || '').toLowerCase(); return r === 'school_admin' || r === 'schooladmin' || r === 'finance' || r === 'financemanager'; });
   const totalSchoolAdmins = schoolAdmins.length;
   const activeSubs = subscriptions.filter((s) => s.status === 'ACTIVE' || s.status === 'Active').length;
   const expiringSubs = subscriptions.filter((s) => s.status === 'EXPIRED' || s.status === 'PENDING').length;
@@ -699,16 +746,162 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
   };
 
   
+  const handleUpdateSchoolCredentials = (schoolId, { role, newPassword }) => {
+    if (!schoolId || !newPassword) return;
+
+    const trimmedPassword = newPassword.trim();
+    const isFinance = role === 'finance' || role === 'financemanager';
+
+    setSelectedSchool((prev) => {
+      if (!prev || (prev.id !== schoolId && prev.schoolId !== schoolId)) return prev;
+      if (isFinance) {
+        return { ...prev, financePassword: trimmedPassword };
+      }
+      return { ...prev, password: trimmedPassword, adminPassword: trimmedPassword };
+    });
+
+    setSchools((prev) =>
+      prev.map((s) => {
+        if (s.id === schoolId || s.schoolId === schoolId) {
+          if (isFinance) {
+            return { ...s, financePassword: trimmedPassword };
+          }
+          return { ...s, password: trimmedPassword, adminPassword: trimmedPassword };
+        }
+        return s;
+      })
+    );
+
+    let targetUsername = '';
+    setUsers((prev) =>
+      prev.map((u) => {
+        const matchSchool = u.schoolId === schoolId;
+        const uRole = (u.role || '').toLowerCase();
+        const matchRole = isFinance
+          ? (uRole === 'finance' || uRole === 'financemanager')
+          : (uRole === 'schooladmin' || uRole === 'school_admin');
+        if (matchSchool && matchRole) {
+          targetUsername = u.username;
+          return { ...u, password: trimmedPassword };
+        }
+        return u;
+      })
+    );
+
+    try {
+      const store = getPortalData();
+      if (store.schools) {
+        store.schools = store.schools.map((s) => {
+          if (s.id === schoolId || s.schoolId === schoolId) {
+            if (isFinance) return { ...s, financePassword: trimmedPassword };
+            return { ...s, password: trimmedPassword, adminPassword: trimmedPassword };
+          }
+          return s;
+        });
+      }
+      if (store.users) {
+        let foundInStore = false;
+        store.users = store.users.map((u) => {
+          const matchSchool = u.schoolId === schoolId;
+          const uRole = (u.role || '').toLowerCase();
+          const matchRole = isFinance
+            ? (uRole === 'finance' || uRole === 'financemanager')
+            : (uRole === 'schooladmin' || uRole === 'school_admin');
+          if (matchSchool && matchRole) {
+            foundInStore = true;
+            if (!targetUsername) targetUsername = u.username;
+            return { ...u, password: trimmedPassword };
+          }
+          return u;
+        });
+
+        if (!foundInStore) {
+          const currentTargetSchool = (store.schools || []).find((s) => s.id === schoolId || s.schoolId === schoolId) || selectedSchool;
+          const cleanCode = (currentTargetSchool?.code || 'school').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const newUname = isFinance
+            ? (currentTargetSchool?.financeUsername || `finance_${cleanCode.substring(0, 8)}`)
+            : (currentTargetSchool?.username || currentTargetSchool?.adminUsername || `admin_${cleanCode.substring(0, 8)}`);
+          const newEmail = isFinance
+            ? (currentTargetSchool?.financeEmail || `finance@${cleanCode}.edu`)
+            : (currentTargetSchool?.admin || currentTargetSchool?.email || `admin@${cleanCode}.edu`);
+
+          store.users.push({
+            id: 'USR_' + Date.now(),
+            name: isFinance ? 'School Finance Manager' : (currentTargetSchool?.adminName || 'School Administrator'),
+            username: newUname,
+            email: newEmail,
+            password: trimmedPassword,
+            role: isFinance ? 'finance' : 'schooladmin',
+            schoolId: schoolId,
+            schoolName: currentTargetSchool?.name || 'Campus',
+            status: 'Active',
+            createdDate: new Date().toISOString().split('T')[0],
+          });
+          if (!targetUsername) targetUsername = newUname;
+        }
+      }
+      savePortalData(store);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('portal_data_updated', { detail: store }));
+      }
+    } catch (e) {
+      console.warn('Error saving updated credentials to local store:', e);
+    }
+
+    try {
+      if (api && typeof api.syncAuthUser === 'function') {
+        const currentTargetSchool = schools.find((s) => s.id === schoolId || s.schoolId === schoolId) || selectedSchool;
+        const cleanCode = (currentTargetSchool?.code || 'school').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const fallbackUsername = isFinance ? `finance_${cleanCode.substring(0, 8)}` : `admin_${cleanCode.substring(0, 8)}`;
+        const finalUsername = targetUsername || (isFinance ? currentTargetSchool?.financeUsername : (currentTargetSchool?.username || currentTargetSchool?.adminUsername)) || fallbackUsername;
+
+        api.syncAuthUser({
+          username: finalUsername,
+          password: trimmedPassword,
+          role: isFinance ? 'finance' : 'schooladmin',
+          schoolId: schoolId,
+          schoolName: currentTargetSchool?.name || 'Campus'
+        }).catch(() => {});
+      }
+    } catch (e) {}
+
+    showFeedback(
+      'Credentials Updated',
+      `The ${isFinance ? 'Finance Manager' : 'School Administrator'} password for "${selectedSchool?.name || 'school'}" has been changed to "${trimmedPassword}". Login accounts have been updated in Auth Directory.`
+    );
+  };
+
   const handleSchoolOnboarded = (newSchool) => {
     setIsWizardOpen(false);
 
-    
+    newSchool.studentsCount = 10;
+    newSchool.teachersCount = 5;
+    newSchool.parentsCount = 10;
+
     setSchools((prev) => [newSchool, ...prev]);
 
-    
-    const adminEmail = newSchool.admin || newSchool.email || `admin@${(newSchool.code || 'school').toLowerCase().replace(/[^a-z0-9]/g, '')}.edu`;
-    const adminUsername = newSchool.username || `admin_${(newSchool.code || 'school').toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 8)}`;
+    const cleanCode = (newSchool.code || 'school').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanPrefix = (newSchool.code || 'SCH').toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6) || 'CAMP';
+    const adminEmail = newSchool.admin || newSchool.email || `admin@${cleanCode}.edu`;
+    const adminUsername = newSchool.username || `admin_${cleanCode.substring(0, 8)}`;
     const adminName = newSchool.adminName || `Admin ${newSchool.name}`;
+    const adminPassword = newSchool.password || 'Admin@12345';
+
+    const financeEmail = newSchool.financeEmail || `finance@${cleanCode}.edu`;
+    const financeUsername = newSchool.financeUsername || `finance_${cleanCode.substring(0, 8)}`;
+    const financeName = newSchool.financeName || `Finance Manager (${newSchool.name})`;
+    const financePassword = newSchool.financePassword || 'Finance@12345';
+
+    newSchool.username = adminUsername;
+    newSchool.password = adminPassword;
+    newSchool.adminUsername = adminUsername;
+    newSchool.adminPassword = adminPassword;
+    newSchool.admin = adminEmail;
+    newSchool.adminName = adminName;
+    newSchool.financeEmail = financeEmail;
+    newSchool.financeUsername = financeUsername;
+    newSchool.financePassword = financePassword;
+    newSchool.financeName = financeName;
 
     const createdAdmin = {
       id: 'USR0' + (users.length + 10) + Math.floor(10 + Math.random() * 89),
@@ -716,15 +909,30 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
       email: adminEmail,
       phone: newSchool.phone || '+91 94400 00000',
       username: adminUsername,
-      role: 'SCHOOL_ADMIN',
+      password: adminPassword,
+      role: 'schooladmin',
       schoolId: newSchool.id,
       schoolName: newSchool.name,
       status: 'Active',
       createdDate: new Date().toISOString().split('T')[0],
     };
-    setUsers((prev) => [createdAdmin, ...prev]);
 
-    
+    const createdFinance = {
+      id: 'USR0' + (users.length + 20) + Math.floor(10 + Math.random() * 89),
+      name: financeName,
+      email: financeEmail,
+      phone: newSchool.phone || '+91 94400 00001',
+      username: financeUsername,
+      password: financePassword,
+      role: 'finance',
+      schoolId: newSchool.id,
+      schoolName: newSchool.name,
+      status: 'Active',
+      createdDate: new Date().toISOString().split('T')[0],
+    };
+
+    setUsers((prev) => [createdAdmin, createdFinance, ...prev]);
+
     const pendingSub = {
       id: 'SUB-' + (newSchool.code || newSchool.id).replace(/[^A-Z0-9]/gi, '').toUpperCase() + '-01',
       schoolId: newSchool.id,
@@ -747,21 +955,323 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
       ...prev,
     ]);
 
-    
+    const demoTeachers = [
+      {
+        id: `${cleanPrefix}-T01`,
+        name: 'Mrs. Priya Sundaram',
+        roleType: 'Teacher',
+        phone: '+91 98401 23451',
+        email: `priya.s@${cleanCode}.edu`,
+        address: `${newSchool.city || 'Chennai'}, Tamil Nadu`,
+        bloodGroup: 'O+',
+        qualification: 'M.Sc., B.Ed',
+        subject: 'Mathematics',
+        onboardSubject: 'Mathematics',
+        class: 'Grade 10-A',
+        schoolId: newSchool.id,
+        schoolName: newSchool.name,
+        status: 'Active'
+      },
+      {
+        id: `${cleanPrefix}-T02`,
+        name: 'Dr. Anandhi Rajan',
+        roleType: 'Teacher',
+        phone: '+91 98401 23452',
+        email: `anandhi.r@${cleanCode}.edu`,
+        address: `${newSchool.city || 'Chennai'}, Tamil Nadu`,
+        bloodGroup: 'A+',
+        qualification: 'Ph.D., M.Sc., B.Ed',
+        subject: 'Physics',
+        onboardSubject: 'Physics',
+        class: 'Grade 10-B',
+        schoolId: newSchool.id,
+        schoolName: newSchool.name,
+        status: 'Active'
+      },
+      {
+        id: `${cleanPrefix}-T03`,
+        name: 'Mr. Raghu Raman',
+        roleType: 'Teacher',
+        phone: '+91 98401 23453',
+        email: `raghu.r@${cleanCode}.edu`,
+        address: `${newSchool.city || 'Chennai'}, Tamil Nadu`,
+        bloodGroup: 'B+',
+        qualification: 'M.Sc., M.Phil., B.Ed',
+        subject: 'Chemistry',
+        onboardSubject: 'Chemistry',
+        class: 'Grade 11-A',
+        schoolId: newSchool.id,
+        schoolName: newSchool.name,
+        status: 'Active'
+      },
+      {
+        id: `${cleanPrefix}-T04`,
+        name: 'Mrs. Revathi Chandran',
+        roleType: 'Teacher',
+        phone: '+91 98401 23454',
+        email: `revathi.c@${cleanCode}.edu`,
+        address: `${newSchool.city || 'Chennai'}, Tamil Nadu`,
+        bloodGroup: 'AB+',
+        qualification: 'M.A., M.Ed',
+        subject: 'English',
+        onboardSubject: 'English',
+        class: 'Grade 11-B',
+        schoolId: newSchool.id,
+        schoolName: newSchool.name,
+        status: 'Active'
+      },
+      {
+        id: `${cleanPrefix}-T05`,
+        name: 'Mr. Vijay Ananth',
+        roleType: 'Teacher',
+        phone: '+91 98401 23455',
+        email: `vijay.a@${cleanCode}.edu`,
+        address: `${newSchool.city || 'Chennai'}, Tamil Nadu`,
+        bloodGroup: 'O+',
+        qualification: 'M.C.A., B.Ed',
+        subject: 'Computer Science',
+        onboardSubject: 'Computer Science',
+        class: 'Grade 12-A',
+        schoolId: newSchool.id,
+        schoolName: newSchool.name,
+        status: 'Active'
+      }
+    ];
+
+    const demoStudentConfigs = [
+      { num: '01', name: 'Aarav Sundaram', grade: 'Grade 10', sec: 'A', gender: 'Male', parent: 'Mr. Sundaram K. (Father)', phone: '+91 98401 55101', total: 20000, paid: 20000, status: 'PAID' },
+      { num: '02', name: 'Divya Prakash', grade: 'Grade 10', sec: 'A', gender: 'Female', parent: 'Mr. Prakash R. (Father)', phone: '+91 98401 55102', total: 20000, paid: 10000, status: 'PARTIAL' },
+      { num: '03', name: 'Karthik Venkat', grade: 'Grade 10', sec: 'A', gender: 'Male', parent: 'Mrs. Venkat L. (Mother)', phone: '+91 98401 55103', total: 20000, paid: 0, status: 'OVERDUE' },
+      { num: '04', name: 'Harini Saravanan', grade: 'Grade 10', sec: 'B', gender: 'Female', parent: 'Mr. Saravanan M. (Father)', phone: '+91 98401 55104', total: 20000, paid: 20000, status: 'PAID' },
+      { num: '05', name: 'Manoj Kumar', grade: 'Grade 10', sec: 'B', gender: 'Male', parent: 'Mr. Kumarasamy (Father)', phone: '+91 98401 55105', total: 20000, paid: 5000, status: 'PARTIAL' },
+      { num: '06', name: 'Nandhini R', grade: 'Grade 11', sec: 'A', gender: 'Female', parent: 'Mrs. Radha R. (Mother)', phone: '+91 98401 55106', total: 20000, paid: 20000, status: 'PAID' },
+      { num: '07', name: 'Pradeep Raj', grade: 'Grade 11', sec: 'A', gender: 'Male', parent: 'Mr. Rajendran P. (Father)', phone: '+91 98401 55107', total: 20000, paid: 0, status: 'OVERDUE' },
+      { num: '08', name: 'Sneha Murugan', grade: 'Grade 11', sec: 'B', gender: 'Female', parent: 'Mr. Murugan V. (Father)', phone: '+91 98401 55108', total: 20000, paid: 12000, status: 'PARTIAL' },
+      { num: '09', name: 'Vigneshwaran S', grade: 'Grade 12', sec: 'A', gender: 'Male', parent: 'Mr. Sivakumar T. (Father)', phone: '+91 98401 55109', total: 20000, paid: 20000, status: 'PAID' },
+      { num: '10', name: 'Varsha Balaji', grade: 'Grade 12', sec: 'A', gender: 'Female', parent: 'Mrs. Balaji K. (Mother)', phone: '+91 98401 55110', total: 20000, paid: 10000, status: 'PARTIAL' }
+    ];
+
+    const demoStudents = [];
+    const demoFeeRecords = [];
+    const demoParents = [];
+
+    demoStudentConfigs.forEach((cfg) => {
+      const roll = `${cleanPrefix}-S${cfg.num}`;
+      const className = `${cfg.grade}-${cfg.sec}`;
+      const due = Math.max(0, cfg.total - cfg.paid);
+      const invoiceNo = `INV-2026-${cleanPrefix}-${cfg.num}`;
+
+      const feeItems = [
+        { feeType: 'Admission Fees', description: 'Admission & Enrollment', amount: 5000, discount: 0, fine: 0, netAmount: 5000, status: cfg.paid >= 5000 ? 'Paid' : 'Unpaid', paidAmount: cfg.paid >= 5000 ? 5000 : 0 },
+        { feeType: 'Transport Fees', description: 'Campus Bus / Van', amount: 5000, discount: 0, fine: 0, netAmount: 5000, status: cfg.paid >= 10000 ? 'Paid' : (cfg.paid > 5000 ? 'Partially Paid' : 'Unpaid'), paidAmount: cfg.paid >= 10000 ? 5000 : Math.max(0, cfg.paid - 5000) },
+        { feeType: 'Monthly Fees', description: 'Monthly Tuition Fee', amount: 4000, discount: 0, fine: 0, netAmount: 4000, status: cfg.paid >= 14000 ? 'Paid' : 'Unpaid', paidAmount: cfg.paid >= 14000 ? 4000 : 0 },
+        { feeType: 'Co-curricular Fees', description: 'Sports & Arts Activities', amount: 3000, discount: 0, fine: 0, netAmount: 3000, status: cfg.paid >= 17000 ? 'Paid' : 'Unpaid', paidAmount: cfg.paid >= 17000 ? 3000 : 0 },
+        { feeType: 'Exam Fees', description: 'Assessments & Books', amount: 3000, discount: 0, fine: 0, netAmount: 3000, status: cfg.paid === cfg.total ? 'Paid' : 'Unpaid', paidAmount: cfg.paid === cfg.total ? 3000 : 0 }
+      ];
+
+      demoStudents.push({
+        roll,
+        regNo: `REG-2026-${cleanPrefix}-${cfg.num}`,
+        name: cfg.name,
+        class: className,
+        gender: cfg.gender,
+        schoolId: newSchool.id,
+        schoolName: newSchool.name,
+        attendance: `${92 + (parseInt(cfg.num, 10) % 7)}%`,
+        performance: cfg.paid === cfg.total ? 'Outstanding' : 'Very Good',
+        parentName: cfg.parent,
+        parentPhone: cfg.phone,
+        emergencyContact: cfg.phone,
+        totalFees: cfg.total,
+        feeItems,
+        marks: [
+          { subject: 'Mathematics', max: 100, scored: 88 + (parseInt(cfg.num, 10) % 10), grade: 'A+' },
+          { subject: 'Physics', max: 100, scored: 84 + (parseInt(cfg.num, 10) % 12), grade: 'A+' },
+          { subject: 'Chemistry', max: 100, scored: 86 + (parseInt(cfg.num, 10) % 9), grade: 'A' },
+          { subject: 'Tamil', max: 100, scored: 92 + (parseInt(cfg.num, 10) % 7), grade: 'A+' },
+          { subject: 'English', max: 100, scored: 90 + (parseInt(cfg.num, 10) % 8), grade: 'A+' }
+        ]
+      });
+
+      demoFeeRecords.push({
+        id: `FEE-${cleanPrefix}-${cfg.num}`,
+        roll,
+        studentId: roll,
+        name: cfg.name,
+        studentName: cfg.name,
+        class: className,
+        grade: cfg.grade,
+        section: cfg.sec,
+        parent: cfg.parent,
+        parentName: cfg.parent,
+        phone: cfg.phone,
+        parentPhone: cfg.phone,
+        totalFee: `₹${cfg.total.toLocaleString('en-IN')}`,
+        totalFees: cfg.total,
+        paid: `₹${cfg.paid.toLocaleString('en-IN')}`,
+        paidAmount: cfg.paid,
+        due: `₹${due.toLocaleString('en-IN')}`,
+        pendingAmount: due,
+        status: cfg.status,
+        paymentStatus: cfg.status === 'PAID' ? 'Paid' : (cfg.paid > 0 ? 'Partially Paid' : 'Unpaid'),
+        invoiceNumber: invoiceNo,
+        dueDate: '2026-11-15',
+        billingMonth: 'October',
+        billingDate: new Date().toISOString().split('T')[0],
+        schoolId: newSchool.id,
+        schoolName: newSchool.name,
+        feeItems
+      });
+
+      demoParents.push({
+        id: `PRNT-${cleanPrefix}-${cfg.num}`,
+        name: cfg.parent,
+        phone: cfg.phone,
+        studentRoll: roll,
+        studentName: cfg.name,
+        studentClass: className,
+        schoolId: newSchool.id
+      });
+    });
+
     try {
       const store = getPortalData();
       if (!store.schools) store.schools = [];
       if (!store.users) store.users = [];
       if (!store.subscriptions) store.subscriptions = [];
+      if (!store.teachers) store.teachers = [];
+      if (!store.students) store.students = [];
+      if (!store.feeRecords) store.feeRecords = [];
+      if (!store.parents) store.parents = [];
+
       store.schools.unshift(newSchool);
       store.users.unshift(createdAdmin);
+      store.users.unshift(createdFinance);
       store.subscriptions.unshift(pendingSub);
+
+      demoTeachers.forEach((t) => store.teachers.unshift(t));
+      demoStudents.forEach((s) => store.students.unshift(s));
+      demoFeeRecords.forEach((f) => store.feeRecords.unshift(f));
+      demoParents.forEach((p) => store.parents.unshift(p));
+
+      if (!store.salaries) store.salaries = [];
+      const demoSalaries = demoTeachers.map((t, idx) => ({
+        _id: `sal_${t.id}`,
+        salarySlipNo: `SLIP-2026-10-0${idx + 1}`,
+        schoolId: newSchool.id,
+        schoolName: newSchool.name,
+        staffId: t.id,
+        staffName: t.name,
+        staffType: 'Teaching',
+        designation: `${t.subject || 'Faculty'} Teacher`,
+        department: t.subject || 'General',
+        salaryMonth: 'October',
+        salaryYear: 2026,
+        basicSalary: 32000,
+        hra: 10000,
+        allowances: 3000,
+        grossSalary: 45000,
+        pfDeduction: 3840,
+        netSalary: 41160,
+        paymentStatus: idx % 2 === 0 ? 'Paid' : 'Pending',
+        paymentDate: idx % 2 === 0 ? '2026-10-31' : null
+      }));
+      demoSalaries.forEach((s) => store.salaries.unshift(s));
+
+      if (!store.expenses) store.expenses = [];
+      const demoExpenses = [
+        {
+          _id: `exp_${cleanPrefix}_01`,
+          expenseId: `EXP-2026-${cleanPrefix}-01`,
+          schoolId: newSchool.id,
+          schoolName: newSchool.name,
+          expenseCategory: 'Electricity and Utilities',
+          expenseName: 'Campus Power & Water Utilities',
+          description: 'EB grid power and campus water supply',
+          vendorName: 'State Electricity Board',
+          invoiceNumber: `EB-OCT-${cleanPrefix}`,
+          expenseDate: '2026-10-10',
+          amount: 25000,
+          paidAmount: 25000,
+          pendingAmount: 0,
+          paymentStatus: 'Paid',
+          paymentMethod: 'NetBanking'
+        },
+        {
+          _id: `exp_${cleanPrefix}_02`,
+          expenseId: `EXP-2026-${cleanPrefix}-02`,
+          schoolId: newSchool.id,
+          schoolName: newSchool.name,
+          expenseCategory: 'Maintenance',
+          expenseName: 'Lab Kits & Campus Infrastructure',
+          description: 'Computer maintenance and laboratory replenishment',
+          vendorName: 'Campus Tech Supplies',
+          invoiceNumber: `TECH-OCT-${cleanPrefix}`,
+          expenseDate: '2026-10-14',
+          amount: 15000,
+          paidAmount: 10000,
+          pendingAmount: 5000,
+          paymentStatus: 'Pending',
+          paymentMethod: 'Cheque'
+        }
+      ];
+      demoExpenses.forEach((x) => store.expenses.unshift(x));
+
       savePortalData(store);
-    } catch (e) {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('portal_data_updated', { detail: store }));
+        window.dispatchEvent(new CustomEvent('fee_records_updated', { detail: { feeRecords: store.feeRecords } }));
+      }
+    } catch (e) {
+      console.error('Error saving portal demo data:', e);
+    }
+
+    try {
+      if (typeof api !== 'undefined' && api) {
+        if (typeof api.syncAuthUser === 'function') {
+          api.syncAuthUser(createdAdmin).catch(() => {});
+          api.syncAuthUser(createdFinance).catch(() => {});
+        }
+        if (typeof api.createUser === 'function') {
+          api.createUser(createdAdmin).catch(() => {});
+          api.createUser(createdFinance).catch(() => {});
+        }
+        if (typeof api.createStudent === 'function') {
+          demoStudents.forEach((st) => {
+            api.createStudent({
+              name: st.name,
+              rollNo: st.roll,
+              grade: st.class.split('-')[0],
+              section: st.class.split('-')[1] || 'A',
+              gender: st.gender,
+              parentName: st.parentName,
+              parentPhone: st.parentPhone,
+              feeStatus: st.performance === 'Outstanding' ? 'Paid' : 'Pending',
+              schoolId: newSchool.id
+            }).catch(() => {});
+          });
+        }
+      }
+    } catch (errSync) {}
 
     showFeedback(
-      'School Onboarded Successfully',
-      `1. School "${newSchool.name}" registered in Schools Management.\n2. Administrator "${adminName}" created in Admin Management.\n3. School enrolled in Subscriptions as "Pending Activation" — you can activate their SaaS plan anytime!`
+      'School & Administrative Accounts Created',
+      `School "${newSchool.name}" has been successfully registered with 10 demo students and 5 demo teachers. The system has automatically provisioned the School Administrator and Finance Manager login accounts:`,
+      {
+        schoolAdmin: {
+          name: adminName,
+          email: adminEmail,
+          username: adminUsername,
+          password: adminPassword,
+        },
+        financeManager: {
+          name: financeName,
+          email: financeEmail,
+          username: financeUsername,
+          password: financePassword,
+        }
+      }
     );
   };
 
@@ -1259,7 +1769,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                   fontSize: '0.82rem',
                   fontWeight: 700
                 }}>
-                  <span>⚡ Super Admin Access</span>
+                  <span> Super Admin Access</span>
                 </div>
               </div>
 
@@ -1288,6 +1798,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                 }}>
                   {[
                     { id: 'schooladmin', label: 'School Admin Dashboard', defaultTab: 'school-admin-users' },
+                    { id: 'finance', label: 'Finance Dashboard', defaultTab: 'finance-management' },
                     { id: 'principal', label: 'Principal Dashboard', defaultTab: 'attendance-reports' },
                     { id: 'teacher', label: 'Faculty / Teacher', defaultTab: 'my-classes' },
                     { id: 'student', label: 'Student Portal', defaultTab: 'view-dashboard' },
@@ -1334,7 +1845,6 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                   {activeCampusRole === 'schooladmin' && (
                     <>
                       <button className={`btn btn-sm ${activeCampusTab === 'school-admin-users' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('school-admin-users')}>DashBoard</button>
-                      <button className={`btn btn-sm ${activeCampusTab === 'finance-management' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('finance-management')} style={{ fontWeight: 700 }}>Finance Manage</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'school-services-tab' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('school-services-tab')}>Campus Services & Activities</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'manage-staff' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('manage-staff')}>Manage Staff</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'manage-students' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('manage-students')}>Manage Students</button>
@@ -1345,6 +1855,11 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                       <button className={`btn btn-sm ${activeCampusTab === 'publish-announcements' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('publish-announcements')}>Announcements</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'view-reports' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('view-reports')}>School Reports</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'secure-messaging' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('secure-messaging')}>Secure Messaging</button>
+                    </>
+                  )}
+                  {activeCampusRole === 'finance' && (
+                    <>
+                      <button className="btn btn-sm btn-primary" onClick={() => setActiveCampusTab('finance-management')} style={{ fontWeight: 700 }}>Finance Manage & Dues</button>
                     </>
                   )}
                   {activeCampusRole === 'principal' && (
@@ -1405,8 +1920,10 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
 
               
               <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '20px', minHeight: '600px' }}>
-                {activeCampusRole === 'schooladmin' ? (
-                  <SchoolAdminView activeTab={activeCampusTab} setActiveTab={setActiveCampusTab} />
+                {activeCampusRole === 'finance' ? (
+                  <SchoolFinanceModule user={{ schoolId: activeCampusPortal.id, schoolName: activeCampusPortal.name, role: 'finance' }} />
+                ) : activeCampusRole === 'schooladmin' ? (
+                  <SchoolAdminView activeTab={activeCampusTab} setActiveTab={setActiveCampusTab} user={{ schoolId: activeCampusPortal.id, schoolName: activeCampusPortal.name, role: 'schooladmin' }} />
                 ) : (
                   <AcademicRolesView
                     role={activeCampusRole}
@@ -1548,7 +2065,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                           }}
                         >
                           {s.subscription || 'Pending Activation'}
-                          {s.subscription === 'Pending Activation' ? ' ⚡' : ''}
+                          {s.subscription === 'Pending Activation' ? ' ' : ''}
                         </span>
                       </td>
                       <td data-label="Status">
@@ -1570,7 +2087,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                               setActiveCampusTab('school-admin-users');
                             }}
                           >
-                            📊 Dashboards
+                             Dashboards
                           </button>
                           {s.subscription === 'Pending Activation' && (
                             <button
@@ -1584,7 +2101,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                                 setIsSubModalOpen(true);
                               }}
                             >
-                              ⚡ Plan
+                               Plan
                             </button>
                           )}
                           <button
@@ -1742,6 +2259,11 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                             <div className="school-meta-line">
                               <strong style={{ color: '#0f172a', fontSize: '0.92rem', display: 'block' }}>{a.name}</strong>
                               <small style={{ color: '#64748b', fontSize: '0.78rem' }}>Username: <code style={{ color: '#2563eb' }}>{a.username}</code></small>
+                              <div style={{ marginTop: '3px' }}>
+                                <small style={{ color: '#047857', fontSize: '0.78rem', fontWeight: 700 }}>
+                                  Password: <code style={{ background: '#ecfdf5', color: '#065f46', padding: '1px 7px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>{a.password || 'Admin@12345'}</code>
+                                </small>
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -2123,7 +2645,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      <span>🏫</span> Select School:
+                      <span></span> Select School:
                     </span>
                     <select
                       value={selectedSchoolForServiceView}
@@ -2951,7 +3473,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                                   setIsSubModalOpen(true);
                                 }}
                               >
-                                ⚡ Activate Plan
+                                 Activate Plan
                               </button>
                             ) : (
                               <button
@@ -3287,6 +3809,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
           setActiveCampusRole('schooladmin');
           setActiveCampusTab('school-admin-users');
         }}
+        onUpdateCredentials={handleUpdateSchoolCredentials}
       />
 
       
@@ -3349,6 +3872,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
         isOpen={feedback.isOpen}
         title={feedback.title}
         message={feedback.message}
+        credentials={feedback.credentials}
         onClose={() => setFeedback({ ...feedback, isOpen: false })}
       />
 

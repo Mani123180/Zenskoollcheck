@@ -1,4 +1,156 @@
 
+export const defaultPortalSchools = [
+  {
+    id: 'SCHOOL002',
+    name: 'Sri Sankara Vidhyasala Girls High School',
+    code: 'SSV-KOD',
+    city: 'Kodumudi',
+    phone: '+91 98456 12301',
+    email: 'info@ssvgirlsschool.edu',
+    principal: 'Dr. Savithri Raman',
+    academicYear: '2026-2027',
+    admin: 'admin@ssvschool.com',
+    adminName: 'Mrs. Savithri Raman',
+    username: 'admin_ssv',
+    adminUsername: 'admin_ssv',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_ssv',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@ssvschool.com',
+    financeName: 'School Finance Manager',
+    status: 'Active',
+    studentsCount: 482,
+    teachersCount: 34,
+    parentsCount: 460,
+    subscription: 'Enterprise Plan',
+    createdDate: '2026-02-15',
+    board: 'State Board (Tamil Nadu)',
+  },
+  {
+    id: 'SCHOOL001',
+    name: 'ABC Matriculation School',
+    code: 'ABC-CHE',
+    city: 'Chennai',
+    phone: '+91 94433 11223',
+    email: 'contact@abcschool.com',
+    principal: 'Dr. K. Ramanathan',
+    academicYear: '2026-2027',
+    admin: 'admin@abcschool.com',
+    adminName: 'Admin Rajesh',
+    username: 'admin_abcche',
+    adminUsername: 'admin_abcche',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_abcche',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@abcschool.com',
+    financeName: 'Finance Manager (ABC)',
+    status: 'Active',
+    studentsCount: 520,
+    teachersCount: 28,
+    parentsCount: 480,
+    subscription: 'Pro Plan',
+    createdDate: '2026-01-10',
+    board: 'Matriculation',
+  },
+  {
+    id: 'SCHOOL003',
+    name: 'St. Marys Academy',
+    code: 'STM-ERD',
+    city: 'Erode',
+    phone: '+91 97890 45678',
+    email: 'office@stmarys.edu',
+    principal: 'Fr. Thomas Varghese',
+    academicYear: '2026-2027',
+    admin: 'admin@stmarys.com',
+    adminName: 'Admin Joseph',
+    username: 'admin_stmerd',
+    adminUsername: 'admin_stmerd',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_stmerd',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@stmerd.edu',
+    financeName: 'Finance Manager (St. Marys)',
+    status: 'Active',
+    studentsCount: 650,
+    teachersCount: 42,
+    parentsCount: 620,
+    subscription: 'Pro Plan',
+    createdDate: '2026-03-01',
+    board: 'ICSE',
+  },
+  {
+    id: 'SCHOOL004',
+    name: 'Delhi Public World School',
+    code: 'DPW-CBE',
+    city: 'Coimbatore',
+    phone: '+91 94888 23456',
+    email: 'contact@dpwschool.edu',
+    principal: 'Mrs. Anitha Sharma',
+    academicYear: '2026-2027',
+    admin: 'admin@dpwschool.edu',
+    adminName: 'Admin Anitha',
+    username: 'admin_dpwcbe',
+    adminUsername: 'admin_dpwcbe',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_dpwcbe',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@dpwschool.edu',
+    financeName: 'Finance Manager (DPW)',
+    status: 'Active',
+    studentsCount: 710,
+    teachersCount: 45,
+    parentsCount: 680,
+    subscription: 'Enterprise Plan',
+    createdDate: '2026-02-01',
+    board: 'CBSE',
+  },
+  {
+    id: 'SCHOOL005',
+    name: 'Oxford International Academy',
+    code: 'OXF-CHN',
+    city: 'Chennai',
+    phone: '+91 91234 56789',
+    email: 'admin@oxford.edu',
+    principal: 'Mr. David Paul',
+    academicYear: '2026-2027',
+    admin: 'admin@oxford.edu',
+    adminName: 'Admin Vikram',
+    username: 'admin_oxfchn',
+    adminUsername: 'admin_oxfchn',
+    password: 'Admin@12345',
+    adminPassword: 'Admin@12345',
+    financeUsername: 'finance_oxfchn',
+    financePassword: 'Finance@12345',
+    financeEmail: 'finance@oxford.edu',
+    financeName: 'Finance Manager (Oxford)',
+    status: 'Active',
+    studentsCount: 320,
+    teachersCount: 22,
+    parentsCount: 310,
+    subscription: 'Basic Plan',
+    createdDate: '2025-08-12',
+    board: 'CBSE',
+  },
+];
+
+export const defaultPortalUsers = [
+  { id: 'USR001', name: 'Super Administrator', email: 'superadmin@zenschool.com', phone: '+91 98401 11001', username: 'superadmin', password: 'SuperAdmin@123', role: 'superadmin', schoolId: 'ALL', schoolName: 'Zenith Central Trust', status: 'Active', aliases: ['superadmin'] },
+  { id: 'USR003', name: 'School Administrator (SSV)', email: 'admin@ssvschool.com', phone: '+91 98401 22002', username: 'admin_ssv', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', aliases: ['admin_ssv', 'admin_ssvkod', 'admin@ssvschool.com'] },
+  { id: 'USR005', name: 'School Finance Manager (SSV)', email: 'finance@ssvschool.com', phone: '+91 98401 22005', username: 'finance_ssv', password: 'Finance@12345', role: 'finance', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', aliases: ['finance_ssv', 'finance_ssvkod', 'finance@ssvschool.com'] },
+  { id: 'USR002', name: 'Admin Rajesh (ABC School)', email: 'admin@abcschool.com', phone: '+91 98401 33003', username: 'admin_abcche', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', aliases: ['admin_abcche', 'admin_abc', 'admin@abcschool.com'] },
+  { id: 'USR012', name: 'Finance Manager (ABC School)', email: 'finance@abcschool.com', phone: '+91 98401 33012', username: 'finance_abcche', password: 'Finance@12345', role: 'finance', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', aliases: ['finance_abcche', 'finance_abc', 'finance@abcschool.com'] },
+  { id: 'USR004', name: 'Admin Joseph (St. Marys)', email: 'admin@stmarys.com', phone: '+91 98401 44004', username: 'admin_stmerd', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', aliases: ['admin_stmerd', 'admin_stm', 'admin@stmarys.com'] },
+  { id: 'USR014', name: 'Finance Manager (St. Marys)', email: 'finance@stmerd.edu', phone: '+91 98401 44014', username: 'finance_stmerd', password: 'Finance@12345', role: 'finance', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', aliases: ['finance_stmerd', 'finance_stm', 'finance@stmerd.edu'] },
+  { id: 'USR006', name: 'Admin Anitha (DPW School)', email: 'admin@dpwschool.edu', phone: '+91 98401 55004', username: 'admin_dpwcbe', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL004', schoolName: 'Delhi Public World School', status: 'Active', aliases: ['admin_dpwcbe', 'admin_dpw', 'admin@dpwschool.edu'] },
+  { id: 'USR016', name: 'Finance Manager (DPW School)', email: 'finance@dpwschool.edu', phone: '+91 98401 55016', username: 'finance_dpwcbe', password: 'Finance@12345', role: 'finance', schoolId: 'SCHOOL004', schoolName: 'Delhi Public World School', status: 'Active', aliases: ['finance_dpwcbe', 'finance_dpw', 'finance@dpwschool.edu'] },
+  { id: 'USR005', name: 'Admin Vikram (Oxford)', email: 'admin@oxford.edu', phone: '+91 98401 55005', username: 'admin_oxfchn', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL005', schoolName: 'Oxford International Academy', status: 'Active', aliases: ['admin_oxfchn', 'admin_oxf', 'admin@oxford.edu'] },
+  { id: 'USR015', name: 'Finance Manager (Oxford)', email: 'finance@oxford.edu', phone: '+91 98401 55015', username: 'finance_oxfchn', password: 'Finance@12345', role: 'finance', schoolId: 'SCHOOL005', schoolName: 'Oxford International Academy', status: 'Active', aliases: ['finance_oxfchn', 'finance_oxf', 'finance@oxford.edu'] },
+];
+
 
 
 
@@ -458,6 +610,28 @@ export function getPortalData() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      if (!parsed.schools || parsed.schools.length === 0) {
+        parsed.schools = [...defaultPortalSchools];
+      } else {
+        defaultPortalSchools.forEach((ds) => {
+          if (!parsed.schools.some((s) => s.id === ds.id)) {
+            parsed.schools.push(ds);
+          }
+        });
+      }
+
+      if (!parsed.users || parsed.users.length === 0) {
+        parsed.users = [...defaultPortalUsers];
+      } else {
+        defaultPortalUsers.forEach((du) => {
+          const existing = parsed.users.find((u) => u.username === du.username || (du.aliases && du.aliases.includes(u.username)));
+          if (!existing) {
+            parsed.users.push(du);
+          } else if (!existing.password) {
+            existing.password = du.password;
+          }
+        });
+      }
       if (!parsed.staffLeaves || parsed.staffLeaves.length === 0) {
         parsed.staffLeaves = defaultData.staffLeaves;
       }

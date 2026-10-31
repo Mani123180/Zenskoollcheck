@@ -918,10 +918,16 @@ exports.updateStudentBill = async (req, res) => {
     }
 
     if (getDBStatus()) {
-      const updated = await StudentBill.findByIdAndUpdate(id, updateData, { new: true });
+      let updated = null;
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        updated = await StudentBill.findByIdAndUpdate(id, updateData, { new: true });
+      }
+      if (!updated) {
+        updated = await StudentBill.findOneAndUpdate({ $or: [{ invoiceNumber: id }, { rollNo: id }, { studentId: id }] }, updateData, { new: true });
+      }
       return res.json({ success: true, message: 'Bill updated successfully', bill: updated });
     } else {
-      const idx = memoryStudentBills.findIndex(b => b._id === id || b.invoiceNumber === id);
+      const idx = memoryStudentBills.findIndex(b => b._id === id || b.invoiceNumber === id || b.rollNo === id || b.studentId === id);
       if (idx === -1) return res.status(404).json({ success: false, message: 'Bill not found' });
       memoryStudentBills[idx] = { ...memoryStudentBills[idx], ...updateData };
       return res.json({ success: true, message: 'Bill updated successfully', bill: memoryStudentBills[idx] });

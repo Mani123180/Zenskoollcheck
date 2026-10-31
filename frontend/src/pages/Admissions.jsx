@@ -310,7 +310,7 @@ export default function Admissions() {
               <h3 className="card-title" style={{ marginBottom: '20px' }}>Financial Aid & Awards</h3>
               <div className="feature-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <div style={{ color: 'var(--color-secondary)', fontSize: '1.2rem' }}>★</div>
+                  <div style={{ color: 'var(--color-secondary)', fontSize: '1.2rem' }}></div>
                   <div>
                     <strong style={{ display: 'block', color: 'var(--color-primary)' }}>Merit-Based Scholarship</strong>
                     <span style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
@@ -320,7 +320,7 @@ export default function Admissions() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <div style={{ color: 'var(--color-secondary)', fontSize: '1.2rem' }}>★</div>
+                  <div style={{ color: 'var(--color-secondary)', fontSize: '1.2rem' }}></div>
                   <div>
                     <strong style={{ display: 'block', color: 'var(--color-primary)' }}>Need-Based Grants</strong>
                     <span style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
