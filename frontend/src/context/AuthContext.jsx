@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { getPortalData } from '../services/portalData';
+import { getPortalData, defaultPortalSchools, defaultPortalUsers } from '../services/portalData';
 
 const AuthContext = createContext();
 
@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const store = getPortalData() || {};
-      const allUsers = [...(defaultPortalUsers || []), ...(store.users || []), ...(defaultData?.users || [])];
+      const allUsers = [...(defaultPortalUsers || []), ...(store.users || [])];
       const allSchools = [...(defaultPortalSchools || []), ...(store.schools || [])];
 
       let matchedUser = allUsers.find((u) => {
