@@ -360,9 +360,6 @@ const finIcons = {
                     <h3 id="user-display-name" style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--color-primary)' }}>
                       Super Administrator
                     </h3>
-                    <span id="user-display-role" style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-                      Zenith Central Trust (HQ)
-                    </span>
                   </>
                 ) : (
                   <>

@@ -539,15 +539,15 @@ export default function Login() {
                   disabled={submitting}
                   style={{
                     width: '100%',
-                    background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)',
-                    color: '#ffffff',
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    color: '#0f172a',
                     border: 'none',
-                    padding: '12px 16px',
+                    padding: '13px 16px',
                     borderRadius: '8px',
                     fontWeight: 800,
-                    fontSize: '0.95rem',
+                    fontSize: '0.98rem',
                     cursor: submitting ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 4px 14px rgba(30, 58, 138, 0.35)',
+                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.45)',
                     transition: 'all 0.2s ease',
                     letterSpacing: '0.3px',
                     display: 'flex',
@@ -558,7 +558,7 @@ export default function Login() {
                 >
                   {submitting ? (
                     <>
-                      <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #ffffff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }}></span>
+                      <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #0f172a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }}></span>
                       <span>Verifying Credentials...</span>
                     </>
                   ) : (
