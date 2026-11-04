@@ -12,14 +12,13 @@ const staffSalarySchema = new mongoose.Schema(
     salaryMonth: { type: String, required: true }, 
     salaryYear: { type: Number, required: true }, 
 
-    
+  
     basicSalary: { type: Number, required: true, default: 0, min: 0 },
     hra: { type: Number, default: 0, min: 0 },
     allowances: { type: Number, default: 0, min: 0 },
     bonus: { type: Number, default: 0, min: 0 },
     incentives: { type: Number, default: 0, min: 0 },
 
-    
     pf: { type: Number, default: 0, min: 0 },
     esi: { type: Number, default: 0, min: 0 },
     otherDeductions: { type: Number, default: 0, min: 0 },

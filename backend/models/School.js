@@ -15,7 +15,7 @@ const schoolSchema = new mongoose.Schema(
     studentCount: { type: Number, default: 0 },
     teacherCount: { type: Number, default: 0 },
     plan: { type: String, default: 'Standard' },
-    status: { type: String, enum: ['Active', 'Pending', 'Suspended'], default: 'Active' },
+    status: { type: String, enum: ['Active', 'Pending', 'Suspended', 'Inactive', 'Deactivated'], default: 'Active' },
     joinedDate: { type: String, default: () => new Date().toISOString().split('T')[0] },
   },
   { timestamps: true }

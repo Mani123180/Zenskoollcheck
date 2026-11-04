@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
+import { getPortalData, isSchoolActive, isUserActive } from '../services/portalData';
 import SuperAdminView from './portal/SuperAdminView';
 import SchoolAdminView from './portal/SchoolAdminView';
 import AcademicRolesView from './portal/AcademicRolesView';
@@ -67,6 +68,35 @@ export default function Portal() {
 
   const currentRole = user ? user.role.toLowerCase() : 'superadmin';
 
+  const checkDeactivation = () => {
+    if (currentRole === 'superadmin') return false;
+    const sId = user?.schoolId;
+    if (sId && sId !== 'ALL' && !isSchoolActive(sId)) {
+      return true;
+    }
+    const uId = user?.userId || user?.id;
+    const uName = user?.username;
+    if (!isUserActive(uId, uName)) {
+      return true;
+    }
+    return false;
+  };
+
+  const [isDeactivated, setIsDeactivated] = useState(() => checkDeactivation());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setIsDeactivated(checkDeactivation());
+    };
+
+    window.addEventListener('portal_data_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('portal_data_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, [user, currentRole]);
+
   
 
 const finIcons = {
@@ -127,7 +157,7 @@ const finIcons = {
       { id: 'sa-services', label: 'Services', icon: saIcons.services },
       { id: 'sa-subscriptions', label: 'Subscription', icon: saIcons.subscriptions },
       { id: 'sa-billing', label: 'Bills / Billing', icon: saIcons.billing },
-      { id: 'sa-messaging', label: 'Secure Messaging', icon: schIcons.messaging },
+      { id: 'sa-messaging', label: 'Messages', icon: schIcons.messaging },
       { id: 'sa-settings', label: 'Settings', icon: saIcons.settings },
     ],
     schooladmin: [
@@ -141,7 +171,7 @@ const finIcons = {
       { id: 'financial-manage', label: 'Financial Manage', icon: saIcons.billing },
       { id: 'publish-announcements', label: 'Announcements', icon: schIcons.announcements },
       { id: 'view-reports', label: 'School Reports', icon: schIcons.reports },
-      { id: 'secure-messaging', label: 'Secure Messaging', icon: schIcons.messaging },
+      { id: 'secure-messaging', label: 'Messages', icon: schIcons.messaging },
     ],
     finance: [
       { id: 'dashboard', label: 'Finance Dashboard', icon: finIcons.dashboard },
@@ -180,7 +210,7 @@ const finIcons = {
       { id: 'study-materials', label: 'Study Materials', icon: schIcons.subjects },
       { id: 'announcements', label: 'Announcements', icon: schIcons.announcements },
       { id: 'leave-request', label: 'Leave Requests & Approvals', icon: schIcons.reports },
-      { id: 'secure-messaging', label: 'Secure Messaging', icon: schIcons.messaging },
+      { id: 'secure-messaging', label: 'Messages', icon: schIcons.messaging },
       { id: 'timetable', label: 'Timetable', icon: saIcons.dashboard },
     ],
     student: [
@@ -224,8 +254,17 @@ const finIcons = {
     api.sendHeartbeat();
     const hbInterval = setInterval(() => {
       api.sendHeartbeat();
-    }, 6000);
-    return () => clearInterval(hbInterval);
+    }, 5000);
+
+    const handleUnload = () => {
+      api.sendOffline();
+    };
+    window.addEventListener('beforeunload', handleUnload);
+
+    return () => {
+      clearInterval(hbInterval);
+      window.removeEventListener('beforeunload', handleUnload);
+    };
   }, [user]);
 
   const getRoleDisplayName = () => {
@@ -342,16 +381,32 @@ const finIcons = {
             </div>
 
             <div className="sidebar-menu" id="portal-menu">
-              {currentMenu.map((item) => (
-                <button
-                  key={item.id}
-                  className={`menu-item ${activeTab === item.id ? 'active' : ''}`}
-                  onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
-                >
-                  <span className="menu-icon">{item.icon}</span>
-                  <span>{item.label}</span>
-                </button>
-              ))}
+              {isDeactivated && currentRole !== 'superadmin' ? (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  color: '#991b1b',
+                  fontSize: '0.82rem',
+                  lineHeight: '1.5',
+                  margin: '10px 0'
+                }}>
+                  <strong style={{ display: 'block', marginBottom: '4px' }}>🔒 Navigation Locked</strong>
+                  School operations are suspended by Super Admin. All modules are disabled.
+                </div>
+              ) : (
+                currentMenu.map((item) => (
+                  <button
+                    key={item.id}
+                    className={`menu-item ${activeTab === item.id ? 'active' : ''}`}
+                    onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
+                  >
+                    <span className="menu-icon">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))
+              )}
             </div>
 
             <button
@@ -369,16 +424,142 @@ const finIcons = {
           
           <main className="portal-main">
             {currentRole === 'superadmin' && <SuperAdminView activeTab={activeTab} setActiveTab={setActiveTab} />}
-            {currentRole === 'schooladmin' && <SchoolAdminView activeTab={activeTab} setActiveTab={setActiveTab} user={user} />}
-            {(currentRole === 'finance' || currentRole === 'financemanager') && (
-              <SchoolFinanceModule
-                user={user}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-              />
-            )}
-            {['principal', 'teacher', 'student', 'parent'].includes(currentRole) && (
-              <AcademicRolesView role={currentRole} user={user} activeTab={activeTab} setActiveTab={setActiveTab} />
+            {currentRole !== 'superadmin' && isDeactivated ? (
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #fecaca',
+                borderRadius: '16px',
+                padding: '48px 32px',
+                maxWidth: '720px',
+                margin: '40px auto',
+                textAlign: 'center',
+                boxShadow: '0 10px 25px -5px rgba(220, 38, 38, 0.1), 0 8px 10px -6px rgba(220, 38, 38, 0.1)'
+              }}>
+                <div style={{
+                  width: '84px',
+                  height: '84px',
+                  borderRadius: '50%',
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '20px',
+                  border: '2px solid #fca5a5'
+                }}>
+                  <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    <line x1="12" y1="15" x2="12" y2="18"></line>
+                  </svg>
+                </div>
+                <div style={{
+                  display: 'inline-block',
+                  background: '#fef2f2',
+                  color: '#b91c1c',
+                  border: '1px solid #f87171',
+                  padding: '5px 16px',
+                  borderRadius: '20px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.6px',
+                  marginBottom: '14px'
+                }}>
+                  Institutional Access Revoked
+                </div>
+                <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px', letterSpacing: '-0.3px' }}>
+                  {!isUserActive(user?.userId || user?.id, user?.username)
+                    ? 'Administrator Account Deactivated'
+                    : `${getSchoolDisplayName()} is Deactivated`}
+                </h2>
+                <p style={{ color: '#64748b', fontSize: '1rem', lineHeight: '1.6', maxWidth: '580px', margin: '0 auto 24px' }}>
+                  {!isUserActive(user?.userId || user?.id, user?.username)
+                    ? 'Your administrator credentials have been deactivated by the Central Super Administrator. All management operations and portal privileges for this account are currently suspended.'
+                    : 'This school campus has been deactivated by the Central Super Administrator (Zenith Central Trust). All teacher classroom portals, biometric attendance registers, fee collections, homework assignments, and student access for this entire institution have been temporarily disabled.'}
+                </p>
+
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  textAlign: 'left',
+                  maxWidth: '540px',
+                  margin: '0 auto 28px',
+                  fontSize: '0.88rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Campus Identifier:</span>
+                    <strong style={{ color: '#0f172a' }}>{user?.schoolId || 'CAMPUS'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Account Status:</span>
+                    <strong style={{ color: '#dc2626' }}>DEACTIVATED / INACTIVE</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Your User Role:</span>
+                    <strong style={{ color: '#1e3a8a' }}>{getRoleDisplayName()}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Data Sovereignty:</span>
+                    <span style={{ color: '#059669', fontWeight: 700 }}>Records Securely Preserved</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      navigate('/login');
+                    }}
+                    style={{
+                      background: '#0f172a',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '12px 28px',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '0.92rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Sign Out
+                  </button>
+                  <a
+                    href="mailto:support@zenschool.com?subject=Reactivate%20Campus%20Access%20Request"
+                    style={{
+                      background: '#f1f5f9',
+                      color: '#334155',
+                      border: '1px solid #cbd5e1',
+                      padding: '12px 24px',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '0.92rem',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    Contact Central Admin
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <>
+                {currentRole === 'schooladmin' && <SchoolAdminView activeTab={activeTab} setActiveTab={setActiveTab} user={user} />}
+                {(currentRole === 'finance' || currentRole === 'financemanager') && (
+                  <SchoolFinanceModule
+                    user={user}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                  />
+                )}
+                {['principal', 'teacher', 'student', 'parent'].includes(currentRole) && (
+                  <AcademicRolesView role={currentRole} user={user} activeTab={activeTab} setActiveTab={setActiveTab} />
+                )}
+              </>
             )}
           </main>
         </div>

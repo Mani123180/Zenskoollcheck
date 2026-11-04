@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getPortalData } from '../services/portalData';
+import { getPortalData, isSchoolActive } from '../services/portalData';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -19,49 +19,56 @@ export default function Login() {
       user: 'superadmin@zenschool.com',
       pass: 'SuperAdmin@123',
       color: '#1e3a8a',
-      badge: 'Platform Owner'
+      badge: 'Platform Owner',
+      schoolId: 'ALL'
     },
     schooladmin_ssv: {
       label: 'School Admin',
       user: 'admin@ssvschool.com',
       pass: 'Admin@12345',
       color: '#2563eb',
-      badge: 'Campus Admin'
+      badge: 'Campus Admin',
+      schoolId: 'SCHOOL002'
     },
     finance_manager: {
       label: 'Finance Manager',
       user: 'finance@ssvschool.com',
       pass: 'Finance@12345',
       color: '#059669',
-      badge: 'Finance Desk'
+      badge: 'Finance Desk',
+      schoolId: 'SCHOOL002'
     },
     principal: {
       label: 'Principal',
       user: 'principal@ssvschool.com',
       pass: 'principal123',
       color: '#7c3aed',
-      badge: 'Leadership'
+      badge: 'Leadership',
+      schoolId: 'SCHOOL002'
     },
     teacher: {
       label: 'Teacher',
       user: 'teacher@ssvschool.com',
       pass: 'teacher123',
       color: '#0891b2',
-      badge: 'Academic Faculty'
+      badge: 'Academic Faculty',
+      schoolId: 'SCHOOL002'
     },
     student: {
       label: 'Student',
       user: 'student@ssvschool.com',
       pass: 'student123',
       color: '#d97706',
-      badge: 'Student Portal'
+      badge: 'Student Portal',
+      schoolId: 'SCHOOL002'
     },
     parent: {
       label: 'Parent',
       user: 'parent@ssvschool.com',
       pass: 'parent123',
       color: '#db2777',
-      badge: 'Parent Guardian'
+      badge: 'Parent Guardian',
+      schoolId: 'SCHOOL002'
     },
   };
 
@@ -74,13 +81,13 @@ export default function Login() {
       if (store && store.users) {
         if (key === 'schooladmin_ssv') {
           const u = store.users.find((x) => x.username === 'admin_ssv' || x.email === 'admin@ssvschool.com');
-          if (u && u.password) {
+          if (u && u.password && !u.password.startsWith('$2')) {
             cred.pass = u.password;
             if (u.username) cred.user = u.username;
           }
         } else if (key === 'finance_manager') {
           const u = store.users.find((x) => x.username === 'finance_ssv' || x.email === 'finance@ssvschool.com');
-          if (u && u.password) {
+          if (u && u.password && !u.password.startsWith('$2')) {
             cred.pass = u.password;
             if (u.username) cred.user = u.username;
           }
@@ -385,15 +392,16 @@ export default function Login() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {Object.entries(demoCredentials).map(([key, cred]) => {
                     const isActive = activePreset === key;
+                    const isDeactivated = cred.schoolId && cred.schoolId !== 'ALL' && !isSchoolActive(cred.schoolId);
                     return (
                       <button
                         key={key}
                         type="button"
                         onClick={() => handleFillDemo(key)}
                         style={{
-                          background: isActive ? cred.color : '#ffffff',
-                          color: isActive ? '#ffffff' : '#334155',
-                          border: `1px solid ${isActive ? cred.color : '#e2e8f0'}`,
+                          background: isActive ? cred.color : (isDeactivated ? '#f8fafc' : '#ffffff'),
+                          color: isActive ? '#ffffff' : (isDeactivated ? '#94a3b8' : '#334155'),
+                          border: `1px solid ${isActive ? cred.color : (isDeactivated ? '#fca5a5' : '#e2e8f0')}`,
                           padding: '4px 10px',
                           borderRadius: '16px',
                           fontSize: '0.74rem',
@@ -403,11 +411,18 @@ export default function Login() {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px',
+                          opacity: isDeactivated ? 0.75 : 1,
                           boxShadow: isActive ? '0 2px 6px rgba(0,0,0,0.15)' : 'none'
                         }}
+                        title={isDeactivated ? `${cred.label} - Campus is currently DEACTIVATED by Super Admin` : cred.badge}
                       >
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isActive ? '#ffffff' : cred.color, display: 'inline-block' }}></span>
-                        {cred.label}
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isActive ? '#ffffff' : (isDeactivated ? '#ef4444' : cred.color), display: 'inline-block' }}></span>
+                        <span>{cred.label}</span>
+                        {isDeactivated && (
+                          <span style={{ fontSize: '0.62rem', background: '#fee2e2', color: '#dc2626', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
+                            OFFLINE
+                          </span>
+                        )}
                       </button>
                     );
                   })}

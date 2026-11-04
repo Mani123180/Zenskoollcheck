@@ -1,219 +1,203 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export default function About() {
+  const pillars = [
+    {
+      title: 'Automated School Operations',
+      desc: 'Say goodbye to fragmented paper registers and manual receipt logs. ZenSkooll centralizes student onboarding, fee billing, examination rosters, and staff salary processing.',
+      color: '#2563eb'
+    },
+    {
+      title: 'Real-Time Parent Connectivity',
+      desc: 'Keep guardians informed every single morning. Instant RFID gate arrival alerts, daily homework assignments with PDF study materials, and WhatsApp fee receipts.',
+      color: '#7c3aed'
+    },
+    {
+      title: 'Indian Compliance Ready',
+      desc: 'Tailored for CBSE, ICSE, Matriculation, and State Board curriculum structures with built-in EPF, ESI statutory deductions and itemized fee ledgers.',
+      color: '#059669'
+    },
+    {
+      title: 'Multi-Role Enterprise Security',
+      desc: 'Strict role-based access control with isolated dashboards for Super Admins, School Administrators, Principals, Finance Managers, Teachers, Students, and Parents.',
+      color: '#d97706'
+    }
+  ];
+
   return (
-    <>
+    <div className="landing-wrapper">
       
-      <section className="hero" style={{ padding: '80px 0' }}>
-        <div className="container hero-content">
-          <h1 className="hero-title" style={{ fontSize: '2.8rem', marginBottom: '12px' }}>
-            About Our School
-          </h1>
-          <p className="hero-desc" style={{ marginBottom: 0 }}>
-            Dedicated to high academic standards and holistic development for girls.
+      {/* HERO SECTION */}
+      <section
+        className="landing-hero"
+        style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #0b1938 100%)',
+          position: 'relative',
+          padding: '80px 20px 60px',
+          textAlign: 'center',
+          color: '#ffffff'
+        }}
+      >
+        <h1 style={{ color: '#ffffff', fontSize: '2.8rem', fontWeight: 900, margin: '0 0 14px', letterSpacing: '-0.4px' }}>
+          Pioneering the Future of <span style={{ color: '#fbbf24' }}>Digital Campus Management</span>
+        </h1>
+        <p style={{ color: '#cbd5e1', maxWidth: '720px', margin: '0 auto', fontSize: '1.1rem', lineHeight: '1.7' }}>
+          ZenSkooll is a modern, all-in-one educational ERP designed to eliminate administrative friction and empower schools, teachers, students, and parents with seamless digital workflows.
+        </p>
+      </section>
+
+      {/* MISSION & VISION */}
+      <section style={{ maxWidth: '1200px', margin: '0 auto', padding: '60px 20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '36px', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ fontSize: '2.1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 14px' }}>
+              Built From the Ground Up for Indian Educational Institutions
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '0.98rem', lineHeight: '1.7', marginBottom: '14px' }}>
+              Traditional school management relied heavily on scattered paper registers, manual cash billing, delayed report card generation, and unorganized staff payroll calculations. Educational leaders spent valuable hours managing paperwork rather than focusing on institutional growth and student development.
+            </p>
+            <p style={{ color: '#64748b', fontSize: '0.98rem', lineHeight: '1.7', marginBottom: '22px' }}>
+              ZenSkooll was engineered to solve these exact operational challenges. We combined automated biometric roll-calls, real-time fee collection with instant WhatsApp receipts, class period timetables, batch exam scheduling, and staff payroll into one unified, secure platform.
+            </p>
+
+            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+              <Link
+                to="/features"
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: '#0f172a',
+                  padding: '12px 26px',
+                  borderRadius: '8px',
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  textDecoration: 'none',
+                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>Explore Features</span>
+                <span>&rarr;</span>
+              </Link>
+              <Link
+                to="/contact"
+                style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1px solid #cbd5e1',
+                  padding: '12px 26px',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '0.92rem',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>Book a Demo</span>
+              </Link>
+            </div>
+          </div>
+
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
+            <h3 style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px' }}>
+              How ZenSkooll Transforms Daily School Life
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem', flexShrink: 0 }}>1</div>
+                <div>
+                  <b style={{ color: '#0f172a', fontSize: '0.94rem' }}>Zero Administrative Bottlenecks</b>
+                  <p style={{ color: '#64748b', fontSize: '0.86rem', margin: '2px 0 0', lineHeight: '1.5' }}>Daily attendance registers, fee dues calculation, and marks compilation happen automatically without manual tallying.</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem', flexShrink: 0 }}>2</div>
+                <div>
+                  <b style={{ color: '#0f172a', fontSize: '0.94rem' }}>Transparent Parent Partnerships</b>
+                  <p style={{ color: '#64748b', fontSize: '0.86rem', margin: '2px 0 0', lineHeight: '1.5' }}>Parents stay continuously looped in through automated morning entry timestamps, homework reminders, and WhatsApp fee receipts.</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem', flexShrink: 0 }}>3</div>
+                <div>
+                  <b style={{ color: '#0f172a', fontSize: '0.94rem' }}>100% Statutory HR & Payroll Compliance</b>
+                  <p style={{ color: '#64748b', fontSize: '0.86rem', margin: '2px 0 0', lineHeight: '1.5' }}>Monthly teaching and non-teaching payroll calculations with automated EPF, ESI deductions, allowances, and bank transfer slips.</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem', flexShrink: 0 }}>4</div>
+                <div>
+                  <b style={{ color: '#0f172a', fontSize: '0.94rem' }}>Dedicated Cloud Data Sovereignty</b>
+                  <p style={{ color: '#64748b', fontSize: '0.86rem', margin: '2px 0 0', lineHeight: '1.5' }}>Every educational institution operates within an isolated, encrypted workspace with enterprise role-based authorization.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* OUR CORE PILLARS */}
+        <div style={{ marginTop: '80px', textAlign: 'center', marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px' }}>
+            Core Pillars of ZenSkooll
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '1rem', maxWidth: '620px', margin: '0 auto' }}>
+            Our architectural principles ensure complete reliability, data privacy, and daily convenience for educational campuses.
           </p>
         </div>
-      </section>
 
-      
-      <section className="section">
-        <div className="container grid-2" style={{ alignItems: 'center' }}>
-          <div>
-            <span className="badge badge-secondary" style={{ marginBottom: '14px' }}>Our History</span>
-            <h2 className="section-title" style={{ textAlign: 'left', marginBottom: '16px' }}>About S.S.V.</h2>
-            <p style={{ color: 'var(--color-text-light)', marginBottom: '14px', lineHeight: 1.7 }}>
-              Founded in <strong>1910</strong>, <strong>Sri Sankara Vidya Sala (S.S.V.)</strong> has been a pioneer
-              in providing quality education in and around Kodumudi. Established by visionary philanthropists{' '}
-              <strong>K. S. Narayana Iyer</strong> and <strong>Mulanoor Muthusamy Gounder</strong>, the institution
-              was created to bring secondary education to a region where no high school existed within a 40-kilometre radius.
-            </p>
-            <p style={{ color: 'var(--color-text-light)', marginBottom: '14px', lineHeight: 1.7 }}>
-              Over the years, S.S.V. has grown into a trusted educational institution through the generous support of
-              donors and the dedicated service of its management. From its first High School to the establishment of the
-              Girls High School, Higher Secondary School, and Nursery & Primary Schools, S.S.V. has continuously expanded
-              its commitment to academic excellence and holistic student development.
-            </p>
-            <p style={{ color: 'var(--color-text-light)', lineHeight: 1.7 }}>
-              With more than a century of educational service, S.S.V. remains dedicated to nurturing knowledge,
-              character, and values while preparing students to become responsible citizens and future leaders.
-            </p>
-          </div>
-          <div>
-            <img
-              src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=600&auto=format&fit=crop"
-              alt="Sri Sankara Vidya Sala Campus"
-              style={{ borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', width: '100%' }}
-            />
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px' }}>
+          {pillars.map((p, i) => (
+            <div key={i} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '28px', boxShadow: '0 4px 14px rgba(0,0,0,0.03)', borderTop: `4px solid ${p.color}` }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>{p.title}</h3>
+              <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.6', margin: 0 }}>{p.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* TRUST BANNER */}
+        <div style={{
+          marginTop: '70px',
+          background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
+          border: '1px solid #bfdbfe',
+          borderRadius: '16px',
+          padding: '40px',
+          textAlign: 'center'
+        }}>
+          <h3 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#1e3a8a', marginBottom: '10px' }}>
+            Ready to Digitize Your Educational Campus?
+          </h3>
+          <p style={{ color: '#475569', fontSize: '0.98rem', maxWidth: '640px', margin: '0 auto 24px', lineHeight: '1.6' }}>
+            Experience how ZenSkooll streamlines attendance, fee invoices, staff payroll, and examination dates in one click.
+          </p>
+          <Link
+            to="/login"
+            style={{
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              color: '#0f172a',
+              padding: '13px 34px',
+              borderRadius: '8px',
+              fontWeight: 800,
+              fontSize: '0.98rem',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)'
+            }}
+          >
+            <span>Access ZenSkooll Portal</span>
+            <span>&rarr;</span>
+          </Link>
         </div>
       </section>
-
-      
-      <section className="section section-bg">
-        <div className="container">
-          <div className="section-title-wrap">
-            <h2 className="section-title">Our Vision & Mission</h2>
-            <p style={{ color: 'var(--color-text-light)' }}>Guiding principles that drive our community forward.</p>
-          </div>
-          <div className="grid-2">
-            <div className="card">
-              <div style={{ fontSize: '2.5rem', marginBottom: '14px' }}></div>
-              <h3 className="card-title">Our Vision</h3>
-              <p className="card-desc">
-                To be a leading center of educational excellence that inspires girls to lead, create, and succeed in a dynamic world.
-              </p>
-            </div>
-            <div className="card">
-              <div style={{ fontSize: '2.5rem', marginBottom: '14px' }}></div>
-              <h3 className="card-title">Our Mission</h3>
-              <p className="card-desc">
-                Empowering students through tailored learning modules, comprehensive support, state-of-the-art laboratory work, and value-based personal growth.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      
-      <section className="section">
-        <div className="container">
-          <div className="section-title-wrap">
-            <h2 className="section-title">Core Values We Instill</h2>
-            <p style={{ color: 'var(--color-text-light)' }}>
-              Our curriculum and culture revolve around these core parameters of growth.
-            </p>
-          </div>
-
-          <div className="grid-3">
-            <div className="card">
-              <h3 className="card-title" style={{ color: 'var(--color-primary)' }}>1. Integrity</h3>
-              <p className="card-desc">
-                Honesty, moral uprightness, and respect for oneself and others in all situations.
-              </p>
-            </div>
-            <div className="card">
-              <h3 className="card-title" style={{ color: 'var(--color-primary)' }}>2. Self-Reliance</h3>
-              <p className="card-desc">
-                Fostering independence, critical thinking, problem-solving, and decisive leadership.
-              </p>
-            </div>
-            <div className="card">
-              <h3 className="card-title" style={{ color: 'var(--color-primary)' }}>3. Compassion</h3>
-              <p className="card-desc">
-                Empathetic understanding, community service, and environmental stewardship.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      
-      <section className="section section-bg">
-        <div className="container">
-          <div className="section-title-wrap">
-            <h2 className="section-title">Our Milestone Journey</h2>
-            <p style={{ color: 'var(--color-text-light)' }}>Over a century of shaping history and educating local communities.</p>
-          </div>
-
-          <div className="timeline">
-            <div className="timeline-item">
-              <div className="timeline-badge"></div>
-              <div className="timeline-card">
-                <div className="timeline-year">1910</div>
-                <h4 style={{ marginBottom: '8px', color: 'var(--color-primary)' }}>The Foundation</h4>
-                <p style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                  Founded by philanthropists K. S. Narayana Iyer and Mulanoor Muthusamy Gounder to bring secondary education to the Kodumudi region.
-                </p>
-              </div>
-            </div>
-
-            <div className="timeline-item">
-              <div className="timeline-badge"></div>
-              <div className="timeline-card">
-                <div className="timeline-year">1995</div>
-                <h4 style={{ marginBottom: '8px', color: 'var(--color-primary)' }}>Science Wing Expansion</h4>
-                <p style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                  Upgraded science laboratories and introduced technical computer science streams to encourage girls in STEM fields.
-                </p>
-              </div>
-            </div>
-
-            <div className="timeline-item">
-              <div className="timeline-badge"></div>
-              <div className="timeline-card">
-                <div className="timeline-year">2012</div>
-                <h4 style={{ marginBottom: '8px', color: 'var(--color-primary)' }}>Digital Campus Initiative</h4>
-                <p style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                  Equipped all classrooms with smart projectors and digitized the student evaluation process for parents.
-                </p>
-              </div>
-            </div>
-
-            <div className="timeline-item">
-              <div className="timeline-badge"></div>
-              <div className="timeline-card">
-                <div className="timeline-year">2026</div>
-                <h4 style={{ marginBottom: '8px', color: 'var(--color-primary)' }}>Looking to the Future</h4>
-                <p style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                  Expanding digital portals, self-defense classes, and advanced lab integrations for students.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      
-      <section className="section" id="safety">
-        <div className="container grid-2" style={{ alignItems: 'center' }}>
-          <div>
-            <img
-              src="https://images.unsplash.com/photo-1580582932707-520aed937b7b?q=80&w=600&auto=format&fit=crop"
-              alt="Modern clean classroom"
-              style={{ borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', width: '100%' }}
-            />
-          </div>
-          <div>
-            <span className="badge badge-secondary" style={{ marginBottom: '14px' }}>Campus Safety First</span>
-            <h2 className="section-title" style={{ textAlign: 'left', marginBottom: '16px' }}>
-              A Secure Environment for Learning
-            </h2>
-            <p style={{ color: 'var(--color-text-light)', marginBottom: '20px', lineHeight: 1.7 }}>
-              We prioritize safety to allow students to focus fully on their growth without worry. Our campus features comprehensive safety measures:
-            </p>
-
-            <div className="feature-list" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <span style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>✔</span>
-                <div>
-                  <strong style={{ display: 'block', color: 'var(--color-primary)' }}>Secure Controlled Access</strong>
-                  <span style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                    Single checkpoint gate manned by trained female security personnel 24/7.
-                  </span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <span style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>✔</span>
-                <div>
-                  <strong style={{ display: 'block', color: 'var(--color-primary)' }}>Comprehensive Surveillance</strong>
-                  <span style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                    Full CCTV coverage across corridors, laboratories, classrooms, and school buses.
-                  </span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <span style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>✔</span>
-                <div>
-                  <strong style={{ display: 'block', color: 'var(--color-primary)' }}>Medical Care</strong>
-                  <span style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-                    On-campus healthcare center with a registered nurse present during school hours.
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </>
+    </div>
   );
 }

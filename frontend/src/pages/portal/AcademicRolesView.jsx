@@ -239,7 +239,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
       'assignments': 'Homework & Assignments',
       'study-materials': 'Study Materials',
       'announcements': 'Announcements',
-      'secure-messaging': 'Secure Messaging',
+      'secure-messaging': 'Messages',
       'timetable': 'Timetable',
       'view-dashboard': 'View Dashboard',
       'check-attendance': 'Check Attendance',
@@ -769,9 +769,35 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
           ]).map((s) => ({ ...s, cost: '0/yr' }));
 
           
+          const sId = user?.schoolId || 'SCHOOL002';
+          const allAssignments = currentStore.schoolServiceAssignments && currentStore.schoolServiceAssignments.length > 0
+            ? currentStore.schoolServiceAssignments
+            : [
+                { id: 'SSA-01', serviceId: 'SRV-01', serviceName: 'Coding for Kids', schoolId: 'SCHOOL002', status: 'Active', portalAccess: true, visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin'] },
+                { id: 'SSA-02', serviceId: 'SRV-02', serviceName: 'Chess Academy', schoolId: 'SCHOOL002', status: 'Active', portalAccess: true, visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin'] },
+                { id: 'SSA-03', serviceId: 'SRV-03', serviceName: 'Robotics', schoolId: 'SCHOOL002', status: 'Active', portalAccess: true, visibleRoles: ['student', 'teacher', 'schooladmin'] },
+                { id: 'SSA-04', serviceId: 'SRV-04', serviceName: 'Drawing & Art', schoolId: 'SCHOOL001', status: 'Active', portalAccess: true, visibleRoles: ['student', 'parent', 'schooladmin'] },
+                { id: 'SSA-05', serviceId: 'SRV-05', serviceName: 'Spoken English', schoolId: 'SCHOOL001', status: 'Inactive', portalAccess: false, visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin'] },
+                { id: 'SSA-06', serviceId: 'SRV-06', serviceName: 'Abacus & Vedic Maths', schoolId: 'SCHOOL003', status: 'Active', portalAccess: true, visibleRoles: ['student', 'teacher', 'parent', 'schooladmin'] },
+              ];
+
+          const storeAssignments = allAssignments.filter(
+            (a) => (!sId || a.schoolId === sId || a.schoolId === 'ALL')
+          );
+
           const visibleServices = masterServices.filter((srv) => {
-            const allowed = srv.visibleRoles || ['schooladmin', 'teacher', 'student'];
-            return allowed.includes(role);
+            if (storeAssignments.length > 0) {
+              const assign = storeAssignments.find((a) => a.serviceId === srv.id || (a.serviceName && a.serviceName.toLowerCase() === srv.name.toLowerCase()));
+              if (!assign) return false;
+              if (assign.status === 'Inactive') return false;
+              if (assign.portalAccess === false) return false;
+              const allowed = (assign.visibleRoles || ['student', 'teacher', 'parent', 'principal', 'schooladmin']).map((r) => r.toLowerCase());
+              return allowed.includes(role.toLowerCase());
+            } else {
+              if (srv.status === 'Inactive') return false;
+              const allowed = (srv.visibleRoles || ['schooladmin', 'teacher', 'student']).map((r) => r.toLowerCase());
+              return allowed.includes(role.toLowerCase());
+            }
           });
 
           return (
@@ -795,77 +821,96 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '18px' }}>
-                {visibleServices.map((srv) => (
-                  <div
-                    key={srv.id}
-                    style={{
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '14px',
-                      padding: '20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                        <div style={{
-                          width: '46px',
-                          height: '46px',
-                          borderRadius: '12px',
-                          background: '#eff6ff',
-                          border: '1px solid #dbeafe',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '1.5rem'
-                        }}>
-                          {srv.icon || ''}
+              {visibleServices.length === 0 ? (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1.5px dashed #cbd5e1',
+                  borderRadius: '14px',
+                  padding: '50px 20px',
+                  textAlign: 'center',
+                  color: '#64748b'
+                }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🔒</div>
+                  <h4 style={{ margin: '0 0 8px', color: '#0f172a', fontWeight: 800, fontSize: '1.15rem' }}>
+                    No Active Services Available for {role.toUpperCase()} Portal
+                  </h4>
+                  <p style={{ fontSize: '0.88rem', maxWidth: '480px', margin: '0 auto', lineHeight: '1.6' }}>
+                    Portal access for campus services has been turned OFF or restricted for your role by the Super Administrator.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '18px' }}>
+                  {visibleServices.map((srv) => (
+                    <div
+                      key={srv.id}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '14px',
+                        padding: '20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                          <div style={{
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '12px',
+                            background: '#eff6ff',
+                            border: '1px solid #dbeafe',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.5rem'
+                          }}>
+                            {srv.icon || ''}
+                          </div>
+                          <span className="badge badge-success">Enrolled & Active</span>
                         </div>
-                        <span className="badge badge-success">Enrolled & Active</span>
+
+                        <h4 style={{ margin: '0 0 4px', fontSize: '1.08rem', fontWeight: 800, color: '#1e3a8a' }}>
+                          {srv.name}
+                        </h4>
+                        <div style={{ fontSize: '0.76rem', color: '#4f46e5', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px' }}>
+                          {srv.category}
+                        </div>
+                        <p style={{ fontSize: '0.84rem', color: '#64748b', lineHeight: 1.45, margin: '0 0 16px' }}>
+                          {srv.description}
+                        </p>
                       </div>
 
-                      <h4 style={{ margin: '0 0 4px', fontSize: '1.08rem', fontWeight: 800, color: '#1e3a8a' }}>
-                        {srv.name}
-                      </h4>
-                      <div style={{ fontSize: '0.76rem', color: '#4f46e5', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px' }}>
-                        {srv.category}
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setActivePlayService(srv)}
+                          style={{
+                            width: '100%',
+                            padding: '9px 12px',
+                            borderRadius: '8px',
+                            background: '#2563eb',
+                            color: '#ffffff',
+                            border: 'none',
+                            fontWeight: 700,
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 4px rgba(37,99,235,0.25)'
+                          }}
+                        >
+                          <span>▶</span> Open & Practice
+                        </button>
                       </div>
-                      <p style={{ fontSize: '0.84rem', color: '#64748b', lineHeight: 1.45, margin: '0 0 16px' }}>
-                        {srv.description}
-                      </p>
                     </div>
-
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setActivePlayService(srv)}
-                        style={{
-                          width: '100%',
-                          padding: '9px 12px',
-                          borderRadius: '8px',
-                          background: '#2563eb',
-                          color: '#ffffff',
-                          border: 'none',
-                          fontWeight: 700,
-                          fontSize: '0.85rem',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          boxShadow: '0 2px 4px rgba(37,99,235,0.25)'
-                        }}
-                      >
-                        <span>▶</span> Open & Practice
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })()}

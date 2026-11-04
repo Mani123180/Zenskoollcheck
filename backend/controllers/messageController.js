@@ -13,17 +13,17 @@ const realPortalUsers = [
     schoolId: 'ALL',
     schoolName: 'Zenith Central Trust',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    status: 'online',
+    status: 'offline',
   },
   {
     userId: 'USR002',
     username: 'admin_ssv',
-    name: 'School Administrator',
+    name: 'School Administrator (SSV)',
     role: 'schooladmin',
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-    status: 'online',
+    status: 'offline',
   },
   {
     userId: 'USR003',
@@ -33,7 +33,7 @@ const realPortalUsers = [
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80',
-    status: 'online',
+    status: 'offline',
   },
   {
     userId: 'USR004',
@@ -43,7 +43,17 @@ const realPortalUsers = [
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
-    status: 'online',
+    status: 'offline',
+  },
+  {
+    userId: 'USR005',
+    username: 'finance_ssv',
+    name: 'School Finance Manager (SSV)',
+    role: 'finance',
+    schoolId: 'SCHOOL002',
+    schoolName: 'Sri Sankara Vidhyasala Girls High School',
+    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=150&q=80',
+    status: 'offline',
   },
   {
     userId: 'USR006',
@@ -53,7 +63,7 @@ const realPortalUsers = [
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-    status: 'online',
+    status: 'offline',
   },
   {
     userId: 'USR008',
@@ -63,31 +73,61 @@ const realPortalUsers = [
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
-    status: 'online',
+    status: 'offline',
   },
 ];
 
 let memMessages = [...initialMessages];
 
-
-const normalizeId = (id) => {
-  if (!id) return id;
-  const map = {
+const normalizeId = (idOrUser) => {
+  if (!idOrUser) return '';
+  if (typeof idOrUser === 'object') {
+    const uname = (idOrUser.username || '').toLowerCase();
+    const unameMap = {
+      superadmin: 'USR001',
+      admin_ssv: 'USR002',
+      admin_ssvkod: 'USR002',
+      principal: 'USR003',
+      teacher: 'USR004',
+      priya: 'USR004',
+      finance_ssv: 'USR005',
+      student: 'USR006',
+      aishwarya: 'USR006',
+      parent: 'USR008',
+      ramesh: 'USR008',
+      admin_abcche: 'USR_ABC_ADM',
+      finance_abcche: 'USR_ABC_FIN',
+      admin_stmerd: 'USR_STM_ADM',
+      finance_stmerd: 'USR_STM_FIN',
+      admin_dpwcbe: 'USR_DPW_ADM',
+      finance_dpwcbe: 'USR_DPW_FIN',
+      admin_oxfchn: 'USR_OXF_ADM',
+      finance_oxfchn: 'USR_OXF_FIN',
+    };
+    if (uname && unameMap[uname]) return unameMap[uname];
+    idOrUser = idOrUser.userId || idOrUser.id || idOrUser._id || '';
+  }
+  const str = String(idOrUser).trim();
+  const idMap = {
     'USR-SA': 'USR001',
     'USR-ADM': 'USR002',
     'USR-PRIN': 'USR003',
+    'USR001_PRIN': 'USR003',
     'USR-TCH': 'USR004',
+    'USR003_TEA': 'USR004',
+    'USR004_TEA': 'USR004',
     'USR-STD': 'USR006',
+    'USR005_STU': 'USR006',
+    'USR006_STU': 'USR006',
     'USR-PAR': 'USR008',
+    'USR007_PAR': 'USR008',
   };
-  return map[id] || id;
+  return idMap[str] || str;
 };
 
 const { memUsers } = require('./userController');
 
-
 const activeUserPresence = new Map();
-
 
 const isUserOnline = (userId) => {
   const norm = normalizeId(userId);
@@ -96,15 +136,12 @@ const isUserOnline = (userId) => {
   return Date.now() - lastSeen < 12000;
 };
 
-
 const heartbeat = async (req, res) => {
   try {
-    const rawUserId = req.user ? (req.user.userId || req.user.id) : null;
-    const currentUserId = normalizeId(rawUserId);
+    const currentUserId = normalizeId(req.user);
     if (currentUserId) {
       activeUserPresence.set(currentUserId, Date.now());
 
-      
       memMessages.forEach((m) => {
         if (normalizeId(m.receiverId) === currentUserId && !m.delivered) {
           m.delivered = true;
@@ -114,16 +151,10 @@ const heartbeat = async (req, res) => {
       if (getDBStatus()) {
         try {
           await Message.updateMany(
-            { receiverId: { $in: [currentUserId, rawUserId] }, delivered: false },
+            { receiverId: currentUserId, delivered: false },
             { $set: { delivered: true } }
           );
-          await User.findOneAndUpdate(
-            { $or: [{ userId: currentUserId }, { userId: rawUserId }] },
-            { $set: { lastActiveAt: new Date() } }
-          );
-        } catch (e) {
-          
-        }
+        } catch (e) {}
       }
     }
     return res.json({ success: true, online: true });
@@ -132,18 +163,26 @@ const heartbeat = async (req, res) => {
   }
 };
 
+const offline = async (req, res) => {
+  try {
+    const currentUserId = normalizeId(req.user);
+    if (currentUserId) {
+      activeUserPresence.delete(currentUserId);
+    }
+    return res.json({ success: true, online: false });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 const getContacts = async (req, res) => {
   try {
     const rawUserId = req.user ? (req.user.userId || req.user.id) : null;
-    const currentUserId = normalizeId(rawUserId);
+    const currentUserId = normalizeId(req.user) || normalizeId(rawUserId);
     if (currentUserId) {
       activeUserPresence.set(currentUserId, Date.now());
     }
 
-    
-    const portalUserIds = new Set(realPortalUsers.map((u) => u.userId));
-
-    
     const userMap = new Map();
     realPortalUsers.forEach((u) => {
       const uid = normalizeId(u.userId);
@@ -159,10 +198,9 @@ const getContacts = async (req, res) => {
       });
     });
 
-    
     if (Array.isArray(memUsers)) {
       memUsers.forEach((u) => {
-        const uId = normalizeId(u.userId || u.id);
+        const uId = normalizeId(u);
         if (uId && !userMap.has(uId)) {
           const online = isUserOnline(uId);
           userMap.set(uId, {
@@ -178,9 +216,8 @@ const getContacts = async (req, res) => {
       });
     }
 
-    allUsers = Array.from(userMap.values());
+    const allUsers = Array.from(userMap.values());
 
-    
     const getUnreadCount = (contactId) => {
       const cId = normalizeId(contactId);
       return memMessages.filter(
@@ -188,7 +225,6 @@ const getContacts = async (req, res) => {
       ).length;
     };
 
-    
     const getLastMsg = (contactId) => {
       const cId = normalizeId(contactId);
       const matched = memMessages.filter(
@@ -202,7 +238,6 @@ const getContacts = async (req, res) => {
       return null;
     };
 
-    
     const filteredContacts = allUsers
       .filter((c) => c.id !== currentUserId && c.id !== rawUserId)
       .map((c) => {
@@ -225,14 +260,13 @@ const getMessages = async (req, res) => {
   try {
     const rawContactId = req.query.contactId;
     const rawUserId = req.user ? (req.user.userId || req.user.id) : null;
-    const currentUserId = normalizeId(rawUserId);
+    const currentUserId = normalizeId(req.user) || normalizeId(rawUserId);
     const contactId = normalizeId(rawContactId);
 
     if (currentUserId) {
       activeUserPresence.set(currentUserId, Date.now());
     }
 
-    
     if (contactId && currentUserId) {
       memMessages.forEach((m) => {
         const mSender = normalizeId(m.senderId);
@@ -252,9 +286,7 @@ const getMessages = async (req, res) => {
             },
             { $set: { delivered: true, read: true } }
           );
-        } catch (e) {
-          
-        }
+        } catch (e) {}
       }
     }
 
@@ -310,24 +342,19 @@ const sendMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Receiver and message text are required' });
     }
 
-    const rawUserId = req.user ? (req.user.userId || req.user.id) : 'USR002';
-    const currentUserId = normalizeId(rawUserId);
-    const currentUserName = req.user ? req.user.name : 'School Admin';
-    const currentUserRole = req.user ? req.user.role : 'schooladmin';
+    const rawUserId = req.user ? (req.user.userId || req.user.id) : null;
+    const currentUserId = normalizeId(req.user) || normalizeId(rawUserId) || 'USR001';
+    const currentUserName = req.user ? req.user.name : 'Super Administrator';
+    const currentUserRole = req.user ? req.user.role : 'superadmin';
     const normalizedReceiverId = normalizeId(receiverId);
 
-    
     activeUserPresence.set(currentUserId, Date.now());
 
-    
     const receiverOnline = isUserOnline(normalizedReceiverId);
 
     const msgId = 'MSG' + String(Date.now()).slice(-4);
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    
-    
-    
     const newMsg = {
       messageId: msgId,
       senderId: currentUserId,
@@ -335,8 +362,8 @@ const sendMessage = async (req, res) => {
       senderRole: currentUserRole,
       receiverId: normalizedReceiverId,
       receiverName: receiverName || 'User',
-      receiverRole: receiverRole || 'staff',
-      schoolId: req.user ? req.user.schoolId : 'SCH001',
+      receiverRole: receiverRole || 'user',
+      schoolId: req.user ? req.user.schoolId : 'ALL',
       text: text.trim(),
       timestamp: timeStr,
       delivered: receiverOnline,
@@ -358,4 +385,4 @@ const sendMessage = async (req, res) => {
   }
 };
 
-module.exports = { getContacts, getMessages, sendMessage, heartbeat, activeUserPresence };
+module.exports = { getContacts, getMessages, sendMessage, heartbeat, offline, activeUserPresence };

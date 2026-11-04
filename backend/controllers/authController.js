@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { initialUsers } = require('../seed/seedData');
 const { getDBStatus } = require('../config/db');
+const { isSchoolActive } = require('./schoolController');
 
 const realPortalUsers = [
   {
@@ -285,6 +286,27 @@ const login = async (req, res) => {
 
     if (!isPasswordValid) {
       return res.status(401).json({ success: false, message: 'Invalid username/email or password.' });
+    }
+
+    const userRole = (foundUser.role || 'schooladmin').toLowerCase();
+    if (userRole !== 'superadmin') {
+      if (foundUser.status === 'Inactive' || foundUser.status === 'Suspended') {
+        return res.status(403).json({
+          success: false,
+          isDeactivated: true,
+          message: `Account Deactivated: The administrator account for ${foundUser.name || foundUser.username} has been DEACTIVATED by Super Admin. Please contact Super Admin to reactivate.`
+        });
+      }
+    }
+    if (userRole !== 'superadmin' && foundUser.schoolId && foundUser.schoolId !== 'ALL') {
+      const active = await isSchoolActive(foundUser.schoolId);
+      if (!active) {
+        return res.status(403).json({
+          success: false,
+          isDeactivated: true,
+          message: `Institution Access Suspended: ${foundUser.schoolName || 'This school'} has been DEACTIVATED by the Central Super Administrator. All logins and operations for this school are currently disabled.`
+        });
+      }
     }
 
     const token = generateToken(foundUser);

@@ -65,10 +65,7 @@ export default function Pricing() {
     <div className="landing-wrapper">
       
       <section className="landing-hero" style={{ background: '#ffffff', padding: '60px 20px 40px', textAlign: 'center' }}>
-        <span className="badge-pricing-title" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '6px 16px', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem' }}>
-          Pricing Plans
-        </span>
-        <h1 style={{ color: '#0f172a', fontSize: '2.5rem', fontWeight: 900, marginTop: '16px' }}>
+        <h1 style={{ color: '#0f172a', fontSize: '2.5rem', fontWeight: 900, marginTop: '0' }}>
           TRANSPARENT & AFFORDABLE <span style={{ color: '#d97706', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>ZENSKOOLL PRICING</span>
         </h1>
         <p style={{ color: '#64748b', maxWidth: '640px', margin: '12px auto 0', fontSize: '1.05rem' }}>

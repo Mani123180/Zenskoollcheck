@@ -2,6 +2,90 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 export default function Features() {
+  const pictorialModules = [
+    {
+      title: 'Smart Homework & Assignments Desk',
+      category: 'Academics & Study Desk',
+      badge: 'PDF NOTES & DEADLINES',
+      desc: 'Publish daily subject assignments with attached study materials, sample exercise questions, and digital response uploads. Track real-time submission rates across classes.',
+      imgSrc: '/images/previews/ai-homework-management.jpg',
+      accent: '#d97706',
+      highlights: ['PDF study material attachments', 'Class-wise submission rate counters', 'Automated parent alerts on new homework']
+    },
+    {
+      title: 'Real-Time Attendance & Biometric Sync',
+      category: 'Student & Staff Roll Call',
+      badge: '95% LIVE ATTENDANCE',
+      desc: 'Capture morning assembly turnstile scans, RFID card taps, and manual teacher class registers with automatic absentee WhatsApp notifications dispatched to parents.',
+      imgSrc: '/images/previews/ai-attendance-tracking.jpg',
+      accent: '#7c3aed',
+      highlights: ['08:30 AM assembly cutoff tracking', 'Instant absent notification to parents', 'Biometric QR & turnstile gate sync']
+    },
+    {
+      title: 'Easy Student Fee Billing & Receipts',
+      category: 'Fee Invoicing & Payments',
+      badge: 'INSTANT WHATSAPP RECEIPTS',
+      desc: 'Complete student fee billing system with itemized tuition, transport, and lab fee heads, real-time Paid and Pending status tracking, and 1-click WhatsApp payment receipts.',
+      imgSrc: '/images/previews/ai-fee-billing.jpg',
+      accent: '#2563eb',
+      highlights: ['Itemized tuition & transport invoices', 'Due balance tracking across terms', 'Direct parent WhatsApp receipts']
+    },
+    {
+      title: 'Smart Financial Management & Ledger',
+      category: 'Campus Finance & Accounts',
+      badge: 'MULTI-HEAD LEDGERS',
+      desc: 'Centralized school financial ledger tracking total revenue, collected student fees, outstanding dues, monthly institutional expenses, and audited net surplus.',
+      imgSrc: '/images/previews/ai-financial-management.jpg',
+      accent: '#059669',
+      highlights: ['Revenue & expense KPI dash cards', '81.6% collection rate reconciliation', 'Audited financial balance sheet']
+    },
+    {
+      title: 'Academic Timetables & Period Scheduling',
+      category: 'Faculty & Classroom Rosters',
+      badge: 'AUTO-MATCHED SCHEDULES',
+      desc: 'Interactive period scheduling matrix matching subject teachers to classroom periods and science laboratories, complete with emergency substitution handling.',
+      imgSrc: '/images/previews/ai-timetables.jpg',
+      accent: '#2563eb',
+      highlights: ['Conflict-free period allocation', 'Faculty substitution management', 'Student & parent mobile timetable sync']
+    },
+    {
+      title: 'Batch Examination Dates & Seating',
+      category: 'Exams & Hall Allocations',
+      badge: '5 SUBJECTS PUBLISHED',
+      desc: 'Schedule comprehensive multi-subject board examinations in one centralized date sheet, publish dates directly to student portals, and assign exam hall desk numbers.',
+      imgSrc: '/images/previews/ai-examinations.jpg',
+      accent: '#7c3aed',
+      highlights: ['Published term date sheets', 'Hall ticket & desk allocation', 'Syllabus guidelines attachment']
+    },
+    {
+      title: 'Faculty & Staff Monthly Payroll',
+      category: 'Payroll & HR Clearance',
+      badge: '100% EPF/ESI COMPLIANT',
+      desc: 'Automated salary calculation covering teaching faculties and non-teaching campus staff (drivers, wardens, maintenance), allowance breakdowns, and bank transfer slips.',
+      imgSrc: '/images/previews/ai-payroll.jpg',
+      accent: '#d97706',
+      highlights: ['Teaching & non-teaching payroll tabs', 'Basic + HRA + Allowances computation', 'Downloadable monthly salary slips']
+    },
+    {
+      title: 'Live Parent Updates & WhatsApp Feed',
+      category: 'Guardian Communication Desk',
+      badge: 'INSTANT ALERTS',
+      desc: 'Keep parents informed with real-time morning gate arrival notifications, homework assignments, upcoming examination schedules, and term report cards.',
+      imgSrc: '/images/previews/ai-parent-updates.jpg',
+      accent: '#db2777',
+      highlights: ['Morning gate RFID turnstile alert', 'Homework submission reminders', 'Direct teacher-to-parent messaging']
+    },
+    {
+      title: 'Multi-Campus Super Admin Tower',
+      category: 'Central Trust Governance',
+      badge: 'MULTI-SCHOOL NETWORK',
+      desc: 'Centralized governance tower for trust administrators managing multiple campuses, school principal credentials, active student quotas, and enterprise licenses.',
+      imgSrc: '/images/previews/ai-multi-campus.jpg',
+      accent: '#0891b2',
+      highlights: ['Multi-branch oversight & analytics', 'Admin & Finance credential controls', 'License management & school onboarding']
+    }
+  ];
+
   const comparisonData = [
     { name: 'Super Admin & Multi-School Oversight', basic: true, standard: true, premium: true },
     { name: 'School Admin Institutional Portal', basic: true, standard: true, premium: true },
@@ -25,120 +109,166 @@ export default function Features() {
     { name: '24/7 Dedicated Support & Cloud Backup', basic: false, standard: false, premium: true },
   ];
 
-  const featurePillars = [
-    {
-      title: 'Smart Academic Administration',
-      desc: 'Centralized control for class timetables, batch subject examination schedules, syllabus dissemination, and faculty allocations.',
-      icon: ''
-    },
-    {
-      title: 'Finance Manage & Payroll',
-      desc: 'End-to-end fee invoices, automated dues calculation, staff salary disbursement with slip downloads, and institutional expense registers.',
-      icon: ''
-    },
-    {
-      title: 'Instant Parent-Student Sync',
-      desc: 'Live examination schedules, term marks report cards, digital homework submissions, and real-time attendance rate tracking.',
-      icon: ''
-    },
-    {
-      title: 'Faculty & Leave Workflow',
-      desc: 'Teachers submit leave applications with substitute faculty tagging; principals review and approve requests with one click.',
-      icon: ''
-    },
-    {
-      title: 'Bulk Data Imports & Analytics',
-      desc: 'Seamless Excel import for hundreds of students and staff payroll records with instant validation and ledger reconciliation.',
-      icon: ''
-    },
-    {
-      title: 'Multi-Role Secure Access',
-      desc: 'Role-based authorization and dashboard view customization for Super Admin, School Admin, Principals, Teachers, Students, and Parents.',
-      icon: ''
-    }
-  ];
-
   return (
     <div className="landing-wrapper">
       
-      <section className="landing-hero" style={{ background: '#ffffff', padding: '60px 20px 40px', textAlign: 'center' }}>
-        <span className="badge-pricing-title" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', padding: '6px 16px', borderRadius: '20px', fontWeight: 800, fontSize: '0.85rem' }}>
-          Platform Features
-        </span>
-        <h1 style={{ color: '#0f172a', fontSize: '2.5rem', fontWeight: 900, marginTop: '16px' }}>
-          POWERFUL FEATURES BUILT FOR <span style={{ color: '#d97706', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>ZENSKOOLL</span>
+      {/* HERO BANNER */}
+      <section
+        className="landing-hero"
+        style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #0b1938 100%)',
+          position: 'relative',
+          padding: '80px 20px 70px',
+          textAlign: 'center',
+          color: '#ffffff'
+        }}
+      >
+        <h1 style={{ color: '#ffffff', fontSize: '2.7rem', fontWeight: 900, margin: '0 0 12px', letterSpacing: '-0.4px' }}>
+          Comprehensive <span style={{ color: '#fbbf24' }}>ZenSkooll</span> Platform Features
         </h1>
-        <p style={{ color: '#64748b', maxWidth: '680px', margin: '12px auto 0', fontSize: '1.05rem' }}>
-          Explore all the modules and tools included in ZenSkooll to automate campus administration, academic scheduling, and parent communication.
+        <p style={{ color: '#cbd5e1', maxWidth: '720px', margin: '0 auto 30px', fontSize: '1.08rem', lineHeight: '1.6' }}>
+          Explore specialized operational modules designed to digitize modern schools, colleges, and educational institutions.
         </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          <Link
+            to="/login"
+            style={{
+              background: '#f59e0b',
+              color: '#0f172a',
+              padding: '12px 28px',
+              borderRadius: '8px',
+              fontWeight: 800,
+              fontSize: '0.95rem',
+              textDecoration: 'none'
+            }}
+          >
+            Open Live Portal &rarr;
+          </Link>
+          <Link
+            to="/contact"
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: '#ffffff',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
+              padding: '12px 28px',
+              borderRadius: '8px',
+              fontWeight: 700,
+              fontSize: '0.95rem',
+              textDecoration: 'none'
+            }}
+          >
+            Request Institutional Demo
+          </Link>
+        </div>
       </section>
 
-      
-      <section className="landing-section" style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '50px' }}>
-          {featurePillars.map((p, i) => (
-            <div key={i} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '28px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-              <div style={{ fontSize: '2.2rem', marginBottom: '14px' }}>{p.icon}</div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>{p.title}</h3>
-              <p style={{ color: '#64748b', fontSize: '0.92rem', lineHeight: '1.6', margin: 0 }}>{p.desc}</p>
+      {/* PICTORIAL FEATURE MODULES */}
+      <section style={{ maxWidth: '1200px', margin: '0 auto', padding: '60px 20px 40px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '46px' }}>
+          <h2 style={{ fontSize: '2.1rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px' }}>
+            Interactive Modules Built for Real School Workflows
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '1rem', maxWidth: '640px', margin: '0 auto' }}>
+            Every tool is engineered for clean everyday execution by principals, teachers, finance officers, and parents.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '30px' }}>
+          {pictorialModules.map((m, i) => (
+            <div
+              key={i}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '22px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              {/* Browser style frame */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '10px',
+                  padding: '10px',
+                  marginBottom: '18px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.64rem', color: m.accent, fontWeight: 800, background: `${m.accent}12`, padding: '2px 6px', borderRadius: '4px' }}>
+                    {m.badge}
+                  </span>
+                </div>
+                <div style={{ borderRadius: '6px', overflow: 'hidden', border: '1px solid #e2e8f0', height: '200px' }}>
+                  <img
+                    src={m.imgSrc}
+                    alt={m.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'inline-block', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: m.accent, background: `${m.accent}12`, padding: '3px 10px', borderRadius: '6px', marginBottom: '8px', alignSelf: 'flex-start' }}>
+                {m.category}
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+                {m.title}
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.88rem', lineHeight: '1.6', margin: '0 0 16px', flex: 1 }}>
+                {m.desc}
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '14px', fontSize: '0.82rem', color: '#334155', fontWeight: 600 }}>
+                {m.highlights.map((h, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: m.accent, fontWeight: 800 }}>✓</span>
+                    <span>{h}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
 
-        
-        <div className="section-header" style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h2 style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a' }}>DETAILED MODULE & FEATURE COMPARISON</h2>
-          <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Check which plan matches your school's student strength and operational requirements</p>
+        {/* COMPARISON TABLE */}
+        <div style={{ marginTop: '70px', textAlign: 'center', marginBottom: '30px' }}>
+          <h2 style={{ fontSize: '1.9rem', fontWeight: 900, color: '#0f172a', margin: '0 0 10px' }}>
+            Detailed Feature Comparison Matrix
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Select the plan matched to your institution size and technical requirements</p>
         </div>
-        <div className="comparison-table-wrapper" style={{ overflowX: 'auto', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.04)' }}>
-          <table className="comparison-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+
+        <div style={{ overflowX: 'auto', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px', fontSize: '0.9rem' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                 <th style={{ padding: '16px 20px', color: '#1e3a8a', fontWeight: 800 }}>Core Features & Modules</th>
-                <th className="header-basic" style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 800, color: '#475569' }}>Basic Plan</th>
-                <th className="header-standard" style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 800, color: '#d97706' }}>Standard Plan</th>
-                <th className="header-premium" style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 800, color: '#b45309' }}>Premium Plan</th>
+                <th style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 800, color: '#475569' }}>Basic Plan</th>
+                <th style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 800, color: '#d97706' }}>Standard Plan</th>
+                <th style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 800, color: '#059669' }}>Premium Plan</th>
               </tr>
             </thead>
             <tbody>
-              {comparisonData.map((row, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#fafafa' }}>
-                  <td className="feature-category-name" style={{ padding: '14px 20px', fontWeight: 600, color: '#1e293b' }}>{row.name}</td>
-                  <td className="basic-val" style={{ padding: '14px 20px', textAlign: 'center', color: row.basic ? '#10b981' : '#cbd5e1', fontWeight: 700 }}>
-                    {row.basic ? '✓ Included' : '—'}
+              {comparisonData.map((row, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', background: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+                  <td style={{ padding: '14px 20px', fontWeight: 600, color: '#334155' }}>{row.name}</td>
+                  <td style={{ padding: '14px 20px', textAlign: 'center' }}>
+                    {row.basic ? <span style={{ color: '#10b981', fontWeight: 800 }}>✓</span> : <span style={{ color: '#94a3b8' }}>—</span>}
                   </td>
-                  <td className="standard-val" style={{ padding: '14px 20px', textAlign: 'center', color: row.standard ? '#10b981' : '#cbd5e1', fontWeight: 700 }}>
-                    {row.standard ? '✓ Included' : '—'}
+                  <td style={{ padding: '14px 20px', textAlign: 'center' }}>
+                    {row.standard ? <span style={{ color: '#d97706', fontWeight: 800 }}>✓</span> : <span style={{ color: '#94a3b8' }}>—</span>}
                   </td>
-                  <td className="premium-val" style={{ padding: '14px 20px', textAlign: 'center', color: row.premium ? '#10b981' : '#cbd5e1', fontWeight: 700 }}>
-                    {row.premium ? '✓ Included' : '—'}
+                  <td style={{ padding: '14px 20px', textAlign: 'center' }}>
+                    {row.premium ? <span style={{ color: '#059669', fontWeight: 800 }}>✓</span> : <span style={{ color: '#94a3b8' }}>—</span>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-
-        
-        <div style={{ marginTop: '50px', background: 'linear-gradient(135deg, #0a1e3f 0%, #1e3a8a 100%)', borderRadius: '16px', padding: '36px', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-          <div>
-            <h3 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 800 }}>Need a custom setup or module demo?</h3>
-            <p style={{ margin: 0, opacity: 0.9, fontSize: '0.95rem' }}>Our team can tailor ZenSkooll specifically to your institution's size and workflows.</p>
-          </div>
-          <Link
-            to="/contact"
-            style={{
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              color: '#0f172a',
-              fontWeight: 800,
-              padding: '12px 28px',
-              borderRadius: '8px',
-              textDecoration: 'none',
-              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.45)'
-            }}
-          >
-            Get in Touch →
-          </Link>
         </div>
       </section>
     </div>

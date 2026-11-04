@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { getPortalData, savePortalData } from '../../services/portalData';
+import { getPortalData, savePortalData, setSchoolStatusInStore, setUserStatusInStore } from '../../services/portalData';
 import NewSchoolWizardModal from './NewSchoolWizardModal';
 import SubscriptionModal from './SubscriptionModal';
 import SchoolAdminView from './SchoolAdminView';
@@ -20,7 +20,7 @@ import {
   PrintableInvoiceModal,
   DashboardDetailModal,
 } from './SuperAdminModals';
-import SuperAdminSecurityView from './SuperAdminSecurityView';
+import SuperAdminSettingsView from './SuperAdminSettingsView';
 import InteractiveServicePlayerModal from './InteractiveServicePlayerModal';
 import { downloadInvoicePDF } from '../../services/pdfDownloadUtil';
 
@@ -189,12 +189,12 @@ const defaultServices = [
 ];
 
 const defaultSchoolServiceAssignments = [
-  { id: 'SSA-01', serviceId: 'SRV-01', serviceName: 'Coding for Kids', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-01-15' },
-  { id: 'SSA-02', serviceId: 'SRV-02', serviceName: 'Chess Academy', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-01-20' },
-  { id: 'SSA-03', serviceId: 'SRV-03', serviceName: 'Robotics', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-02-01' },
-  { id: 'SSA-04', serviceId: 'SRV-04', serviceName: 'Drawing & Art', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', assignedDate: '2026-01-10' },
-  { id: 'SSA-05', serviceId: 'SRV-05', serviceName: 'Spoken English', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Inactive', assignedDate: '2026-01-12' },
-  { id: 'SSA-06', serviceId: 'SRV-06', serviceName: 'Abacus & Vedic Maths', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', assignedDate: '2026-03-01' },
+  { id: 'SSA-01', serviceId: 'SRV-01', serviceName: 'Coding for Kids', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-01-15', portalAccess: true, visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin'] },
+  { id: 'SSA-02', serviceId: 'SRV-02', serviceName: 'Chess Academy', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-01-20', portalAccess: true, visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin'] },
+  { id: 'SSA-03', serviceId: 'SRV-03', serviceName: 'Robotics', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-02-01', portalAccess: true, visibleRoles: ['student', 'teacher', 'schooladmin'] },
+  { id: 'SSA-04', serviceId: 'SRV-04', serviceName: 'Drawing & Art', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', assignedDate: '2026-01-10', portalAccess: true, visibleRoles: ['student', 'parent', 'schooladmin'] },
+  { id: 'SSA-05', serviceId: 'SRV-05', serviceName: 'Spoken English', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Inactive', assignedDate: '2026-01-12', portalAccess: false, visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin'] },
+  { id: 'SSA-06', serviceId: 'SRV-06', serviceName: 'Abacus & Vedic Maths', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', assignedDate: '2026-03-01', portalAccess: true, visibleRoles: ['student', 'teacher', 'parent', 'schooladmin'] },
 ];
 
 const defaultPlans = [
@@ -320,7 +320,11 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
     try {
       const store = getPortalData();
       if (store && store.schoolServiceAssignments && store.schoolServiceAssignments.length > 0) {
-        return store.schoolServiceAssignments;
+        return store.schoolServiceAssignments.map((a) => ({
+          ...a,
+          portalAccess: a.portalAccess !== undefined ? a.portalAccess : (a.status !== 'Inactive'),
+          visibleRoles: a.visibleRoles || ['student', 'teacher', 'parent', 'principal', 'schooladmin'],
+        }));
       }
     } catch (e) {}
     return defaultSchoolServiceAssignments;
@@ -337,7 +341,13 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
     status: 'Active',
     visibleRoles: ['schooladmin', 'teacher', 'student']
   });
-  const [assignFormData, setAssignFormData] = useState({ serviceId: '', schoolId: '', status: 'Active' });
+  const [assignFormData, setAssignFormData] = useState({
+    serviceId: '',
+    schoolId: '',
+    status: 'Active',
+    portalAccess: true,
+    visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin']
+  });
 
   
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -520,7 +530,10 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
   const totalSchools = schools.length;
   const activeSchools = schools.filter((s) => s.status === 'Active').length;
   const inactiveSchools = schools.filter((s) => s.status !== 'Active').length;
-  const schoolAdmins = users.filter((u) => { const r = (u.role || '').toLowerCase(); return r === 'school_admin' || r === 'schooladmin' || r === 'finance' || r === 'financemanager'; });
+  const schoolAdmins = users.filter((u) => {
+    const r = (u.role || '').toLowerCase().replace(/[^a-z]/g, '');
+    return (r === 'schooladmin' || r === 'admin' || r === 'schooladministrator') && !r.includes('finance') && !r.includes('super');
+  });
   const totalSchoolAdmins = schoolAdmins.length;
   const activeSubs = subscriptions.filter((s) => s.status === 'ACTIVE' || s.status === 'Active').length;
   const expiringSubs = subscriptions.filter((s) => s.status === 'EXPIRED' || s.status === 'PENDING').length;
@@ -537,29 +550,170 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
   const totalStaff = totalTeachers + totalSchoolAdmins + schools.length;
 
   
-  const handleToggleSchool = (id, newStatus) => {
+  const handleToggleSchool = async (id, newStatus) => {
+    // 1. Update React state immediately
     setSchools((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: newStatus } : s))
+      prev.map((s) => (s.id === id || s.schoolId === id ? { ...s, status: newStatus } : s))
     );
-    const target = schools.find((s) => s.id === id);
+
+    // 2. Persist to localStorage / portalData store
+    try {
+      const store = getPortalData() || {};
+      if (store && store.schools) {
+        store.schools = store.schools.map((s) =>
+          s.id === id || s.schoolId === id ? { ...s, status: newStatus } : s
+        );
+        savePortalData(store);
+      }
+      setSchoolStatusInStore(id, newStatus);
+    } catch (err) {
+      console.warn('Could not save school status locally:', err);
+    }
+
+    // 3. Persist to Backend API
+    try {
+      await api.updateSchool(id, { status: newStatus });
+    } catch (apiErr) {
+      console.warn('Backend updateSchool notice:', apiErr.message);
+    }
+
+    const target = schools.find((s) => s.id === id || s.schoolId === id);
+    const targetName = target ? target.name : id;
+
+    // 4. Record audit activity
     setActivities((prev) => [
       {
         id: 'ACT-' + Date.now(),
         type: newStatus === 'Active' ? 'school_activated' : 'school_deactivated',
-        text: `Campus status changed to ${newStatus} for ${target ? target.name : id}`,
+        text: `Campus status changed to ${newStatus} for ${targetName}`,
         time: 'Just now',
       },
       ...prev,
     ]);
-    showFeedback('Status Updated', `School status updated to ${newStatus}.`);
+
+    // 5. Informative feedback alert
+    if (newStatus === 'Active') {
+      showFeedback(
+        'Campus Activated',
+        `Success: ${targetName} is now ACTIVE. All school portals, faculty accounts, fee collections, and student logins for this institution are fully operational.`
+      );
+    } else {
+      showFeedback(
+        'Campus Deactivated',
+        `Attention: ${targetName} has been DEACTIVATED. All logins and portal access for this entire school have been locked and suspended.`
+      );
+    }
   };
 
   
-  const handleToggleAdmin = (id, newStatus) => {
+  const handleToggleAdmin = async (id, newStatus) => {
+    // 1. Update React state immediately
     setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, status: newStatus } : u))
+      prev.map((u) => (u.id === id || u.userId === id ? { ...u, status: newStatus } : u))
     );
-    showFeedback('Admin Status Updated', `Administrator status set to ${newStatus}.`);
+
+    // 2. Persist to localStorage / portalData store
+    try {
+      const store = getPortalData() || {};
+      if (store && store.users) {
+        store.users = store.users.map((u) =>
+          u.id === id || u.userId === id ? { ...u, status: newStatus } : u
+        );
+        savePortalData(store);
+      }
+      setUserStatusInStore(id, newStatus);
+      window.dispatchEvent(new Event('portal_data_updated'));
+    } catch (err) {
+      console.warn('Could not save user status locally:', err);
+    }
+
+    // 3. Persist to Backend API
+    try {
+      await api.updateUser(id, { status: newStatus });
+    } catch (apiErr) {
+      console.warn('Backend updateUser notice:', apiErr.message);
+    }
+
+    const target = users.find((u) => u.id === id || u.userId === id);
+    const targetName = target ? target.name : id;
+
+    // 4. Record audit activity
+    setActivities((prev) => [
+      {
+        id: 'ACT-' + Date.now(),
+        type: newStatus === 'Active' ? 'admin_activated' : 'admin_deactivated',
+        text: `Administrator ${targetName} status changed to ${newStatus}`,
+        time: 'Just now',
+      },
+      ...prev,
+    ]);
+
+    // 5. Informative feedback alert
+    if (newStatus === 'Active') {
+      showFeedback(
+        'Administrator Activated',
+        `Success: ${targetName} is now ACTIVE. Login credentials and portal access have been fully restored.`
+      );
+    } else {
+      showFeedback(
+        'Administrator Deactivated',
+        `Attention: ${targetName} has been DEACTIVATED. All logins and portal access for this administrator account are now locked and suspended.`
+      );
+    }
+  };
+
+  const handleTogglePortalAccess = (assignmentId) => {
+    let nextVal = true;
+    let targetName = 'Service';
+    let targetSchool = 'School';
+
+    setSchoolAssignments((prev) => {
+      const updated = prev.map((a) => {
+        if (a.id === assignmentId) {
+          nextVal = a.portalAccess === false ? true : false;
+          targetName = a.serviceName;
+          targetSchool = a.schoolName;
+          return { ...a, portalAccess: nextVal };
+        }
+        return a;
+      });
+      try {
+        const store = getPortalData() || {};
+        store.schoolServiceAssignments = updated;
+        savePortalData(store);
+      } catch (e) {}
+      window.dispatchEvent(new Event('portal_data_updated'));
+      return updated;
+    });
+
+    showFeedback(
+      'Portal Access Updated',
+      `Portal access for "${targetName}" at ${targetSchool} is now ${nextVal ? 'ENABLED (ON)' : 'DISABLED (OFF)'}.`
+    );
+  };
+
+  const handleToggleServiceRole = (assignmentId, roleName) => {
+    setSchoolAssignments((prev) => {
+      const updated = prev.map((a) => {
+        if (a.id === assignmentId) {
+          const currentRoles = (a.visibleRoles || ['student', 'teacher', 'parent', 'principal', 'schooladmin']).map((r) => r.toLowerCase());
+          const targetRole = roleName.toLowerCase();
+          const exists = currentRoles.includes(targetRole);
+          const nextRoles = exists
+            ? currentRoles.filter((r) => r !== targetRole)
+            : [...currentRoles, targetRole];
+          return { ...a, visibleRoles: nextRoles };
+        }
+        return a;
+      });
+      try {
+        const store = getPortalData() || {};
+        store.schoolServiceAssignments = updated;
+        savePortalData(store);
+      } catch (e) {}
+      window.dispatchEvent(new Event('portal_data_updated'));
+      return updated;
+    });
   };
 
   
@@ -594,17 +748,33 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
   };
 
   
-  const handleAddAdmin = (newAdmin) => {
+  const handleAddAdmin = async (newAdmin) => {
     setUsers((prev) => [newAdmin, ...prev]);
     if (newAdmin.schoolId) {
       setSchools((prev) =>
         prev.map((s) =>
           (s.id || s.schoolId) === newAdmin.schoolId
-            ? { ...s, admin: newAdmin.email, adminName: newAdmin.name }
+            ? { ...s, admin: newAdmin.email, adminName: newAdmin.name, adminUsername: newAdmin.username, adminPassword: newAdmin.password }
             : s
         )
       );
     }
+    try {
+      const store = getPortalData() || {};
+      if (!store.users) store.users = [];
+      store.users.unshift(newAdmin);
+      if (newAdmin.schoolId && store.schools) {
+        store.schools = store.schools.map((s) =>
+          (s.id || s.schoolId) === newAdmin.schoolId
+            ? { ...s, admin: newAdmin.email, adminName: newAdmin.name, adminUsername: newAdmin.username, adminPassword: newAdmin.password }
+            : s
+        );
+      }
+      savePortalData(store);
+      if (typeof api !== 'undefined' && api && typeof api.createUser === 'function') {
+        await api.createUser(newAdmin);
+      }
+    } catch (e) {}
     showFeedback('Admin Created', `Admin ${newAdmin.name} created and assigned.`);
   };
 
@@ -910,11 +1080,12 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
       phone: newSchool.phone || '+91 94400 00000',
       username: adminUsername,
       password: adminPassword,
-      role: 'schooladmin',
+      role: 'SCHOOL_ADMIN',
       schoolId: newSchool.id,
       schoolName: newSchool.name,
       status: 'Active',
       createdDate: new Date().toISOString().split('T')[0],
+      aliases: [adminUsername, adminEmail]
     };
 
     const createdFinance = {
@@ -924,11 +1095,12 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
       phone: newSchool.phone || '+91 94400 00001',
       username: financeUsername,
       password: financePassword,
-      role: 'finance',
+      role: 'FINANCE',
       schoolId: newSchool.id,
       schoolName: newSchool.name,
       status: 'Active',
       createdDate: new Date().toISOString().split('T')[0],
+      aliases: [financeUsername, financeEmail]
     };
 
     setUsers((prev) => [createdAdmin, createdFinance, ...prev]);
@@ -1229,6 +1401,9 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
 
     try {
       if (typeof api !== 'undefined' && api) {
+        if (typeof api.createSchool === 'function') {
+          api.createSchool(newSchool).catch(() => {});
+        }
         if (typeof api.syncAuthUser === 'function') {
           api.syncAuthUser(createdAdmin).catch(() => {});
           api.syncAuthUser(createdFinance).catch(() => {});
@@ -1285,9 +1460,16 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
     return true;
   });
 
-  const filteredAdmins = users.filter((u) => u.role === 'SCHOOL_ADMIN').filter((a) => {
+  const filteredAdmins = schoolAdmins.filter((a) => {
     if (adminFilter !== 'All' && a.status !== adminFilter) return false;
-    if (adminSearch && !a.name.toLowerCase().includes(adminSearch.toLowerCase()) && !a.email.toLowerCase().includes(adminSearch.toLowerCase())) return false;
+    if (adminSearch) {
+      const q = adminSearch.toLowerCase();
+      const matchesName = (a.name || '').toLowerCase().includes(q);
+      const matchesEmail = (a.email || '').toLowerCase().includes(q);
+      const matchesSchool = (a.schoolName || '').toLowerCase().includes(q);
+      const matchesUsername = (a.username || '').toLowerCase().includes(q);
+      if (!matchesName && !matchesEmail && !matchesSchool && !matchesUsername) return false;
+    }
     return true;
   });
 
@@ -1773,6 +1955,49 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                 </div>
               </div>
 
+              {activeCampusPortal.status !== 'Active' && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '10px',
+                  padding: '12px 18px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                  color: '#991b1b',
+                  fontSize: '0.86rem',
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.08)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <strong style={{ background: '#dc2626', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem' }}>CAMPUS DEACTIVATED</strong>
+                    <span>This institution is currently DEACTIVATED. All logins and portal access for regular staff and students are offline.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleToggleSchool(activeCampusPortal.id, 'Active');
+                      setActiveCampusPortal(prev => ({ ...prev, status: 'Active' }));
+                    }}
+                    style={{
+                      background: '#10b981',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '7px 16px',
+                      borderRadius: '6px',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
+                    }}
+                  >
+                    Activate School
+                  </button>
+                </div>
+              )}
+
               
               <div style={{
                 background: '#ffffff',
@@ -1854,7 +2079,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                       <button className={`btn btn-sm ${activeCampusTab === 'fee-collection-tracker' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('fee-collection-tracker')}>Fee Collection & Dues</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'publish-announcements' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('publish-announcements')}>Announcements</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'view-reports' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('view-reports')}>School Reports</button>
-                      <button className={`btn btn-sm ${activeCampusTab === 'secure-messaging' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('secure-messaging')}>Secure Messaging</button>
+                      <button className={`btn btn-sm ${activeCampusTab === 'secure-messaging' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('secure-messaging')}>Messages</button>
                     </>
                   )}
                   {activeCampusRole === 'finance' && (
@@ -1884,7 +2109,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                       <button className={`btn btn-sm ${activeCampusTab === 'study-materials' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('study-materials')}>Study Materials</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'announcements' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('announcements')}>Announcements</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'leave-request' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('leave-request')}>Leave Requests & Approvals</button>
-                      <button className={`btn btn-sm ${activeCampusTab === 'secure-messaging' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('secure-messaging')}>Secure Messaging</button>
+                      <button className={`btn btn-sm ${activeCampusTab === 'secure-messaging' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('secure-messaging')}>Messages</button>
                       <button className={`btn btn-sm ${activeCampusTab === 'timetable' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveCampusTab('timetable')}>Timetable</button>
                     </>
                   )}
@@ -2257,7 +2482,12 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                               {a.name ? a.name.charAt(0).toUpperCase() : 'A'}
                             </div>
                             <div className="school-meta-line">
-                              <strong style={{ color: '#0f172a', fontSize: '0.92rem', display: 'block' }}>{a.name}</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <strong style={{ color: '#0f172a', fontSize: '0.92rem' }}>{a.name}</strong>
+                                <span className="badge badge-primary" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                                  School Admin
+                                </span>
+                              </div>
                               <small style={{ color: '#64748b', fontSize: '0.78rem' }}>Username: <code style={{ color: '#2563eb' }}>{a.username}</code></small>
                               <div style={{ marginTop: '3px' }}>
                                 <small style={{ color: '#047857', fontSize: '0.78rem', fontWeight: 700 }}>
@@ -2772,7 +3002,8 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                     <tr>
                       <th style={{ minWidth: '180px', padding: '12px 16px' }}>Service Name</th>
                       <th style={{ minWidth: '220px', padding: '12px 16px' }}>Assigned School</th>
-                      <th style={{ minWidth: '120px', padding: '12px 16px' }}>Assigned Date</th>
+                      <th style={{ minWidth: '130px', textAlign: 'center', padding: '12px 16px' }}>Portal Access</th>
+                      <th style={{ minWidth: '280px', padding: '12px 16px' }}>Visible In Portals (Who Can See)</th>
                       <th style={{ minWidth: '100px', textAlign: 'center', padding: '12px 16px' }}>Status</th>
                       <th style={{ minWidth: '210px', textAlign: 'center', padding: '12px 16px' }}>Actions</th>
                     </tr>
@@ -2799,6 +3030,9 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                       })
                       .map((item) => {
                         const srvObj = services.find((s) => s.id === item.serviceId);
+                        const isPortalOn = item.portalAccess !== false;
+                        const rolesList = (item.visibleRoles || ['student', 'teacher', 'parent', 'principal', 'schooladmin']).map(x => x.toLowerCase());
+
                         return (
                           <tr key={item.id}>
                             <td data-label="Service Name" style={{ verticalAlign: 'middle', padding: '12px 16px' }}>
@@ -2814,6 +3048,81 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                               <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
                                 Code: <span className="badge badge-info">{item.schoolId}</span>
                               </div>
+                            </td>
+                            <td data-label="Portal Access" style={{ textAlign: 'center', verticalAlign: 'middle', padding: '12px 16px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePortalAccess(item.id)}
+                                style={{
+                                  background: isPortalOn ? '#ecfdf5' : '#f8fafc',
+                                  color: isPortalOn ? '#047857' : '#64748b',
+                                  border: `1.5px solid ${isPortalOn ? '#10b981' : '#cbd5e1'}`,
+                                  borderRadius: '20px',
+                                  padding: '5px 14px',
+                                  fontWeight: 800,
+                                  fontSize: '0.78rem',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  boxShadow: isPortalOn ? '0 2px 6px rgba(16, 185, 129, 0.2)' : 'none',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                title={isPortalOn ? 'Click to Turn OFF Portal Access' : 'Click to Turn ON Portal Access'}
+                              >
+                                <span style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  background: isPortalOn ? '#10b981' : '#94a3b8'
+                                }}></span>
+                                <span>{isPortalOn ? 'ACCESS ON' : 'ACCESS OFF'}</span>
+                              </button>
+                            </td>
+                            <td data-label="Visible In Portals" style={{ verticalAlign: 'middle', padding: '12px 16px' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
+                                {[
+                                  { id: 'student', label: 'Student' },
+                                  { id: 'teacher', label: 'Teacher' },
+                                  { id: 'parent', label: 'Parent' },
+                                  { id: 'principal', label: 'Principal' },
+                                  { id: 'schooladmin', label: 'Admin' },
+                                ].map((r) => {
+                                  const isVisible = rolesList.includes(r.id.toLowerCase());
+                                  return (
+                                    <button
+                                      key={r.id}
+                                      type="button"
+                                      disabled={!isPortalOn}
+                                      onClick={() => handleToggleServiceRole(item.id, r.id)}
+                                      style={{
+                                        border: `1px solid ${isVisible && isPortalOn ? '#93c5fd' : '#e2e8f0'}`,
+                                        background: isVisible && isPortalOn ? '#eff6ff' : '#f8fafc',
+                                        color: isVisible && isPortalOn ? '#1d4ed8' : '#94a3b8',
+                                        borderRadius: '6px',
+                                        padding: '2px 8px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: isVisible ? 700 : 500,
+                                        cursor: !isPortalOn ? 'not-allowed' : 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        opacity: !isPortalOn ? 0.5 : 1,
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      title={!isPortalOn ? 'Portal Access is OFF' : `Click to toggle visibility for ${r.label}`}
+                                    >
+                                      <span>{isVisible && isPortalOn ? '✓' : '+'}</span>
+                                      <span>{r.label}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {!isPortalOn && (
+                                <div style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600, marginTop: '3px' }}>
+                                  Portal Access is currently OFF
+                                </div>
+                              )}
                             </td>
                             <td data-label="Assigned Date" style={{ verticalAlign: 'middle', padding: '12px 16px', color: '#475569', fontSize: '0.84rem' }}>
                               {item.assignedDate || '2026-01-15'}
@@ -2845,9 +3154,16 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                                   className={`sa-tbl-action ${item.status === 'Active' ? 'danger' : 'success'}`}
                                   onClick={() => {
                                     const nextStatus = item.status === 'Active' ? 'Inactive' : 'Active';
-                                    setSchoolAssignments((prev) =>
-                                      prev.map((a) => (a.id === item.id ? { ...a, status: nextStatus } : a))
-                                    );
+                                    setSchoolAssignments((prev) => {
+                                      const updated = prev.map((a) => (a.id === item.id ? { ...a, status: nextStatus } : a));
+                                      try {
+                                        const store = getPortalData() || {};
+                                        store.schoolServiceAssignments = updated;
+                                        savePortalData(store);
+                                      } catch (e) {}
+                                      window.dispatchEvent(new Event('portal_data_updated'));
+                                      return updated;
+                                    });
                                     showFeedback('Status Updated', `${item.serviceName} for ${item.schoolName} is now ${nextStatus}.`);
                                   }}
                                   title={item.status === 'Active' ? 'Mark Inactive' : 'Activate Service'}
@@ -2863,7 +3179,16 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                                       title: 'Remove Service Assignment',
                                       message: `Are you sure you want to unassign ${item.serviceName} from ${item.schoolName}?`,
                                       onConfirm: () => {
-                                        setSchoolAssignments((prev) => prev.filter((a) => a.id !== item.id));
+                                        setSchoolAssignments((prev) => {
+                                          const updated = prev.filter((a) => a.id !== item.id);
+                                          try {
+                                            const store = getPortalData() || {};
+                                            store.schoolServiceAssignments = updated;
+                                            savePortalData(store);
+                                          } catch (e) {}
+                                          window.dispatchEvent(new Event('portal_data_updated'));
+                                          return updated;
+                                        });
                                         showFeedback('Assignment Removed', `${item.serviceName} unassigned successfully.`);
                                         setConfirmModal({ isOpen: false });
                                       }
@@ -3256,6 +3581,8 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                         schoolId: sch.id,
                         schoolName: sch.name,
                         status: assignFormData.status,
+                        portalAccess: assignFormData.portalAccess !== false,
+                        visibleRoles: assignFormData.visibleRoles || ['student', 'teacher', 'parent', 'principal', 'schooladmin'],
                         assignedDate: new Date().toISOString().split('T')[0]
                       };
                       const updated = [newAssignment, ...schoolAssignments];
@@ -3265,6 +3592,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                         store.schoolServiceAssignments = updated;
                         savePortalData(store);
                       } catch (err) {}
+                      window.dispatchEvent(new Event('portal_data_updated'));
                       showFeedback('Service Assigned', `Successfully assigned "${srv.name}" to "${sch.name}".`);
                       setIsAssignServiceModalOpen(false);
                       setServicesMainSection('school-services');
@@ -3306,7 +3634,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                     </select>
                   </div>
 
-                  <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <div className="form-group" style={{ marginBottom: '14px' }}>
                     <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.86rem', fontWeight: 600 }}>Initial Status</label>
                     <select
                       className="form-control"
@@ -3316,6 +3644,80 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
                     </select>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.86rem', fontWeight: 600 }}>Portal Access</label>
+                    <div style={{ display: 'flex', gap: '14px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: assignFormData.portalAccess !== false ? '#047857' : '#64748b' }}>
+                        <input
+                          type="radio"
+                          name="assignPortalAccess"
+                          checked={assignFormData.portalAccess !== false}
+                          onChange={() => setAssignFormData({ ...assignFormData, portalAccess: true })}
+                        />
+                        <span>ACCESS ON (Live in Portals)</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: assignFormData.portalAccess === false ? '#dc2626' : '#64748b' }}>
+                        <input
+                          type="radio"
+                          name="assignPortalAccess"
+                          checked={assignFormData.portalAccess === false}
+                          onChange={() => setAssignFormData({ ...assignFormData, portalAccess: false })}
+                        />
+                        <span>ACCESS OFF (Hidden)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '20px', background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.86rem', fontWeight: 700, color: '#1e3a8a' }}>
+                      Visible Portals — Who Can See This Service?
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {[
+                        { id: 'student', label: 'Student' },
+                        { id: 'teacher', label: 'Teacher' },
+                        { id: 'parent', label: 'Parent' },
+                        { id: 'principal', label: 'Principal' },
+                        { id: 'schooladmin', label: 'School Admin' },
+                      ].map((r) => {
+                        const currentRoles = (assignFormData.visibleRoles || ['student', 'teacher', 'parent', 'principal', 'schooladmin']).map(x => x.toLowerCase());
+                        const isChecked = currentRoles.includes(r.id.toLowerCase());
+                        return (
+                          <label
+                            key={r.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              background: isChecked ? '#eff6ff' : '#ffffff',
+                              border: isChecked ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                              padding: '5px 10px',
+                              borderRadius: '6px'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                let updatedRoles;
+                                if (e.target.checked) {
+                                  updatedRoles = [...currentRoles, r.id];
+                                } else {
+                                  updatedRoles = currentRoles.filter((x) => x !== r.id);
+                                }
+                                setAssignFormData({ ...assignFormData, visibleRoles: updatedRoles });
+                              }}
+                            />
+                            <span>{r.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
@@ -3639,7 +4041,7 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
       {activeTab === 'sa-messaging' && (
         <div>
           <div className="content-header">
-            <h2 id="section-title">Institutional Secure Messaging</h2>
+            <h2 id="section-title">Messages</h2>
             <div id="section-actions"></div>
           </div>
           <div id="portal-content" style={{ marginTop: '16px' }}>
@@ -3658,130 +4060,8 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
             <div id="section-actions"></div>
           </div>
 
-          <div id="portal-content">
-            <div className="sa-schools-header-bar" style={{ marginBottom: '20px' }}>
-              <div className="sa-filter-segment">
-                <button
-                  className={`sa-filter-tab ${settingsSection === 'platform' ? 'active' : ''}`}
-                  onClick={() => setSettingsSection('platform')}
-                >
-                  Platform Settings
-                </button>
-                <button
-                  className={`sa-filter-tab ${settingsSection === 'roles' ? 'active' : ''}`}
-                  onClick={() => setSettingsSection('roles')}
-                >
-                  Roles & Permissions
-                </button>
-                <button
-                  className={`sa-filter-tab ${settingsSection === 'notifications' ? 'active' : ''}`}
-                  onClick={() => setSettingsSection('notifications')}
-                >
-                  Notifications
-                </button>
-                <button
-                  className={`sa-filter-tab ${settingsSection === 'security' ? 'active' : ''}`}
-                  onClick={() => setSettingsSection('security')}
-                >
-                  High Security
-                </button>
-                <button
-                  className={`sa-filter-tab ${settingsSection === 'profile' ? 'active' : ''}`}
-                  onClick={() => setSettingsSection('profile')}
-                >
-                  Profile
-                </button>
-              </div>
-            </div>
-
-            {settingsSection === 'security' ? (
-              <div style={{ marginTop: '20px' }}>
-                <SuperAdminSecurityView />
-              </div>
-            ) : (
-              <div id="settings-content-pane" style={{ maxWidth: '760px', marginTop: '15px' }}>
-                <div className="wizard-form-box" style={{ background: 'var(--color-bg-white)', borderRadius: 'var(--radius-md)', padding: '24px', boxShadow: 'var(--shadow-sm)', border: '1px solid #e2e8f0' }}>
-                  <div className="wizard-header-strip">
-                    <div className="wizard-header-icon" style={{ background: 'rgba(30, 58, 138, 0.08)', color: 'var(--color-primary)' }}>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                      </svg>
-                    </div>
-                    <div className="wizard-header-titles">
-                      {settingsSection === 'platform' && (
-                        <>
-                          <h4>ZenSchool Platform Configuration</h4>
-                          <p>Global multi-campus parameters, institutional branding, contact endpoints, and server state.</p>
-                        </>
-                      )}
-                      {settingsSection !== 'platform' && (
-                        <>
-                          <h4>ZenSchool {settingsSection.toUpperCase()} Policy Settings</h4>
-                          <p>Configure institutional standards, policy enforcement flags, and security controls.</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {settingsSection === 'platform' && (
-                    <form onSubmit={(e) => { e.preventDefault(); }}>
-                      <div className="wizard-grid-2">
-                        <div className="wizard-field">
-                          <label>Platform Name <span className="req">*</span></label>
-                          <input type="text" defaultValue="ZenSchool Multi-School Platform" required />
-                        </div>
-                        <div className="wizard-field">
-                          <label>Super Admin Contact Email <span className="req">*</span></label>
-                          <input type="email" defaultValue="superadmin@zenschool.com" required />
-                        </div>
-                        <div className="wizard-field">
-                          <label>Default Currency <span className="req">*</span></label>
-                          <input type="text" defaultValue="INR (₹)" required />
-                        </div>
-                        <div className="wizard-field">
-                          <label>Platform Maintenance Mode <span className="req">*</span></label>
-                          <select defaultValue="Disabled">
-                            <option value="Disabled">Disabled (Platform Online)</option>
-                            <option value="Enabled">Enabled (Maintenance Mode)</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
-                        <button type="submit" className="btn btn-primary btn-sm" style={{ padding: '8px 24px' }}>Save Platform Settings ✓</button>
-                      </div>
-                    </form>
-                  )}
-
-                  {settingsSection !== 'platform' && (
-                    <form onSubmit={(e) => { e.preventDefault(); }}>
-                      <div className="wizard-grid-2">
-                        <div className="wizard-field span-2">
-                          <label>Policy Header / Description <span className="req">*</span></label>
-                          <input type="text" defaultValue={`Standard ${settingsSection} enterprise policy configuration`} required />
-                        </div>
-                        <div className="wizard-field">
-                          <label>Enforcement Status <span className="req">*</span></label>
-                          <select defaultValue="Active">
-                            <option value="Active">Enforced Across All Campuses</option>
-                            <option value="Disabled">Optional per Campus</option>
-                          </select>
-                        </div>
-                        <div className="wizard-field">
-                          <label>Audit Logging</label>
-                          <select defaultValue="Enabled">
-                            <option value="Enabled">Full Activity Logging</option>
-                            <option value="Minimal">Basic Logging</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
-                        <button type="submit" className="btn btn-primary btn-sm" style={{ padding: '8px 24px' }}>Update {settingsSection} Settings ✓</button>
-                      </div>
-                    </form>
-                  )}
-                </div>
-              </div>
-            )}
+          <div id="portal-content" style={{ marginTop: '16px' }}>
+            <SuperAdminSettingsView initialSection={settingsSection} />
           </div>
         </div>
       )}
@@ -3817,8 +4097,19 @@ export default function SuperAdminView({ activeTab = 'sa-dashboard', setActiveTa
         isOpen={isEditSchoolOpen}
         school={selectedSchool}
         onClose={() => setIsEditSchoolOpen(false)}
-        onSave={(updated) => {
+        onSave={async (updated) => {
           setSchools((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+          try {
+            const store = getPortalData() || {};
+            if (store && store.schools) {
+              store.schools = store.schools.map((s) => (s.id === updated.id ? updated : s));
+              savePortalData(store);
+            }
+            if (updated.status) {
+              setSchoolStatusInStore(updated.id, updated.status);
+            }
+            await api.updateSchool(updated.id, updated);
+          } catch (e) {}
           showFeedback('Campus Updated', `Changes saved for ${updated.name}.`);
         }}
       />

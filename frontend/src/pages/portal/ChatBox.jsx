@@ -2,6 +2,68 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
+const normalizeUserId = (u) => {
+  if (!u) return 'USR001';
+  if (typeof u === 'string') {
+    const s = u.trim();
+    const idMap = {
+      'USR-SA': 'USR001',
+      'USR-ADM': 'USR002',
+      'USR-PRIN': 'USR003',
+      'USR001_PRIN': 'USR003',
+      'USR-TCH': 'USR004',
+      'USR003_TEA': 'USR004',
+      'USR004_TEA': 'USR004',
+      'USR-STD': 'USR006',
+      'USR005_STU': 'USR006',
+      'USR006_STU': 'USR006',
+      'USR-PAR': 'USR008',
+      'USR007_PAR': 'USR008',
+    };
+    return idMap[s] || s;
+  }
+  const uname = (u.username || '').toLowerCase();
+  const unameMap = {
+    superadmin: 'USR001',
+    admin_ssv: 'USR002',
+    admin_ssvkod: 'USR002',
+    principal: 'USR003',
+    teacher: 'USR004',
+    priya: 'USR004',
+    finance_ssv: 'USR005',
+    student: 'USR006',
+    aishwarya: 'USR006',
+    parent: 'USR008',
+    ramesh: 'USR008',
+    admin_abcche: 'USR_ABC_ADM',
+    finance_abcche: 'USR_ABC_FIN',
+    admin_stmerd: 'USR_STM_ADM',
+    finance_stmerd: 'USR_STM_FIN',
+    admin_dpwcbe: 'USR_DPW_ADM',
+    finance_dpwcbe: 'USR_DPW_FIN',
+    admin_oxfchn: 'USR_OXF_ADM',
+    finance_oxfchn: 'USR_OXF_FIN',
+  };
+  if (uname && unameMap[uname]) return unameMap[uname];
+
+  const rawId = u.userId || u.id || '';
+  const idMap = {
+    'USR-SA': 'USR001',
+    'USR-ADM': 'USR002',
+    'USR-PRIN': 'USR003',
+    'USR001_PRIN': 'USR003',
+    'USR-TCH': 'USR004',
+    'USR003_TEA': 'USR004',
+    'USR004_TEA': 'USR004',
+    'USR-STD': 'USR006',
+    'USR005_STU': 'USR006',
+    'USR006_STU': 'USR006',
+    'USR-PAR': 'USR008',
+    'USR007_PAR': 'USR008',
+  };
+  return idMap[rawId] || rawId || 'USR001';
+};
+
 export default function ChatBox() {
   const { user } = useAuth();
   const [contacts, setContacts] = useState([]);
@@ -11,20 +73,39 @@ export default function ChatBox() {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
-  const messagesEndRef = useRef(null);
 
-  
+  const chatContainerRef = useRef(null);
+  const isUserAtBottomRef = useRef(true);
+
+  const scrollToBottom = (smooth = false) => {
+    if (!chatContainerRef.current) return;
+    if (smooth) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    } else {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  };
+
+  const handleScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    isUserAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 70;
+  };
+
   const loadContacts = async () => {
     try {
       const res = await api.getContacts();
-      if (res.success && res.data.length > 0) {
+      if (res && res.success && Array.isArray(res.data)) {
         setContacts(res.data);
         setActiveContact((prev) => {
           if (prev) {
             const found = res.data.find((c) => c.id === prev.id);
             return found || prev;
           }
-          return res.data[0];
+          return res.data.length > 0 ? res.data[0] : null;
         });
       }
     } catch (err) {
@@ -36,13 +117,35 @@ export default function ChatBox() {
     loadContacts();
   }, [user]);
 
-  
   const loadMessages = async (contactId) => {
     if (!contactId) return;
     try {
       const res = await api.getMessages(contactId);
-      if (res.success) {
-        setMessages(res.data);
+      if (res && res.success && Array.isArray(res.data)) {
+        setMessages((prev) => {
+          if (prev.length === res.data.length) {
+            const prevLast = prev[prev.length - 1];
+            const newLast = res.data[res.data.length - 1];
+            const prevFirst = prev[0];
+            const newFirst = res.data[0];
+            const isSame =
+              (!prevLast && !newLast) ||
+              (prevLast &&
+                newLast &&
+                (prevLast.messageId === newLast.messageId || prevLast._id === newLast._id) &&
+                prevLast.read === newLast.read &&
+                prevLast.delivered === newLast.delivered &&
+                prevFirst?.messageId === newFirst?.messageId);
+            if (isSame) {
+              return prev;
+            }
+          }
+
+          if (isUserAtBottomRef.current) {
+            setTimeout(() => scrollToBottom(true), 60);
+          }
+          return res.data;
+        });
       }
     } catch (err) {
       console.warn('Messages load error:', err);
@@ -51,15 +154,16 @@ export default function ChatBox() {
 
   useEffect(() => {
     if (activeContact?.id) {
+      isUserAtBottomRef.current = true;
       loadMessages(activeContact.id);
+      setTimeout(() => scrollToBottom(false), 50);
     }
   }, [activeContact?.id]);
 
-  
   useEffect(() => {
     const contactInterval = setInterval(() => {
       loadContacts();
-    }, 4000);
+    }, 2500);
     return () => clearInterval(contactInterval);
   }, []);
 
@@ -71,10 +175,6 @@ export default function ChatBox() {
     return () => clearInterval(interval);
   }, [activeContact?.id]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
-
   const handleSend = async (e) => {
     e.preventDefault();
     if (!inputText.trim() || !activeContact) return;
@@ -82,9 +182,9 @@ export default function ChatBox() {
     const textToSend = inputText.trim();
     setInputText('');
 
-    const currentUserId = user?.userId || user?.id || 'USR002';
-    const currentUserName = user?.name || 'User';
-    const currentUserRole = user?.role || 'schooladmin';
+    const currentUserId = normalizeUserId(user);
+    const currentUserName = user?.name || 'Super Administrator';
+    const currentUserRole = user?.role || 'superadmin';
 
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const localMsg = {
@@ -96,9 +196,13 @@ export default function ChatBox() {
       receiverName: activeContact.name,
       text: textToSend,
       timestamp: timeNow,
+      delivered: activeContact.status === 'online',
+      read: false,
     };
 
     setMessages((prev) => [...prev, localMsg]);
+    isUserAtBottomRef.current = true;
+    setTimeout(() => scrollToBottom(true), 30);
 
     try {
       const res = await api.sendMessage({
@@ -108,7 +212,7 @@ export default function ChatBox() {
         text: textToSend,
       });
 
-      if (res.success && res.data) {
+      if (res && res.success && res.data) {
         setMessages((prev) =>
           prev.map((m) => (m.messageId === localMsg.messageId ? res.data : m))
         );
@@ -130,18 +234,16 @@ export default function ChatBox() {
 
   return (
     <div className={`messaging-layout ${showMobileChat ? 'show-mobile-chat' : 'show-mobile-sidebar'}`}>
-      
       <div className="messaging-sidebar">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
           <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-primary)', margin: 0 }}>
-            Active Conversations
+            Contacts & Chats
           </h4>
           <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>
             {filteredContacts.length} Contacts
           </span>
         </div>
 
-        
         <div style={{ marginBottom: '12px' }}>
           <input
             type="text"
@@ -153,7 +255,7 @@ export default function ChatBox() {
           />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '420px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '440px' }}>
           {filteredContacts.length === 0 ? (
             <div style={{ fontSize: '0.82rem', color: '#94a3b8', textAlign: 'center', padding: '16px 0' }}>
               No contacts found
@@ -161,9 +263,11 @@ export default function ChatBox() {
           ) : (
             filteredContacts.map((c) => {
               const hasUnread = c.unreadCount > 0 && activeContact?.id !== c.id;
+              const isOnline = c.status === 'online';
               return (
                 <button
                   key={c.id}
+                  type="button"
                   className={`contact-item-btn ${activeContact?.id === c.id ? 'active' : ''}`}
                   onClick={() => {
                     setActiveContact(c);
@@ -174,7 +278,7 @@ export default function ChatBox() {
                     borderLeft: hasUnread ? '3px solid #16a34a' : undefined,
                   }}
                 >
-                  <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
                     <img
                       src={c.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
                       alt={c.name}
@@ -185,12 +289,14 @@ export default function ChatBox() {
                         position: 'absolute',
                         bottom: 0,
                         right: 0,
-                        width: '10px',
-                        height: '10px',
+                        width: '11px',
+                        height: '11px',
                         borderRadius: '50%',
-                        backgroundColor: c.status === 'online' ? '#22c55e' : c.status === 'away' ? '#eab308' : '#94a3b8',
+                        backgroundColor: isOnline ? '#22c55e' : '#94a3b8',
                         border: '2px solid #fff',
+                        boxShadow: isOnline ? '0 0 5px rgba(34, 197, 94, 0.7)' : 'none',
                       }}
+                      title={isOnline ? 'Online' : 'Offline'}
                     />
                   </div>
                   <div style={{ textAlign: 'left', overflow: 'hidden', flex: 1 }}>
@@ -216,9 +322,32 @@ export default function ChatBox() {
                         </span>
                       )}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                      {c.role ? c.role.toUpperCase() : 'USER'} {c.schoolName ? `• ${c.schoolName.slice(0, 16)}...` : ''}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        {c.role ? c.role.toUpperCase() : 'USER'}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 600,
+                          color: isOnline ? '#16a34a' : '#94a3b8',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: isOnline ? '#22c55e' : '#94a3b8',
+                            display: 'inline-block',
+                          }}
+                        />
+                        {isOnline ? 'Online' : 'Offline'}
+                      </span>
+                    </div>
                   </div>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" className="mobile-chevron">
                     <polyline points="9 18 15 12 9 6" />
@@ -230,9 +359,7 @@ export default function ChatBox() {
         </div>
       </div>
 
-      
       <div className="messaging-chat-pane" style={{ display: 'flex', flexDirection: 'column', height: '520px' }}>
-        
         {activeContact && (
           <div
             style={{
@@ -259,16 +386,18 @@ export default function ChatBox() {
               <img
                 src={activeContact.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
                 alt={activeContact.name}
-                style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
               />
               <div>
-                <strong style={{ fontSize: '0.92rem', color: 'var(--color-primary)', display: 'block' }}>{activeContact.name}</strong>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <strong style={{ fontSize: '0.92rem', color: 'var(--color-primary)', display: 'block' }}>
+                  {activeContact.name}
+                </strong>
+                <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '1px' }}>
                   <span>{activeContact.role ? activeContact.role.toUpperCase() : 'USER'}</span>
                   <span>•</span>
                   {activeContact.status === 'online' ? (
-                    <span style={{ color: '#16a34a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }}></span>
+                    <span style={{ color: '#16a34a', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block', boxShadow: '0 0 5px #22c55e' }}></span>
                       Online
                     </span>
                   ) : (
@@ -292,8 +421,9 @@ export default function ChatBox() {
           </div>
         )}
 
-        
         <div
+          ref={chatContainerRef}
+          onScroll={handleScroll}
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -303,46 +433,39 @@ export default function ChatBox() {
             flexDirection: 'column',
           }}
         >
-          {messages.map((m, idx) => {
-            const rawMyId = user?.userId || user?.id || 'USR002';
-            const normalize = (id) => {
-              if (!id) return id;
-              const map = {
-                'USR-SA': 'USR001',
-                'USR-ADM': 'USR002',
-                'USR-PRIN': 'USR003',
-                'USR-TCH': 'USR004',
-                'USR-STD': 'USR006',
-                'USR-PAR': 'USR008',
-              };
-              return map[id] || id;
-            };
-            const currentMyId = normalize(rawMyId);
-            const msgSender = normalize(m.senderId);
-            const isMe = msgSender === currentMyId || m.senderId === rawMyId;
-            return (
-              <div key={idx} className={`chat-bubble ${isMe ? 'outgoing' : 'incoming'}`}>
-                <div style={{ fontWeight: 600, fontSize: '0.74rem', marginBottom: '3px', opacity: 0.85 }}>
-                  {isMe ? 'You' : m.senderName}
+          {messages.length === 0 ? (
+            <div style={{ margin: 'auto', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+              No messages yet with {activeContact ? activeContact.name : 'this user'}. Start the conversation!
+            </div>
+          ) : (
+            messages.map((m, idx) => {
+              const currentMyId = normalizeUserId(user);
+              const msgSender = normalizeUserId(m.senderId);
+              const isMe = msgSender === currentMyId || m.senderId === currentMyId || m.senderId === user?.userId;
+              return (
+                <div key={idx} className={`chat-bubble ${isMe ? 'outgoing' : 'incoming'}`}>
+                  <div style={{ fontWeight: 600, fontSize: '0.74rem', marginBottom: '3px', opacity: 0.85 }}>
+                    {isMe ? 'You' : m.senderName}
+                  </div>
+                  <div>{m.text}</div>
+                  <div className="chat-meta">
+                    <span>{m.timestamp}</span>
+                    {isMe && (
+                      <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center' }}>
+                        {m.read ? (
+                          <span style={{ color: '#38bdf8' }} title="Read">✓✓</span>
+                        ) : m.delivered ? (
+                          <span style={{ color: 'rgba(255, 255, 255, 0.75)' }} title="Delivered">✓✓</span>
+                        ) : (
+                          <span style={{ color: 'rgba(255, 255, 255, 0.65)' }} title="Sent">✓</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div>{m.text}</div>
-                <div className="chat-meta">
-                  <span>{m.timestamp}</span>
-                  {isMe && (
-                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center' }}>
-                      {m.read ? (
-                        <span style={{ color: '#38bdf8' }} title="Read">✓✓</span>
-                      ) : m.delivered ? (
-                        <span style={{ color: 'rgba(255, 255, 255, 0.75)' }} title="Delivered">✓✓</span>
-                      ) : (
-                        <span style={{ color: 'rgba(255, 255, 255, 0.65)' }} title="Sent">✓</span>
-                      )}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
 
           {isTyping && (
             <div className="typing-indicator">
@@ -351,10 +474,8 @@ export default function ChatBox() {
               <span className="typing-dot"></span>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
-        
         <form
           onSubmit={handleSend}
           style={{

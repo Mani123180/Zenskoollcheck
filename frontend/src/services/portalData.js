@@ -139,9 +139,9 @@ export const defaultPortalSchools = [
 
 export const defaultPortalUsers = [
   { id: 'USR001', name: 'Super Administrator', email: 'superadmin@zenschool.com', phone: '+91 98401 11001', username: 'superadmin', password: 'SuperAdmin@123', role: 'superadmin', schoolId: 'ALL', schoolName: 'Zenith Central Trust', status: 'Active', aliases: ['superadmin'] },
-  { id: 'USR003', name: 'School Administrator (SSV)', email: 'admin@ssvschool.com', phone: '+91 98401 22002', username: 'admin_ssv', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', aliases: ['admin_ssv', 'admin_ssvkod', 'admin@ssvschool.com'] },
+  { id: 'USR002', name: 'School Administrator (SSV)', email: 'admin@ssvschool.com', phone: '+91 98401 22002', username: 'admin_ssv', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', aliases: ['admin_ssv', 'admin_ssvkod', 'admin@ssvschool.com'] },
   { id: 'USR005', name: 'School Finance Manager (SSV)', email: 'finance@ssvschool.com', phone: '+91 98401 22005', username: 'finance_ssv', password: 'Finance@12345', role: 'finance', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', aliases: ['finance_ssv', 'finance_ssvkod', 'finance@ssvschool.com'] },
-  { id: 'USR002', name: 'Admin Rajesh (ABC School)', email: 'admin@abcschool.com', phone: '+91 98401 33003', username: 'admin_abcche', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', aliases: ['admin_abcche', 'admin_abc', 'admin@abcschool.com'] },
+  { id: 'USR_ABC_ADM', name: 'Admin Rajesh (ABC School)', email: 'admin@abcschool.com', phone: '+91 98401 33003', username: 'admin_abcche', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', aliases: ['admin_abcche', 'admin_abc', 'admin@abcschool.com'] },
   { id: 'USR012', name: 'Finance Manager (ABC School)', email: 'finance@abcschool.com', phone: '+91 98401 33012', username: 'finance_abcche', password: 'Finance@12345', role: 'finance', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', aliases: ['finance_abcche', 'finance_abc', 'finance@abcschool.com'] },
   { id: 'USR004', name: 'Admin Joseph (St. Marys)', email: 'admin@stmarys.com', phone: '+91 98401 44004', username: 'admin_stmerd', password: 'Admin@12345', role: 'schooladmin', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', aliases: ['admin_stmerd', 'admin_stm', 'admin@stmarys.com'] },
   { id: 'USR014', name: 'Finance Manager (St. Marys)', email: 'finance@stmerd.edu', phone: '+91 98401 44014', username: 'finance_stmerd', password: 'Finance@12345', role: 'finance', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', aliases: ['finance_stmerd', 'finance_stm', 'finance@stmerd.edu'] },
@@ -535,12 +535,12 @@ const defaultData = {
 
   users: [
     ...defaultPortalUsers,
-    { id: 'USR001_PRIN', name: 'Dr. Savithri Raman', role: 'PRINCIPAL', phone: '+91 98401 23450', email: 'principal@ssvschool.com', username: 'principal', password: 'principal123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
-    { id: 'USR003_TEA', name: 'Mrs. Priya Krishnan', role: 'TEACHER', phone: '+91 98401 23451', email: 'priya.k@ssvschool.com', username: 'teacher', password: 'teacher123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', aliases: ['priya', 'teacher@ssvschool.com'] },
+    { id: 'USR003', name: 'Dr. Savithri Raman', role: 'PRINCIPAL', phone: '+91 98401 23450', email: 'principal@ssvschool.com', username: 'principal', password: 'principal123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
+    { id: 'USR004', name: 'Mrs. Priya Krishnan', role: 'TEACHER', phone: '+91 98401 23451', email: 'priya.k@ssvschool.com', username: 'teacher', password: 'teacher123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', aliases: ['priya', 'teacher@ssvschool.com'] },
     { id: 'USR004_TEA', name: 'Dr. Anandhi Rajan', role: 'TEACHER', phone: '+91 98401 23452', email: 'anandhi.r@ssvschool.com', username: 'anandhi', password: 'teacher123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
-    { id: 'USR005_STU', name: 'Aishwarya Kumar', role: 'STUDENT', phone: '+91 98401 23453', email: 'student@ssvschool.com', username: 'student', password: 'student123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', aliases: ['aishwarya', 'student@ssvschool.com'] },
+    { id: 'USR006', name: 'Aishwarya Kumar', role: 'STUDENT', phone: '+91 98401 23453', email: 'student@ssvschool.com', username: 'student', password: 'student123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', aliases: ['aishwarya', 'student@ssvschool.com'] },
     { id: 'USR006_STU', name: 'Kavitha Selvam', role: 'STUDENT', phone: '+91 98401 23454', email: 'kavitha@ssvschool.com', username: 'kavitha', password: 'student123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002' },
-    { id: 'USR007_PAR', name: 'Ramesh Kumar', role: 'PARENT', phone: '+91 98401 99009', email: 'parent@ssvschool.com', username: 'parent', password: 'parent123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', studentName: 'Aishwarya Kumar', studentRoll: 'S101', relationship: 'Father', aliases: ['ramesh', 'parent@ssvschool.com'] },
+    { id: 'USR008', name: 'Ramesh Kumar', role: 'PARENT', phone: '+91 98401 99009', email: 'parent@ssvschool.com', username: 'parent', password: 'parent123', status: 'Active', createdDate: '2026-02-15', schoolId: 'SCHOOL002', studentName: 'Aishwarya Kumar', studentRoll: 'S101', relationship: 'Father', aliases: ['ramesh', 'parent@ssvschool.com'] },
   ],
 
   nonTeachingStaff: [
@@ -584,12 +584,12 @@ const defaultData = {
   ],
 
   schoolServiceAssignments: [
-    { id: 'SSA-01', serviceId: 'SRV-01', serviceName: 'Coding for Kids', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-01-15' },
-    { id: 'SSA-02', serviceId: 'SRV-02', serviceName: 'Chess Academy', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-01-20' },
-    { id: 'SSA-03', serviceId: 'SRV-03', serviceName: 'Robotics', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-02-01' },
-    { id: 'SSA-04', serviceId: 'SRV-04', serviceName: 'Drawing & Art', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', assignedDate: '2026-01-10' },
-    { id: 'SSA-05', serviceId: 'SRV-05', serviceName: 'Spoken English', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Inactive', assignedDate: '2026-01-12' },
-    { id: 'SSA-06', serviceId: 'SRV-06', serviceName: 'Abacus & Vedic Maths', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', assignedDate: '2026-03-01' },
+    { id: 'SSA-01', serviceId: 'SRV-01', serviceName: 'Coding for Kids', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-01-15', portalAccess: true, visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin'] },
+    { id: 'SSA-02', serviceId: 'SRV-02', serviceName: 'Chess Academy', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-01-20', portalAccess: true, visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin'] },
+    { id: 'SSA-03', serviceId: 'SRV-03', serviceName: 'Robotics', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-02-01', portalAccess: true, visibleRoles: ['student', 'teacher', 'schooladmin'] },
+    { id: 'SSA-04', serviceId: 'SRV-04', serviceName: 'Drawing & Art', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Active', assignedDate: '2026-01-10', portalAccess: true, visibleRoles: ['student', 'parent', 'schooladmin'] },
+    { id: 'SSA-05', serviceId: 'SRV-05', serviceName: 'Spoken English', schoolId: 'SCHOOL001', schoolName: 'ABC Matriculation School', status: 'Inactive', assignedDate: '2026-01-12', portalAccess: false, visibleRoles: ['student', 'teacher', 'parent', 'principal', 'schooladmin'] },
+    { id: 'SSA-06', serviceId: 'SRV-06', serviceName: 'Abacus & Vedic Maths', schoolId: 'SCHOOL003', schoolName: 'St. Marys Academy', status: 'Active', assignedDate: '2026-03-01', portalAccess: true, visibleRoles: ['student', 'teacher', 'parent', 'schooladmin'] },
   ],
 
   feeRecords: [
@@ -601,7 +601,37 @@ const defaultData = {
     { id: 'FEE-106', roll: 'S106', name: 'Pooja Sundaram', class: 'Grade 10-B', parent: 'Sundaram P.', phone: '+91 98456 12306', totalFee: '₹28,000', paid: '₹28,000', due: '₹0', status: 'PAID', invoiceNumber: 'INV-2026-006', dueDate: '2026-10-15' },
     { id: 'FEE-107', roll: 'S107', name: 'Swathi Rajesh', class: 'Grade 10-B', parent: 'Rajesh K.', phone: '+91 98456 12307', totalFee: '₹28,000', paid: '₹20,000', due: '₹8,000', status: 'PARTIAL', invoiceNumber: 'INV-2026-007', dueDate: '2026-10-15' },
     { id: 'FEE-108', roll: 'S108', name: 'Bhavani Chandran', class: 'Grade 9-A', parent: 'Chandran M.', phone: '+91 98456 12308', totalFee: '₹26,000', paid: '₹26,000', due: '₹0', status: 'PAID', invoiceNumber: 'INV-2026-008', dueDate: '2026-10-15' },
-  ]
+  ],
+
+  platformSettings: {
+    platformName: 'ZenSkooll Multi-School ERP Platform',
+    contactEmail: 'superadmin@zenschool.com',
+    supportPhone: '+91 98401 11001',
+    currency: 'INR (₹)',
+    academicYear: '2026 - 2027',
+    maintenanceMode: 'Disabled',
+    backupFrequency: 'Daily',
+    timezone: 'Asia/Kolkata (IST +5:30)',
+  },
+
+  rolePolicySettings: {
+    allowSchoolAdminCreateStaff: true,
+    allowTeacherPostAnnouncements: true,
+    allowStudentDownloadMaterials: true,
+    allowParentChatTeachers: true,
+    allowFinanceManageExpenses: true,
+    minPasswordLength: 8,
+    requireSpecialChar: true,
+    sessionTimeout: 60,
+  },
+
+  notificationSettings: {
+    emailNotifications: true,
+    smsAlerts: true,
+    inAppSoundAlerts: true,
+    dailyDigest: false,
+    systemAlertEmail: 'alerts@zenschool.com',
+  },
 };
 
 const STORAGE_KEY = 'ssv_demo_data';
@@ -665,6 +695,15 @@ export function getPortalData() {
       }
       if (!parsed.feeRecords || parsed.feeRecords.length === 0) {
         parsed.feeRecords = defaultData.feeRecords;
+      }
+      if (!parsed.schoolServiceAssignments || parsed.schoolServiceAssignments.length === 0) {
+        parsed.schoolServiceAssignments = defaultData.schoolServiceAssignments;
+      } else {
+        parsed.schoolServiceAssignments = parsed.schoolServiceAssignments.map((a) => ({
+          ...a,
+          portalAccess: a.portalAccess !== undefined ? a.portalAccess : (a.status !== 'Inactive'),
+          visibleRoles: a.visibleRoles || ['student', 'teacher', 'parent', 'principal', 'schooladmin'],
+        }));
       }
       if (parsed.students && parsed.students.length > 0) {
         parsed.students = parsed.students.map((s) => {
@@ -750,4 +789,73 @@ export function getInitialPortalData() {
   savePortalData(data);
   return data;
 }
+
+export function getSchoolStatus(schoolId) {
+  if (!schoolId || schoolId === 'ALL') return 'Active';
+  const cleanId = String(schoolId).trim();
+  try {
+    const store = getPortalData() || {};
+    if (store && Array.isArray(store.schools)) {
+      const found = store.schools.find((s) => s.id === cleanId || s.schoolId === cleanId || s.code === cleanId);
+      if (found) return found.status || 'Active';
+    }
+  } catch (e) {}
+  return 'Active';
+}
+
+export function isSchoolActive(schoolId) {
+  return getSchoolStatus(schoolId) === 'Active';
+}
+
+export function setSchoolStatusInStore(schoolId, newStatus) {
+  try {
+    const store = getPortalData() || {};
+    if (store && Array.isArray(store.schools)) {
+      store.schools = store.schools.map((s) =>
+        s.id === schoolId || s.schoolId === schoolId || s.code === schoolId
+          ? { ...s, status: newStatus }
+          : s
+      );
+      savePortalData(store);
+      return true;
+    }
+  } catch (e) {
+    console.warn('setSchoolStatusInStore error:', e);
+  }
+  return false;
+}
+
+export function setUserStatusInStore(userId, newStatus) {
+  try {
+    const store = getPortalData() || {};
+    if (store && Array.isArray(store.users)) {
+      store.users = store.users.map((u) =>
+        u.id === userId || u.userId === userId || (u.username && u.username === userId)
+          ? { ...u, status: newStatus }
+          : u
+      );
+      savePortalData(store);
+      return true;
+    }
+  } catch (e) {
+    console.warn('setUserStatusInStore error:', e);
+  }
+  return false;
+}
+
+export function isUserActive(userId, username) {
+  try {
+    const store = getPortalData() || {};
+    if (store && Array.isArray(store.users)) {
+      const found = store.users.find(
+        (u) =>
+          (userId && (u.id === userId || u.userId === userId)) ||
+          (username && u.username && u.username.toLowerCase() === username.toLowerCase())
+      );
+      if (found) return found.status === 'Active';
+    }
+  } catch (e) {}
+  return true;
+}
+
 

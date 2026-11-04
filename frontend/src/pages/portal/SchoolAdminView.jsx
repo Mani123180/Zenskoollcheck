@@ -677,7 +677,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
       'financial-manage': 'Financial Management',
  'publish-announcements': 'School Announcements',
  'view-reports': 'Academic & Enrollment Reports',
- 'secure-messaging': 'Secure Messaging'
+ 'secure-messaging': 'Messages'
  };
  return titles[activeTab] || 'Dashboard';
  };
@@ -1767,16 +1767,27 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  { id: 'SSA-03', serviceId: 'SRV-03', serviceName: 'Robotics', schoolId: 'SCHOOL002', schoolName: 'Sri Sankara Vidhyasala Girls High School', status: 'Active', assignedDate: '2026-02-01' },
  ];
 
- 
- const visibleServices = masterServices.filter((srv) => {
- const roles = srv.visibleRoles || ['schooladmin', 'teacher', 'student'];
- if (!roles.includes('schooladmin')) return false;
- if (serviceSearch.trim()) {
- const q = serviceSearch.toLowerCase();
- return srv.name.toLowerCase().includes(q) || srv.category.toLowerCase().includes(q);
- }
- return true;
- });
+  const sId = user?.schoolId || 'SCHOOL002';
+  const schoolAssigns = (assignments || []).filter((a) => !sId || a.schoolId === sId || a.schoolId === 'ALL');
+  const visibleServices = masterServices.filter((srv) => {
+    if (schoolAssigns.length > 0) {
+      const assign = schoolAssigns.find((a) => a.serviceId === srv.id || (a.serviceName && a.serviceName.toLowerCase() === srv.name.toLowerCase()));
+      if (!assign) return false;
+      if (assign.status === 'Inactive') return false;
+      if (assign.portalAccess === false) return false;
+      const allowed = (assign.visibleRoles || ['schooladmin', 'teacher', 'student']).map((r) => r.toLowerCase());
+      if (!allowed.includes('schooladmin')) return false;
+    } else {
+      if (srv.status === 'Inactive') return false;
+      const roles = (srv.visibleRoles || ['schooladmin', 'teacher', 'student']).map((r) => r.toLowerCase());
+      if (!roles.includes('schooladmin')) return false;
+    }
+    if (serviceSearch.trim()) {
+      const q = serviceSearch.toLowerCase();
+      return srv.name.toLowerCase().includes(q) || srv.category.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
  return (
  <div>
@@ -1855,6 +1866,24 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  </div>
 
  
+ {visibleServices.length === 0 ? (
+   <div style={{
+     background: '#f8fafc',
+     border: '1.5px dashed #cbd5e1',
+     borderRadius: '14px',
+     padding: '50px 20px',
+     textAlign: 'center',
+     color: '#64748b'
+   }}>
+     <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🔒</div>
+     <h4 style={{ margin: '0 0 8px', color: '#0f172a', fontWeight: 800, fontSize: '1.15rem' }}>
+       No Active Campus Services Available
+     </h4>
+     <p style={{ fontSize: '0.88rem', maxWidth: '480px', margin: '0 auto', lineHeight: '1.6' }}>
+       Portal access for campus services has been turned OFF or restricted for School Administrators by the Super Admin.
+     </p>
+   </div>
+ ) : (
  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '18px' }}>
  {visibleServices.map((srv) => {
  const assignedRecord = assignments.find((a) => a.serviceId === srv.id && a.schoolId === 'SCHOOL002');
@@ -2042,6 +2071,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  );
  })}
  </div>
+ )}
  </div>
  );
  })()}

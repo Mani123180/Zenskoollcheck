@@ -236,6 +236,19 @@ export const api = {
     }
   },
 
+  sendOffline: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/messages/offline`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        keepalive: true,
+      });
+      return handleResponse(res);
+    } catch (e) {
+      return { success: false };
+    }
+  },
+
   getContacts: async () => {
     const res = await fetch(`${API_BASE}/messages/contacts`, { headers: getAuthHeaders() });
     return handleResponse(res);
