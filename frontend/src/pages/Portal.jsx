@@ -237,6 +237,20 @@ const finIcons = {
       { id: 'school-announcements', label: 'School Announcements', icon: schIcons.announcements },
       { id: 'messaging-teachers', label: 'Messaging with Teachers', icon: schIcons.messaging },
     ],
+    staff: [
+      { id: 'timetable', label: 'Staff Timetable', icon: saIcons.dashboard },
+      { id: 'attendance-management', label: 'Attendance Management', icon: schIcons.users },
+      { id: 'leave-request', label: 'Leave Requests & Approvals', icon: schIcons.reports },
+      { id: 'announcements', label: 'Announcements', icon: schIcons.announcements },
+      { id: 'secure-messaging', label: 'Messages', icon: schIcons.messaging },
+    ],
+    nonteaching: [
+      { id: 'timetable', label: 'Staff Timetable', icon: saIcons.dashboard },
+      { id: 'attendance-management', label: 'Attendance Management', icon: schIcons.users },
+      { id: 'leave-request', label: 'Leave Requests & Approvals', icon: schIcons.reports },
+      { id: 'announcements', label: 'Announcements', icon: schIcons.announcements },
+      { id: 'secure-messaging', label: 'Messages', icon: schIcons.messaging },
+    ],
   };
 
   const currentMenu = menuConfig[currentRole] || menuConfig.superadmin;
@@ -251,13 +265,41 @@ const finIcons = {
   
   useEffect(() => {
     if (!user) return;
-    api.sendHeartbeat();
-    const hbInterval = setInterval(() => {
-      api.sendHeartbeat();
-    }, 5000);
+
+    const recordPresence = () => {
+      try {
+        api.sendHeartbeat();
+        const rawId = user.userId || user.id || (user.name ? `USR_${user.name.replace(/\s+/g, '')}` : '');
+        const uname = (user.username || '').toLowerCase();
+        const name = (user.name || '').trim().toLowerCase();
+        const store = JSON.parse(localStorage.getItem('ssv_presence_map') || '{}');
+        const now = Date.now();
+        if (rawId) store[rawId] = now;
+        if (uname) store[uname] = now;
+        if (name) store[name] = now;
+        // Purge entries older than 12 seconds
+        Object.keys(store).forEach((k) => {
+          if (now - store[k] > 12000) delete store[k];
+        });
+        localStorage.setItem('ssv_presence_map', JSON.stringify(store));
+      } catch (e) {}
+    };
+
+    recordPresence();
+    const hbInterval = setInterval(recordPresence, 3500);
 
     const handleUnload = () => {
-      api.sendOffline();
+      try {
+        api.sendOffline();
+        const rawId = user.userId || user.id || (user.name ? `USR_${user.name.replace(/\s+/g, '')}` : '');
+        const uname = (user.username || '').toLowerCase();
+        const name = (user.name || '').trim().toLowerCase();
+        const store = JSON.parse(localStorage.getItem('ssv_presence_map') || '{}');
+        if (rawId) delete store[rawId];
+        if (uname) delete store[uname];
+        if (name) delete store[name];
+        localStorage.setItem('ssv_presence_map', JSON.stringify(store));
+      } catch (e) {}
     };
     window.addEventListener('beforeunload', handleUnload);
 
@@ -273,6 +315,7 @@ const finIcons = {
     if (currentRole === 'finance' || currentRole === 'financemanager') return 'School Finance Manager';
     if (currentRole === 'principal') return 'Principal';
     if (currentRole === 'teacher') return 'Faculty Teacher';
+    if (currentRole === 'staff' || currentRole === 'nonteaching') return 'Campus Staff';
     if (currentRole === 'student') return 'Student';
     if (currentRole === 'parent') return 'Parent / Guardian';
     return user?.role || 'User';
@@ -298,31 +341,34 @@ const finIcons = {
       
       <header className="header" style={{ position: 'sticky', top: 0, zIndex: 100, background: '#ffffff', borderBottom: '2px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div className="container nav-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '70px', padding: '0 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <Link to="/" className="logo" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
               <img
                 src="/images/zenschool_logo.png"
                 alt="ZenSkool Logo"
-                style={{ height: '54px', maxWidth: '190px', width: 'auto', objectFit: 'contain', display: 'block' }}
+                className="portal-navbar-logo"
+                style={{ height: '52px', maxWidth: '180px', width: 'auto', objectFit: 'contain', display: 'block' }}
               />
             </Link>
             {currentRole !== 'superadmin' && (
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                padding: '6px 12px',
-                borderRadius: '8px'
-              }}>
-                <span style={{ fontSize: '1rem' }}></span>
+              <div
+                className="portal-user-header-badge"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  padding: '6px 12px',
+                  borderRadius: '8px'
+                }}
+              >
                 <div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e3a8a', lineHeight: 1.2 }}>
-                    {getSchoolDisplayName()}
+                    {user?.name ? `${user.name} • ${getRoleDisplayName()}` : getSchoolDisplayName()}
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                    {getRoleDisplayName()} &bull; ID: <code>{user?.schoolId || 'CAMPUS'}</code>
+                    {getSchoolDisplayName()} &bull; ID: <code>{user?.schoolId || 'CAMPUS'}</code> {user?.class ? `&bull; Section: ${user.class}` : ''}
                   </div>
                 </div>
               </div>
@@ -341,6 +387,52 @@ const finIcons = {
           </button>
         </div>
       </header>
+
+      {/* MOBILE CAMPUS & ROLE SUB-STRIP (CLEAN & NON-OVERLAPPING) */}
+      {currentRole !== 'superadmin' && (
+        <div className="portal-mobile-user-strip">
+          <div style={{
+            background: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            padding: '7px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            fontSize: '0.76rem',
+          }}>
+            <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontWeight: 800, color: '#1e3a8a' }}>
+                {user?.name || getSchoolDisplayName()}
+              </span>
+              <span style={{ color: '#b45309', fontWeight: 700, marginLeft: '6px' }}>
+                • {getRoleDisplayName()}
+              </span>
+            </div>
+            <div style={{ flexShrink: 0, fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+              ID: <code style={{ color: '#0284c7', fontWeight: 700, background: '#e0f2fe', padding: '1px 5px', borderRadius: '4px' }}>{user?.schoolId || 'CAMPUS'}</code>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE SIDEBAR BACKDROP */}
+      {isMobileMenuOpen && (
+        <div
+          onClick={() => setIsMobileMenuOpen(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 998,
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       
       <div className="portal-section">
@@ -363,14 +455,14 @@ const finIcons = {
                   </>
                 ) : (
                   <>
-                    <h3 id="user-display-name" style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#1e3a8a', lineHeight: 1.3 }}>
-                      {getSchoolDisplayName()}
+                    <h3 id="user-display-name" style={{ margin: 0, fontSize: '1.02rem', fontWeight: 800, color: '#1e3a8a', lineHeight: 1.3 }}>
+                      {user?.name || getSchoolDisplayName()}
                     </h3>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--color-secondary, #b45309)', fontWeight: 700, marginTop: '2px' }}>
-                      {getRoleDisplayName()}
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-secondary, #b45309)', fontWeight: 700, marginTop: '2px' }}>
+                      {getRoleDisplayName()} {user?.class ? `• ${user.class}` : ''}
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
-                      Partition: {user?.schoolId || 'CAMPUS'}
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, marginTop: '1px' }}>
+                      {getSchoolDisplayName()} &bull; {user?.schoolId || 'CAMPUS'}
                     </div>
                   </>
                 )}
@@ -553,7 +645,7 @@ const finIcons = {
                     setActiveTab={setActiveTab}
                   />
                 )}
-                {['principal', 'teacher', 'student', 'parent'].includes(currentRole) && (
+                {['principal', 'teacher', 'staff', 'nonteaching', 'student', 'parent'].includes(currentRole) && (
                   <AcademicRolesView role={currentRole} user={user} activeTab={activeTab} setActiveTab={setActiveTab} />
                 )}
               </>

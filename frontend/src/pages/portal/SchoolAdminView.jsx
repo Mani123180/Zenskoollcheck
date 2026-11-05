@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
  getPortalData,
  savePortalData,
- syncBillToPortalFeeRecords
+ syncBillToPortalFeeRecords,
+ getStaffDailyAttendance,
+ getStaffLeaveOnDate,
+ toggleStaffLeaveOnDate,
+ isDateWithinLeave,
+ normalizeStaffName
 } from '../../services/portalData';
 import { api } from '../../services/api';
 import ChatBox from './ChatBox';
@@ -47,6 +52,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  role: 'Teacher', 
  phone: '',
  email: '',
+ password: '',
  address: '',
  bloodGroup: 'O+',
  qualification: '',
@@ -58,11 +64,11 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
 
  const [isPrincipalModalOpen, setIsPrincipalModalOpen] = useState(false);
  const [editingPrincipal, setEditingPrincipal] = useState(null);
- const [principalForm, setPrincipalForm] = useState({ name: '', qualification: 'Ph.D., M.Ed', experience: '18 Years', phone: '', email: '', status: 'Active' });
+ const [principalForm, setPrincipalForm] = useState({ name: '', qualification: 'Ph.D., M.Ed', experience: '18 Years', phone: '', email: '', password: '', status: 'Active' });
 
  const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
  const [editingTeacher, setEditingTeacher] = useState(null);
- const [teacherForm, setTeacherForm] = useState({ name: '', subject: '', class: 'Grade 10-A' });
+ const [teacherForm, setTeacherForm] = useState({ name: '', subject: '', class: 'Grade 10-A', phone: '', email: '', password: '', status: 'Active' });
 
  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
  const [editingStudent, setEditingStudent] = useState(null);
@@ -70,6 +76,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  roll: '',
  regNo: '',
  name: '',
+ studentEmail: '',
+ password: '',
  class: 'Grade 10-A',
  gender: 'Female',
  dob: '2010-05-15',
@@ -77,6 +85,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  parentName: '',
  parentPhone: '',
  parentEmail: '',
+ parentPassword: '',
  address: '',
  emergencyContact: '',
  admissionDate: new Date().toISOString().split('T')[0],
@@ -100,7 +109,22 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  });
 
  const [isLinkParentOpen, setIsLinkParentOpen] = useState(false);
- const [linkParentForm, setLinkParentForm] = useState({ name: '', relationship: 'Father', phone: '', email: '', studentRoll: 'S101' });
+ const [linkParentForm, setLinkParentForm] = useState({ name: '', relationship: 'Father', phone: '', email: '', password: '', studentRoll: 'S101' });
+
+ // Dedicated Password Management & Visibility State
+ const [visiblePasswords, setVisiblePasswords] = useState({});
+ const [changePasswordModal, setChangePasswordModal] = useState({
+   isOpen: false,
+   user: null,
+   name: '',
+   role: '',
+   email: '',
+   currentPassword: '',
+   newPassword: '',
+   showPassword: false,
+   id: '',
+   roll: ''
+ });
 
  const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false);
  const [announcementSearch, setAnnouncementSearch] = useState('');
@@ -374,6 +398,24 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
 
  
  const [activeReportViewer, setActiveReportViewer] = useState(null); 
+ const [reportClassFilter, setReportClassFilter] = useState('All');
+ const [reportSearchQuery, setReportSearchQuery] = useState('');
+
+ const isClassMatch = (clsNameA, clsNameB) => {
+   if (!clsNameA || !clsNameB) return false;
+   const a = clsNameA.toString().toLowerCase().replace(/^grade\s*/i, '').replace(/[^a-z0-9]/g, '');
+   const b = clsNameB.toString().toLowerCase().replace(/^grade\s*/i, '').replace(/[^a-z0-9]/g, '');
+   return a === b;
+ };
+
+ const isStaffMatch = (nameA, nameB) => {
+   if (!nameA || !nameB) return false;
+   const norm = (str) => str.toLowerCase().replace(/^(dr|mr|mrs|ms)\.?\s+/i, '').replace(/[^a-z0-9]/g, '');
+   const a = norm(nameA);
+   const b = norm(nameB);
+   if (!a || !b) return false;
+   return a === b || a.includes(b) || b.includes(a);
+ };
 
  
  const handleStudentFileSelect = (e) => {
@@ -682,15 +724,195 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  return titles[activeTab] || 'Dashboard';
  };
 
- 
+ // Helper to reliably retrieve email and password credentials for any record
+ const getUserCredentials = (record, roleName = '') => {
+   if (!record) return { email: '', password: 'Password@123' };
+   const rName = (roleName || record.roleType || record.role || '').toLowerCase();
+   
+   // Direct fields on the record
+   let email = record.email || record.studentEmail || record.contactEmail || '';
+   let password = record.password || '';
+
+   // Find in data.users
+   const portalUsers = data.users || [];
+   const matched = portalUsers.find((u) => {
+     if (record.id && u.id === record.id) return true;
+     if (record.roll && (u.username === record.roll.toLowerCase() || u.id === record.roll || u.roll === record.roll)) return true;
+     if (email && u.email && u.email.toLowerCase() === email.toLowerCase()) return true;
+     if (record.name && u.name && u.name.toLowerCase() === record.name.toLowerCase()) {
+       if (!rName) return true;
+       const uRole = (u.role || '').toLowerCase();
+       if (rName.includes('principal') && uRole.includes('principal')) return true;
+       if (rName.includes('teacher') && uRole.includes('teacher')) return true;
+       if (rName.includes('student') && uRole.includes('student')) return true;
+       if (rName.includes('parent') && uRole.includes('parent')) return true;
+       if (rName.includes('staff') || rName.includes('non-teaching')) return true;
+     }
+     return false;
+   });
+
+   if (matched) {
+     if (!email && matched.email) email = matched.email;
+     if (!password && matched.password) password = matched.password;
+   }
+
+   if (!email) {
+     if (record.roll) {
+       email = `${record.roll.toLowerCase()}@ssvschool.com`;
+     } else if (record.name) {
+       const cleanName = record.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+       email = `${cleanName || 'user'}@ssvschool.com`;
+     } else {
+       email = 'user@ssvschool.com';
+     }
+   }
+
+   if (!password) {
+     if (rName.includes('principal')) password = 'principal123';
+     else if (rName.includes('teacher')) password = 'teacher123';
+     else if (rName.includes('student')) password = 'student123';
+     else if (rName.includes('parent')) password = 'parent123';
+     else if (rName.includes('non-teaching') || rName.includes('staff')) password = 'staff123';
+     else password = 'Zen@12345';
+   }
+
+   return { email, password };
+ };
+
+ // Open Change Password Modal for any user/role
+ const handleOpenChangePassword = (record, roleName = '') => {
+   const creds = getUserCredentials(record, roleName);
+   setChangePasswordModal({
+     isOpen: true,
+     user: record,
+     name: record.name || record.assignedTo || 'User',
+     role: roleName || record.roleType || record.role || 'User',
+     email: creds.email,
+     currentPassword: creds.password,
+     newPassword: '',
+     showPassword: true,
+     id: record.id || record.roll || '',
+     roll: record.roll || ''
+   });
+ };
+
+ const getDefaultRolePassword = (r = '') => {
+   const roleLower = (r || '').toLowerCase();
+   if (roleLower.includes('principal')) return 'principal123';
+   if (roleLower.includes('teacher') || roleLower.includes('faculty')) return 'teacher123';
+   if (roleLower.includes('student')) return 'student123';
+   if (roleLower.includes('parent')) return 'parent123';
+   if (roleLower.includes('non-teaching') || roleLower.includes('staff')) return 'staff123';
+   return 'Zen@12345';
+ };
+
+ // Save new password to data.users and specific record
+ const handleUpdatePassword = (e, customPassword = null) => {
+   if (e && e.preventDefault) e.preventDefault();
+   const passToSave = customPassword || changePasswordModal.newPassword;
+   const { name, role, email, id, roll } = changePasswordModal;
+   if (!passToSave || passToSave.trim().length < 4) {
+     alert('Please enter a valid password (minimum 4 characters).');
+     return;
+   }
+   const cleanPass = passToSave.trim();
+   const current = getPortalData() || {};
+   if (!current.users) current.users = [];
+
+   // 1. Update in current.users
+   let userFound = false;
+   current.users = current.users.map((u) => {
+     const match =
+       (id && u.id === id) ||
+       (roll && (u.username === roll.toLowerCase() || u.id === roll)) ||
+       (email && u.email && u.email.toLowerCase() === email.toLowerCase()) ||
+       (name && u.name && u.name.toLowerCase() === name.toLowerCase());
+     if (match) {
+       userFound = true;
+       return {
+         ...u,
+         password: cleanPass,
+         email: email || u.email,
+         username: u.username || (email ? email.split('@')[0] : (name ? name.toLowerCase().replace(/[^a-z0-9]/g, '') : 'user'))
+       };
+     }
+     return u;
+   });
+
+   if (!userFound) {
+     const roleUpper = (role || 'USER').toUpperCase();
+     const username = email ? email.split('@')[0] : (name.toLowerCase().replace(/[^a-z0-9]/g, '') || `user_${Date.now()}`);
+     current.users.unshift({
+       id: id || roll || ('USR0' + (current.users.length + 1)),
+       name: name,
+       role: roleUpper.includes('TEACH') ? 'teacher' : roleUpper.includes('PRINCIPAL') ? 'principal' : roleUpper.includes('STUDENT') ? 'student' : roleUpper.includes('PARENT') ? 'parent' : 'staff',
+       email: email,
+       username: username,
+       password: cleanPass,
+       phone: changePasswordModal.user?.phone || '+91 98401 23450',
+       schoolId: currentSchoolId || 'SCHOOL002',
+       status: 'Active',
+       createdDate: new Date().toISOString().split('T')[0]
+     });
+   }
+
+   // 2. Update in specific entity array
+   const rLower = (role || '').toLowerCase();
+   if (current.teachers && (rLower.includes('teacher') || rLower.includes('faculty'))) {
+     const tIdx = current.teachers.findIndex((t) => (id && t.id === id) || (name && t.name === name) || (email && t.email === email));
+     if (tIdx > -1) current.teachers[tIdx].password = cleanPass;
+   }
+   if (current.principals && rLower.includes('principal')) {
+     const pIdx = current.principals.findIndex((p) => (id && p.id === id) || (name && p.name === name) || (email && p.email === email));
+     if (pIdx > -1) current.principals[pIdx].password = cleanPass;
+   }
+   if (current.students && rLower.includes('student')) {
+     const sIdx = current.students.findIndex((s) => (roll && s.roll === roll) || (id && s.roll === id) || (name && s.name === name));
+     if (sIdx > -1) current.students[sIdx].password = cleanPass;
+   }
+   if (current.parents && rLower.includes('parent')) {
+     const parIdx = current.parents.findIndex((p) => (id && p.id === id) || (name && p.name === name) || (email && p.email === email));
+     if (parIdx > -1) current.parents[parIdx].password = cleanPass;
+   }
+   if (current.nonTeachingStaff && (rLower.includes('non-teaching') || rLower.includes('staff'))) {
+     const ntIdx = current.nonTeachingStaff.findIndex((nt) => (id && nt.id === id) || (name && nt.name === name) || (email && nt.email === email));
+     if (ntIdx > -1) current.nonTeachingStaff[ntIdx].password = cleanPass;
+   }
+
+   savePortalData(current);
+   refreshData();
+
+   try {
+     if (api && api.syncAuthUser) {
+       api.syncAuthUser({
+         id: id || roll,
+         name: name,
+         email: email,
+         username: email ? email.split('@')[0] : (name ? name.toLowerCase().replace(/[^a-z0-9]/g, '') : 'user'),
+         password: cleanPass,
+         role: role,
+         schoolId: currentSchoolId || 'SCHOOL002'
+       }).catch(() => {});
+     }
+   } catch (_) {}
+
+   setChangePasswordModal((prev) => ({ ...prev, isOpen: false }));
+   setFeedback({
+     title: 'Password Updated Successfully',
+     body: `Portal password for ${name} (${role}) has been saved:\n\nEmail / Login ID: ${email || name}\nPassword: ${cleanPass}\n\nYou can now log in immediately with these credentials.`
+   });
+ };
+
  const handleOpenStaffModal = (staff = null, defaultRole = 'Teacher') => {
  setEditingStaff(staff);
  if (staff) {
+ const creds = getUserCredentials(staff, staff.roleType);
  setStaffForm({
  name: staff.name || '',
  role: staff.roleType || (staff.id && staff.id.startsWith('PR') ? 'Principal' : staff.id && staff.id.startsWith('NT') ? 'Non-Teaching' : staff.id && staff.id.startsWith('WRK') ? 'Operations Works' : 'Teacher'),
  phone: staff.phone || '',
- email: staff.email || '',
+ email: staff.email || creds.email,
+ password: staff.password || creds.password || '',
  address: staff.address || '',
  bloodGroup: staff.bloodGroup || 'O+',
  qualification: staff.qualification || '',
@@ -705,6 +927,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  role: defaultRole,
  phone: '',
  email: '',
+ password: 'Zen@' + Math.floor(10000 + Math.random() * 90000),
  address: '',
  bloodGroup: 'O+',
  qualification: '',
@@ -823,9 +1046,11 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  current.users[uIdx].name = staffForm.name;
  current.users[uIdx].phone = staffForm.phone;
  current.users[uIdx].email = staffForm.email;
+ if (staffForm.password) current.users[uIdx].password = staffForm.password.trim();
  current.users[uIdx].status = staffForm.status;
  }
  } else {
+ const staffPass = staffForm.password ? staffForm.password.trim() : (role === 'Principal' ? 'principal123' : role === 'Non-Teaching' ? 'staff123' : 'teacher123');
  if (role === 'Principal') {
  const nextId = 'PR0' + (current.principals.length + 1);
  const newPrincipal = {
@@ -834,6 +1059,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  roleType: 'Principal',
  phone: staffForm.phone,
  email: staffForm.email,
+ password: staffPass,
  address: staffForm.address,
  bloodGroup: staffForm.bloodGroup,
  qualification: staffForm.qualification,
@@ -841,7 +1067,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  username: staffForm.email ? staffForm.email.split('@')[0] : `principal${nextId}`,
  status: staffForm.status,
  joinedDate: new Date().toISOString().split('T')[0],
- schoolId: 'SCHOOL002'
+ schoolId: currentSchoolId || 'SCHOOL002'
  };
  current.principals.push(newPrincipal);
  current.users.push({
@@ -851,9 +1077,10 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  phone: staffForm.phone,
  email: staffForm.email,
  username: staffForm.email ? staffForm.email.split('@')[0] : `principal${nextId}`,
+ password: staffPass,
  status: staffForm.status,
  createdDate: new Date().toISOString().split('T')[0],
- schoolId: 'SCHOOL002'
+ schoolId: currentSchoolId || 'SCHOOL002'
  });
  } else if (role === 'Non-Teaching') {
  const nextId = 'NT0' + (current.nonTeachingStaff.length + 1);
@@ -864,6 +1091,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  department: staffForm.onboardSubject || 'General Administration',
  phone: staffForm.phone,
  email: staffForm.email,
+ password: staffPass,
  address: staffForm.address,
  bloodGroup: staffForm.bloodGroup,
  shift: staffForm.class || '08:30 AM - 04:30 PM',
@@ -879,9 +1107,10 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  phone: staffForm.phone,
  email: staffForm.email,
  username: staffForm.email ? staffForm.email.split('@')[0] : `staff${nextId}`,
+ password: staffPass,
  status: staffForm.status,
  createdDate: new Date().toISOString().split('T')[0],
- schoolId: 'SCHOOL002'
+ schoolId: currentSchoolId || 'SCHOOL002'
  });
  } else if (role === 'Operations Works') {
  const nextId = 'WRK-0' + (current.operationsWorks.length + 1);
@@ -907,6 +1136,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  roleType: 'Teacher',
  phone: staffForm.phone,
  email: staffForm.email,
+ password: staffPass,
  address: staffForm.address,
  bloodGroup: staffForm.bloodGroup,
  qualification: staffForm.qualification,
@@ -914,29 +1144,51 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  onboardSubject: staffForm.onboardSubject || 'General',
  class: staffForm.class,
  status: staffForm.status,
- schoolId: 'SCHOOL002'
+ schoolId: currentSchoolId || 'SCHOOL002'
  };
  current.teachers.push(newTeacher);
  current.users.push({
  id: 'USR0' + (current.users.length + 1),
  name: staffForm.name,
  role: 'TEACHER',
+ teacherId: nextId,
+ subject: staffForm.onboardSubject || 'General',
+ class: staffForm.class,
  phone: staffForm.phone,
  email: staffForm.email,
  username: staffForm.email ? staffForm.email.split('@')[0] : `teacher${nextId}`,
+ password: staffPass,
  status: staffForm.status,
  createdDate: new Date().toISOString().split('T')[0],
- schoolId: 'SCHOOL002'
+ schoolId: currentSchoolId || 'SCHOOL002'
  });
  }
  }
 
  savePortalData(current);
  refreshData();
+
+ try {
+   if (api && api.syncAuthUser) {
+     const assignedRole = role === 'Principal' ? 'PRINCIPAL' : (role === 'Non-Teaching' ? 'STAFF' : 'TEACHER');
+     api.syncAuthUser({
+       id: editingStaff ? editingStaff.id : (staffForm.email || staffForm.name),
+       name: staffForm.name,
+       email: staffForm.email,
+       username: staffForm.email ? staffForm.email.split('@')[0] : staffForm.name.toLowerCase().replace(/[^a-z0-9]/g, ''),
+       password: staffForm.password ? staffForm.password.trim() : (role === 'Principal' ? 'principal123' : role === 'Non-Teaching' ? 'staff123' : 'teacher123'),
+       role: assignedRole,
+       subject: staffForm.onboardSubject,
+       class: staffForm.class,
+       schoolId: currentSchoolId || 'SCHOOL002'
+     }).catch(() => {});
+   }
+ } catch (_) {}
  setIsStaffModalOpen(false);
+ const createdPass = staffForm.password ? staffForm.password.trim() : (role === 'Principal' ? 'principal123' : role === 'Non-Teaching' ? 'staff123' : 'teacher123');
  setFeedback({
  title: editingStaff ? 'Staff Record Updated' : 'Staff Member Onboarded',
- body: `Staff profile for ${staffForm.name} (${staffForm.role}) saved successfully!`
+ body: `Staff profile for ${staffForm.name} (${staffForm.role}) saved successfully!\n\nEmail: ${staffForm.email}\nPassword: ${createdPass}`
  });
  };
 
@@ -944,12 +1196,14 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  const handleOpenPrincipalModal = (principal = null) => {
  setEditingPrincipal(principal);
  if (principal) {
+ const creds = getUserCredentials(principal, 'Principal');
  setPrincipalForm({
  name: principal.name,
  qualification: principal.qualification || 'Ph.D., M.Ed',
  experience: principal.experience || '18 Years',
  phone: principal.phone || '',
- email: principal.email || '',
+ email: principal.email || creds.email,
+ password: principal.password || creds.password || '',
  status: principal.status || 'Active'
  });
  } else {
@@ -959,6 +1213,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  experience: '15 Years',
  phone: '+91 98401 23450',
  email: '',
+ password: 'Zen@' + Math.floor(10000 + Math.random() * 90000),
  status: 'Active'
  });
  }
@@ -971,6 +1226,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  if (!current.principals) current.principals = [];
  if (!current.users) current.users = [];
 
+ const prPassword = principalForm.password ? principalForm.password.trim() : 'principal123';
+
  if (editingPrincipal) {
  const idx = current.principals.findIndex((p) => p.id === editingPrincipal.id);
  if (idx > -1) {
@@ -981,6 +1238,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  experience: principalForm.experience,
  phone: principalForm.phone,
  email: principalForm.email,
+ password: prPassword,
  status: principalForm.status
  };
  }
@@ -991,6 +1249,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  current.users[uIdx].name = principalForm.name;
  current.users[uIdx].phone = principalForm.phone;
  current.users[uIdx].email = principalForm.email;
+ current.users[uIdx].password = prPassword;
  current.users[uIdx].status = principalForm.status;
  }
  } else {
@@ -1002,10 +1261,11 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  experience: principalForm.experience,
  phone: principalForm.phone,
  email: principalForm.email,
+ password: prPassword,
  username: principalForm.email.split('@')[0],
  status: principalForm.status,
  joinedDate: new Date().toISOString().split('T')[0],
- schoolId: 'SCHOOL002'
+ schoolId: currentSchoolId || 'SCHOOL002'
  };
  current.principals.push(newPr);
  current.users.push({
@@ -1015,27 +1275,39 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  phone: principalForm.phone,
  email: principalForm.email,
  username: principalForm.email.split('@')[0],
+ password: prPassword,
  status: principalForm.status,
  createdDate: new Date().toISOString().split('T')[0],
- schoolId: 'SCHOOL002'
+ schoolId: currentSchoolId || 'SCHOOL002'
  });
  }
  savePortalData(current);
  refreshData();
+
+ try {
+   if (api && api.syncAuthUser) {
+     api.syncAuthUser({
+       id: editingPrincipal ? editingPrincipal.id : ('PR0' + current.principals.length),
+       name: principalForm.name,
+       email: principalForm.email,
+       username: principalForm.email.split('@')[0],
+       password: prPassword,
+       role: 'PRINCIPAL',
+       schoolId: currentSchoolId || 'SCHOOL002'
+     }).catch(() => {});
+   }
+ } catch (_) {}
+
  setIsPrincipalModalOpen(false);
  setFeedback({
  title: editingPrincipal ? 'Principal Profile Updated' : 'Principal Registered',
- body: `Principal profile for ${principalForm.name} ${editingPrincipal ? 'updated' : 'registered'} successfully.`
+ body: `Principal profile for ${principalForm.name} ${editingPrincipal ? 'updated' : 'registered'} successfully.\n\nEmail: ${principalForm.email}\nPassword: ${prPassword}`
  });
  };
 
  
- const handleResetPassword = (name, email) => {
- const tempPass = 'Zen@' + Math.floor(10000 + Math.random() * 90000);
- setFeedback({
- title: 'Password Reset',
- body: `Temporary password for ${name} (${email}):\n\n${tempPass}`
- });
+ const handleResetPassword = (name, email, role = '', record = null) => {
+   handleOpenChangePassword(record || { name, email, role }, role);
  };
 
  
@@ -1043,6 +1315,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  e.preventDefault();
  const current = getPortalData();
  const nextId = 'USR0' + (current.users.length + 1);
+ const defaultPass = 'Zen@' + Math.floor(10000 + Math.random() * 90000);
  current.users.push({
  id: nextId,
  name: userForm.name,
@@ -1050,9 +1323,10 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  phone: userForm.phone || '+91 98401 23456',
  email: userForm.email,
  username: userForm.email.split('@')[0],
+ password: defaultPass,
  status: 'Active',
  createdDate: new Date().toISOString().split('T')[0],
- schoolId: 'SCHOOL002'
+ schoolId: currentSchoolId || 'SCHOOL002'
  });
  savePortalData(current);
  refreshData();
@@ -1060,7 +1334,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  setUserForm({ name: '', role: 'TEACHER', phone: '', email: '' });
  setFeedback({
  title: 'User Created',
- body: `User account for ${userForm.name} (${userForm.role}) created successfully!`
+ body: `User account for ${userForm.name} (${userForm.role}) created successfully!\n\nEmail: ${userForm.email}\nPassword: ${defaultPass}`
  });
  };
 
@@ -1068,9 +1342,26 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  const handleOpenTeacherModal = (teacher = null) => {
  setEditingTeacher(teacher);
  if (teacher) {
- setTeacherForm({ name: teacher.name, subject: teacher.subject, class: teacher.class });
+ const creds = getUserCredentials(teacher, 'Teacher');
+ setTeacherForm({
+   name: teacher.name,
+   subject: teacher.subject || teacher.onboardSubject || 'Mathematics',
+   class: teacher.class || 'Grade 10-A',
+   phone: teacher.phone || '+91 98401 23451',
+   email: teacher.email || creds.email,
+   password: teacher.password || creds.password || '',
+   status: teacher.status || 'Active'
+ });
  } else {
- setTeacherForm({ name: '', subject: '', class: 'Grade 10-A' });
+ setTeacherForm({
+   name: '',
+   subject: '',
+   class: 'Grade 10-A',
+   phone: '',
+   email: '',
+   password: 'Zen@' + Math.floor(10000 + Math.random() * 90000),
+   status: 'Active'
+ });
  }
  setIsTeacherModalOpen(true);
  };
@@ -1078,30 +1369,91 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  const handleSaveTeacher = (e) => {
  e.preventDefault();
  const current = getPortalData();
+ if (!current.teachers) current.teachers = [];
+ if (!current.users) current.users = [];
+
+ const tEmail = teacherForm.email ? teacherForm.email.trim() : `${teacherForm.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@ssvschool.com`;
+ const tPassword = teacherForm.password ? teacherForm.password.trim() : 'teacher123';
+
  if (editingTeacher) {
  const idx = current.teachers.findIndex((t) => t.id === editingTeacher.id);
  if (idx > -1) {
- current.teachers[idx].name = teacherForm.name;
- current.teachers[idx].subject = teacherForm.subject;
- current.teachers[idx].class = teacherForm.class;
+ current.teachers[idx] = {
+   ...current.teachers[idx],
+   name: teacherForm.name,
+   subject: teacherForm.subject,
+   onboardSubject: teacherForm.subject,
+   class: teacherForm.class,
+   phone: teacherForm.phone,
+   email: tEmail,
+   password: tPassword,
+   status: teacherForm.status || 'Active'
+ };
+ }
+ const uIdx = current.users.findIndex((u) => u.id === editingTeacher.id || u.email === editingTeacher.email || (u.role === 'TEACHER' && u.name === editingTeacher.name));
+ if (uIdx > -1) {
+   current.users[uIdx].name = teacherForm.name;
+   current.users[uIdx].email = tEmail;
+   current.users[uIdx].phone = teacherForm.phone;
+   current.users[uIdx].password = tPassword;
+   current.users[uIdx].status = teacherForm.status || 'Active';
+   current.users[uIdx].subject = teacherForm.subject;
+   current.users[uIdx].class = teacherForm.class;
  }
  } else {
  const nextId = 'T0' + (current.teachers.length + 1);
  current.teachers.push({
  id: nextId,
  name: teacherForm.name,
+ roleType: 'Teacher',
  subject: teacherForm.subject,
+ onboardSubject: teacherForm.subject,
  class: teacherForm.class,
- schoolId: 'SCHOOL002',
- status: 'Active'
+ phone: teacherForm.phone || '+91 98401 23450',
+ email: tEmail,
+ password: tPassword,
+ schoolId: currentSchoolId || 'SCHOOL002',
+ status: teacherForm.status || 'Active'
+ });
+
+ current.users.push({
+   id: 'USR0' + (current.users.length + 1),
+   name: teacherForm.name,
+   role: 'TEACHER',
+   teacherId: nextId,
+   subject: teacherForm.subject,
+   class: teacherForm.class,
+   phone: teacherForm.phone || '+91 98401 23450',
+   email: tEmail,
+   username: tEmail.split('@')[0],
+   password: tPassword,
+   status: 'Active',
+   createdDate: new Date().toISOString().split('T')[0],
+   schoolId: currentSchoolId || 'SCHOOL002'
  });
  }
  savePortalData(current);
  refreshData();
+
+ try {
+   if (api && api.syncAuthUser) {
+     api.syncAuthUser({
+       id: editingTeacher ? editingTeacher.id : ('T0' + current.teachers.length),
+       name: teacherForm.name,
+       email: tEmail,
+       username: tEmail.split('@')[0],
+       password: tPassword,
+       role: 'TEACHER',
+       subject: teacherForm.subject,
+       class: teacherForm.class,
+       schoolId: currentSchoolId || 'SCHOOL002'
+     }).catch(() => {});
+   }
+ } catch (_) {}
  setIsTeacherModalOpen(false);
  setFeedback({
  title: editingTeacher ? 'Teacher Updated' : 'Teacher Registered',
- body: `Faculty member ${teacherForm.name} saved successfully!`
+ body: `Faculty member ${teacherForm.name} saved successfully!\n\nEmail: ${tEmail}\nPassword: ${tPassword}`
  });
  };
 
@@ -1123,10 +1475,15 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
         existingFees = JSON.parse(JSON.stringify(defaultStudentFeeItems));
       }
 
+      const creds = getUserCredentials(student, 'Student');
+      const parentCreds = linkedParent ? getUserCredentials(linkedParent, 'Parent') : { email: '', password: 'parent123' };
+
       setStudentForm({
         roll: student.roll || '',
         regNo: student.regNo || ('REG-' + student.roll),
         name: student.name || '',
+        studentEmail: student.studentEmail || creds.email,
+        password: student.password || creds.password || '',
         class: student.class || 'Grade 10-A',
         gender: student.gender || 'Female',
         dob: student.dob || '2010-05-15',
@@ -1134,6 +1491,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
         parentName: student.parentName || (linkedParent ? linkedParent.name : ''),
         parentPhone: student.parentPhone || (linkedParent ? linkedParent.phone : ''),
         parentEmail: student.parentEmail || (linkedParent ? linkedParent.email : ''),
+        parentPassword: linkedParent?.password || parentCreds.password || '',
         address: student.address || '',
         emergencyContact: student.emergencyContact || (linkedParent ? linkedParent.phone : ''),
         admissionDate: student.admissionDate || new Date().toISOString().split('T')[0],
@@ -1148,6 +1506,9 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
         roll: autoRoll,
         regNo: autoReg,
         name: '',
+        studentEmail: '',
+        password: 'Zen@' + Math.floor(10000 + Math.random() * 90000),
+        parentPassword: 'Zen@' + Math.floor(10000 + Math.random() * 90000),
         class: 'Grade 10-A',
         gender: 'Female',
         dob: '2010-05-15',
@@ -1224,6 +1585,11 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
       const gradePart = parts[0]?.trim() || 'Grade 10';
       const sectionPart = parts[1]?.trim() || 'A';
 
+      const studentUsername = studentName.toLowerCase().replace(/[^a-z0-9]/g, '') || `student${rollNo}`;
+      const studentMail = (studentForm.studentEmail && studentForm.studentEmail.trim()) || `${studentUsername}@ssvschool.com`;
+      const studentPass = (studentForm.password && studentForm.password.trim()) || 'student123';
+      const parentPass = (studentForm.parentPassword && studentForm.parentPassword.trim()) || 'parent123';
+
       if (editingStudent) {
         const idx = current.students.findIndex((s) => s.roll === editingStudent.roll);
         if (idx > -1) {
@@ -1232,6 +1598,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
             roll: rollNo,
             regNo: regNo,
             name: studentName,
+            studentEmail: studentMail,
+            password: studentPass,
             class: studentForm.class || 'Grade 10-A',
             gender: studentForm.gender || 'Female',
             dob: studentForm.dob || '2010-05-15',
@@ -1247,11 +1615,23 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
             totalFees: totalFees
           };
         }
+
+        const uIdx = current.users.findIndex((u) => u.roll === editingStudent.roll || (u.role === 'STUDENT' && (u.name === editingStudent.name || u.username === studentUsername)));
+        if (uIdx > -1) {
+          current.users[uIdx].name = studentName;
+          current.users[uIdx].email = studentMail;
+          current.users[uIdx].password = studentPass;
+          current.users[uIdx].roll = rollNo;
+          current.users[uIdx].studentRoll = rollNo;
+          current.users[uIdx].class = studentForm.class || 'Grade 10-A';
+        }
       } else {
         current.students.push({
           roll: rollNo,
           regNo: regNo,
           name: studentName,
+          studentEmail: studentMail,
+          password: studentPass,
           class: studentForm.class || 'Grade 10-A',
           gender: studentForm.gender || 'Female',
           dob: studentForm.dob || '2010-05-15',
@@ -1265,7 +1645,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
           status: studentForm.status || 'Active',
           feeItems: feeItems,
           totalFees: totalFees,
-          schoolId: 'SCHOOL002',
+          schoolId: currentSchoolId || 'SCHOOL002',
           attendance: '100%',
           performance: 'Outstanding',
           marks: [
@@ -1277,40 +1657,70 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
           ]
         });
 
-        const studentUsername = studentName.toLowerCase().replace(/[^a-z0-9]/g, '') || `student${rollNo}`;
         current.users.push({
           id: 'USR0' + (current.users.length + 1),
           name: studentName,
           role: 'STUDENT',
+          roll: rollNo,
+          studentRoll: rollNo,
+          class: studentForm.class || 'Grade 10-A',
           phone: studentForm.parentPhone || '+91 98401 23456',
-          email: studentForm.parentEmail || `${studentUsername}@ssvschool.com`,
+          email: studentMail,
           username: studentUsername,
+          password: studentPass,
           status: 'Active',
           createdDate: new Date().toISOString().split('T')[0],
-          schoolId: 'SCHOOL002'
+          schoolId: currentSchoolId || 'SCHOOL002'
         });
       }
 
       if (studentForm.parentName) {
         const parentIdx = current.parents.findIndex((p) => p.studentRoll === rollNo);
+        const pEmail = studentForm.parentEmail || `${studentForm.parentName.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`;
         if (parentIdx > -1) {
           current.parents[parentIdx] = {
             ...current.parents[parentIdx],
             name: studentForm.parentName,
             phone: studentForm.parentPhone || current.parents[parentIdx].phone,
-            email: studentForm.parentEmail || current.parents[parentIdx].email,
-            studentName: studentName
+            email: pEmail,
+            password: parentPass,
+            studentName: studentName,
+            studentRoll: rollNo
           };
+          const pUserIdx = current.users.findIndex((u) => u.role === 'PARENT' && (u.studentRoll === rollNo || u.email === pEmail || u.name === studentForm.parentName));
+          if (pUserIdx > -1) {
+            current.users[pUserIdx].name = studentForm.parentName;
+            current.users[pUserIdx].email = pEmail;
+            current.users[pUserIdx].password = parentPass;
+            current.users[pUserIdx].studentRoll = rollNo;
+            current.users[pUserIdx].studentName = studentName;
+          }
         } else {
           current.parents.push({
             id: 'PAR' + String(current.parents.length + 101),
             name: studentForm.parentName,
             relationship: 'Parent / Guardian',
             phone: studentForm.parentPhone || '+91 98401 99000',
-            email: studentForm.parentEmail || 'parent@domain.com',
+            email: pEmail,
+            password: parentPass,
             studentName: studentName,
             studentRoll: rollNo,
-            schoolId: 'SCHOOL002'
+            schoolId: currentSchoolId || 'SCHOOL002'
+          });
+
+          current.users.push({
+            id: 'USR0' + (current.users.length + 1),
+            name: studentForm.parentName,
+            role: 'PARENT',
+            studentRoll: rollNo,
+            studentName: studentName,
+            phone: studentForm.parentPhone || '+91 98401 99000',
+            email: pEmail,
+            username: pEmail.split('@')[0],
+            password: parentPass,
+            status: 'Active',
+            createdDate: new Date().toISOString().split('T')[0],
+            schoolId: currentSchoolId || 'SCHOOL002'
           });
         }
       }
@@ -1323,6 +1733,11 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
           existingPaidAmount = parseFloat(rawPaid) || 0;
         }
       }
+
+      const totalNum = Number(totalFees) || 128000;
+      const paidNum = Number(existingPaidAmount) || 0;
+      const dueNum = Math.max(0, totalNum - paidNum);
+      const feeStatus = dueNum === 0 ? 'PAID' : (paidNum > 0 ? 'PARTIAL' : 'OVERDUE');
 
       const billPayload = {
         studentName: studentName,
@@ -1338,11 +1753,47 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
         parentName: studentForm.parentName || 'Parent / Guardian',
         parentPhone: studentForm.parentPhone || '+91 98401 23456',
         feeItems: feeItems,
-        totalFees: totalFees,
-        paidAmount: existingPaidAmount,
+        totalFees: totalNum,
+        paidAmount: paidNum,
         paymentMethod: 'Cash',
+        schoolId: currentSchoolId || 'SCHOOL002',
         remarks: 'Configured during student admission / profile update'
       };
+
+      if (!current.feeRecords) current.feeRecords = [];
+      const feeRecordMapped = {
+        id: `FEE-${rollNo}`,
+        roll: rollNo,
+        studentId: rollNo,
+        admissionNumber: rollNo,
+        name: studentName,
+        studentName: studentName,
+        class: studentForm.class || `${gradePart}-${sectionPart}`,
+        grade: gradePart,
+        section: sectionPart,
+        parent: studentForm.parentName || 'Parent / Guardian',
+        phone: studentForm.parentPhone || '+91 98401 23456',
+        totalFee: `₹${totalNum.toLocaleString('en-IN')}`,
+        totalFees: totalNum,
+        paid: `₹${paidNum.toLocaleString('en-IN')}`,
+        paidAmount: paidNum,
+        due: `₹${dueNum.toLocaleString('en-IN')}`,
+        pendingAmount: dueNum,
+        status: feeStatus,
+        invoiceNumber: `INV-2026-${rollNo}`,
+        dueDate: billPayload.dueDate,
+        billingMonth: billPayload.billingMonth,
+        billingDate: billPayload.billingDate,
+        feeItems: feeItems,
+        schoolId: currentSchoolId || 'SCHOOL002'
+      };
+
+      const existingFeeIdx = current.feeRecords.findIndex(r => r.roll === rollNo || r.studentId === rollNo);
+      if (existingFeeIdx > -1) {
+        current.feeRecords[existingFeeIdx] = { ...current.feeRecords[existingFeeIdx], ...feeRecordMapped };
+      } else {
+        current.feeRecords.unshift(feeRecordMapped);
+      }
 
       try {
         if (typeof syncBillToPortalFeeRecords === 'function') {
@@ -1366,6 +1817,44 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
 
       savePortalData(current);
       refreshData();
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('fee_records_updated', { detail: { bill: billPayload, feeRecords: current.feeRecords } }));
+        window.dispatchEvent(new CustomEvent('portal_data_updated', { detail: current }));
+      }
+
+      try {
+        if (api && api.syncAuthUser) {
+          api.syncAuthUser({
+            id: rollNo,
+            roll: rollNo,
+            studentRoll: rollNo,
+            name: studentName,
+            email: studentMail,
+            username: studentUsername,
+            password: studentPass,
+            role: 'STUDENT',
+            class: studentForm.class || 'Grade 10-A',
+            schoolId: currentSchoolId || 'SCHOOL002'
+          }).catch(() => {});
+
+          if (studentForm.parentName) {
+            const pEmail = studentForm.parentEmail || `${studentForm.parentName.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`;
+            api.syncAuthUser({
+              id: 'PAR-' + rollNo,
+              studentRoll: rollNo,
+              studentName: studentName,
+              name: studentForm.parentName,
+              email: pEmail,
+              username: pEmail.split('@')[0],
+              password: parentPass,
+              role: 'PARENT',
+              schoolId: currentSchoolId || 'SCHOOL002'
+            }).catch(() => {});
+          }
+        }
+      } catch (_) {}
+
       setIsStudentModalOpen(false);
       setFeedback({
         title: editingStudent ? 'Student Profile Updated' : 'Student Enrolled Successfully',
@@ -1476,13 +1965,29 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  schoolId: 'SCHOOL002'
  });
  }
+
+ if (classForm.teacher) {
+ if (current.teachers) {
+ const tIdx = current.teachers.findIndex((t) => t.name === classForm.teacher);
+ if (tIdx > -1) {
+ current.teachers[tIdx].class = classForm.name;
+ }
+ }
+ if (current.users) {
+ const uIdx = current.users.findIndex((u) => u.name === classForm.teacher && u.role === 'TEACHER');
+ if (uIdx > -1) {
+ current.users[uIdx].class = classForm.name;
+ }
+ }
+ }
+
  savePortalData(current);
  refreshData();
     setSelectedClass(classForm.name);
  setIsClassModalOpen(false);
  setFeedback({
  title: editingClass ? 'Class Updated' : 'Class Created',
- body: `Classroom section ${classForm.name} saved successfully!`
+ body: `Classroom section ${classForm.name} saved successfully with ${classForm.teacher || 'assigned faculty'} as Class Teacher.`
  });
  };
 
@@ -1633,27 +2138,64 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  const handleSaveLinkParent = (e) => {
  e.preventDefault();
  const current = getPortalData();
+ if (!current.parents) current.parents = [];
+ if (!current.users) current.users = [];
  const nextId = 'PAR0' + (current.parents.length + 1);
  const ward = current.students.find((s) => s.roll === linkParentForm.studentRoll);
+
+ const pEmail = linkParentForm.email ? linkParentForm.email.trim() : `${linkParentForm.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@gmail.com`;
+ const pPassword = linkParentForm.password ? linkParentForm.password.trim() : 'parent123';
 
  current.parents.push({
  id: nextId,
  name: linkParentForm.name,
  relationship: linkParentForm.relationship,
  phone: linkParentForm.phone,
- email: linkParentForm.email,
- studentName: ward ? ward.name : 'Aishwarya Kumar',
+ email: pEmail,
+ password: pPassword,
+ studentName: ward ? ward.name : 'Student Ward',
  studentRoll: linkParentForm.studentRoll,
- schoolId: 'SCHOOL002'
+ schoolId: currentSchoolId || 'SCHOOL002'
+ });
+
+ current.users.push({
+   id: 'USR0' + (current.users.length + 1),
+   name: linkParentForm.name,
+   role: 'PARENT',
+   studentRoll: linkParentForm.studentRoll,
+   studentName: ward ? ward.name : 'Student Ward',
+   phone: linkParentForm.phone,
+   email: pEmail,
+   username: pEmail.split('@')[0],
+   password: pPassword,
+   status: 'Active',
+   createdDate: new Date().toISOString().split('T')[0],
+   schoolId: currentSchoolId || 'SCHOOL002'
  });
 
  savePortalData(current);
  refreshData();
+
+ try {
+   if (api && api.syncAuthUser) {
+     api.syncAuthUser({
+       id: nextId,
+       studentRoll: linkParentForm.studentRoll,
+       studentName: ward ? ward.name : 'Student Ward',
+       name: linkParentForm.name,
+       email: pEmail,
+       username: pEmail.split('@')[0],
+       password: pPassword,
+       role: 'PARENT',
+       schoolId: currentSchoolId || 'SCHOOL002'
+     }).catch(() => {});
+   }
+ } catch (_) {}
  setIsLinkParentOpen(false);
- setLinkParentForm({ name: '', relationship: 'Father', phone: '', email: '', studentRoll: 'S101' });
+ setLinkParentForm({ name: '', relationship: 'Father', phone: '', email: '', password: '', studentRoll: 'S101' });
  setFeedback({
- title: 'Parent Linked',
- body: `Parent account for ${linkParentForm.name} successfully linked to student ward.`
+ title: 'Parent Linked & User Registered',
+ body: `Parent account for ${linkParentForm.name} created.\n\nEmail: ${pEmail}\nPassword: ${pPassword}`
  });
  };
 
@@ -1727,12 +2269,6 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <div className="content-header">
  <h2 id="section-title">{getTabTitle()}</h2>
  <div id="section-actions">
-
- {activeTab === 'manage-classes' && (
- <button className="btn btn-primary btn-sm" onClick={() => handleOpenClassModal()}>
- + Add New Class
- </button>
- )}
  </div>
  </div>
 
@@ -2097,6 +2633,15 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  const totalPendingFees = feeRecords.filter((f) => f.status !== 'PAID').length;
  const avgAttendance = '94.2%';
 
+ const todayDateStr = new Date().toISOString().split('T')[0];
+ const allCurrentLeaves = (data.staffLeaves && data.staffLeaves.length > 0) ? data.staffLeaves : (getPortalData()?.staffLeaves || []);
+ const teachersOnLeaveToday = (schoolTeachers || []).filter((t) => getStaffLeaveOnDate(t.name, todayDateStr, allCurrentLeaves) || t.status === 'On Leave').length;
+ const teachersOnDutyToday = Math.max(0, (schoolTeachers || []).length - teachersOnLeaveToday);
+
+ const schoolNonTeaching = data.nonTeachingStaff || [];
+ const nonTeachingOnLeaveToday = schoolNonTeaching.filter((nt) => getStaffLeaveOnDate(nt.name, todayDateStr, allCurrentLeaves) || nt.status === 'On Leave').length;
+ const nonTeachingOnDutyToday = Math.max(0, schoolNonTeaching.length - nonTeachingOnLeaveToday);
+
  return (
  <div>
  
@@ -2114,8 +2659,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
        </div>
        <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
      </div>
-     <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#b45309', margin: '4px 0' }}>5</p>
-     <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>3 On Duty &bull; 2 On Leave</span>
+     <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#b45309', margin: '4px 0' }}>{schoolTeachers.length}</p>
+     <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>{teachersOnDutyToday} On Duty &bull; {teachersOnLeaveToday} On Leave</span>
    </div>
 
    
@@ -2131,8 +2676,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
        </div>
        <span style={{ fontSize: '0.72rem', color: '#0891b2', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>View &rarr;</span>
      </div>
-     <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0e7490', margin: '4px 0' }}>8</p>
-     <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600 }}>7 Active Today &bull; 1 Leave</span>
+     <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0e7490', margin: '4px 0' }}>{schoolNonTeaching.length}</p>
+     <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600 }}>{nonTeachingOnDutyToday} Active Today &bull; {nonTeachingOnLeaveToday} Leave</span>
    </div>
 
    
@@ -2531,6 +3076,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <th style={{ minWidth: '110px' }}>Role</th>
  <th style={{ minWidth: '130px' }}>Phone Number</th>
  <th style={{ minWidth: '170px' }}>Email Address</th>
+ <th style={{ minWidth: '150px' }}>Portal Password</th>
  <th style={{ minWidth: '150px' }}>Department / Assigned Work</th>
  <th style={{ minWidth: '90px', textAlign: 'center' }}>Blood Group</th>
  <th style={{ minWidth: '140px' }}>Qualification</th>
@@ -2541,12 +3087,15 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <tbody>
  {filteredStaff.length === 0 ? (
  <tr>
- <td colSpan="10" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+ <td colSpan="11" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
  No staff records found matching your filters. Click <strong>+ Add Staff Member</strong> to onboard a new staff member.
  </td>
  </tr>
  ) : (
- filteredStaff.map((staff) => (
+ filteredStaff.map((staff) => {
+ const creds = getUserCredentials(staff, staff.roleType);
+ const rowKey = `staff_${staff.id || staff.name}`;
+ return (
  <tr key={staff.id} style={{ transition: 'background 0.2s' }}>
  <td data-label="Staff ID"><code>{staff.id}</code></td>
  <td data-label="Staff Name">
@@ -2593,7 +3142,37 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  </span>
  </td>
  <td data-label="Phone Number">{staff.phone || '—'}</td>
- <td data-label="Email Address">{staff.email || '—'}</td>
+ <td data-label="Email Address">
+   <span style={{ fontSize: '0.84rem', color: '#1e3a8a', fontWeight: 600 }}>{staff.email || creds.email}</span>
+ </td>
+ <td data-label="Portal Password">
+   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+     <code style={{
+       background: '#f8fafc',
+       border: '1px solid #cbd5e1',
+       padding: '2px 8px',
+       borderRadius: '6px',
+       fontSize: '0.82rem',
+       fontWeight: 700,
+       color: '#0f172a',
+       fontFamily: 'monospace'
+     }}>
+       {visiblePasswords[rowKey] ? creds.password : '••••••••'}
+     </code>
+     <button
+       type="button"
+       onClick={() => setVisiblePasswords(prev => ({ ...prev, [rowKey]: !prev[rowKey] }))}
+       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
+       title={visiblePasswords[rowKey] ? 'Hide password' : 'Show password'}
+     >
+       {visiblePasswords[rowKey] ? (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+       ) : (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+       )}
+     </button>
+   </div>
+ </td>
  <td data-label="Assigned Work">
  <div className="school-meta-line">
  <strong style={{ color: 'var(--color-primary)' }}>
@@ -2691,8 +3270,9 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  </button>
  <button
  className="sa-tbl-action admin"
- onClick={() => handleResetPassword(staff.name, staff.email || `${staff.id}@school.edu`)}
- title="Reset staff password"
+ onClick={() => handleOpenChangePassword(staff, staff.roleType)}
+ title="Change / Update Password"
+ style={{ color: '#d97706', borderColor: '#fde68a', background: '#fffbeb' }}
  >
  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="7.5" cy="15.5" r="5.5" /><path d="m21 2-9.6 9.6" /><path d="m15.5 7.5 3 3L22 7l-3-3" /></svg>
  Pass
@@ -2709,7 +3289,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  </div>
  </td>
  </tr>
- ))
+ );
+ })
  )}
  </tbody>
  </table>
@@ -2747,12 +3328,13 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <tr>
  <th style={{ minWidth: '100px' }}>Principal ID</th>
  <th style={{ minWidth: '180px' }}>Principal Name</th>
- <th style={{ minWidth: '150px' }}>Qualification</th>
- <th style={{ minWidth: '120px' }}>Experience</th>
- <th style={{ minWidth: '140px' }}>Phone Number</th>
+ <th style={{ minWidth: '140px' }}>Qualification</th>
+ <th style={{ minWidth: '110px' }}>Experience</th>
+ <th style={{ minWidth: '130px' }}>Phone Number</th>
  <th style={{ minWidth: '180px' }}>Official Email</th>
+ <th style={{ minWidth: '150px' }}>Portal Password</th>
  <th style={{ minWidth: '90px', textAlign: 'center' }}>Status</th>
- <th style={{ minWidth: '160px', textAlign: 'center' }}>Actions</th>
+ <th style={{ minWidth: '180px', textAlign: 'center' }}>Actions</th>
  </tr>
  </thead>
  <tbody>
@@ -2763,14 +3345,47 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  p.email.toLowerCase().includes(principalSearch.toLowerCase()) ||
  (p.qualification && p.qualification.toLowerCase().includes(principalSearch.toLowerCase()))
  )
- .map((p) => (
+ .map((p) => {
+ const creds = getUserCredentials(p, 'Principal');
+ const rowKey = `principal_${p.id}`;
+ return (
  <tr key={p.id}>
  <td data-label="Principal ID"><code>{p.id}</code></td>
  <td data-label="Principal Name"><strong>{p.name}</strong></td>
  <td data-label="Qualification"><span className="badge badge-info">{p.qualification || 'Ph.D., M.Ed'}</span></td>
  <td data-label="Experience">{p.experience || '18 Years'}</td>
  <td data-label="Phone Number">{p.phone}</td>
- <td data-label="Official Email">{p.email}</td>
+ <td data-label="Official Email">
+   <span style={{ fontSize: '0.84rem', color: '#1e3a8a', fontWeight: 600 }}>{p.email || creds.email}</span>
+ </td>
+ <td data-label="Portal Password">
+   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+     <code style={{
+       background: '#f8fafc',
+       border: '1px solid #cbd5e1',
+       padding: '2px 8px',
+       borderRadius: '6px',
+       fontSize: '0.82rem',
+       fontWeight: 700,
+       color: '#0f172a',
+       fontFamily: 'monospace'
+     }}>
+       {visiblePasswords[rowKey] ? creds.password : '••••••••'}
+     </code>
+     <button
+       type="button"
+       onClick={() => setVisiblePasswords(prev => ({ ...prev, [rowKey]: !prev[rowKey] }))}
+       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
+       title={visiblePasswords[rowKey] ? 'Hide password' : 'Show password'}
+     >
+       {visiblePasswords[rowKey] ? (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+       ) : (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+       )}
+     </button>
+   </div>
+ </td>
  <td data-label="Status" style={{ textAlign: 'center' }}>
  <span className={`badge ${p.status === 'Active' ? 'badge-success' : 'badge-warning'}`}>
  {p.status || 'Active'}
@@ -2782,14 +3397,20 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
  Edit
  </button>
- <button className="sa-tbl-action admin" onClick={() => handleResetPassword(p.name, p.email)}>
+ <button
+   className="sa-tbl-action admin"
+   onClick={() => handleOpenChangePassword(p, 'Principal')}
+   title="Change / Reset Password"
+   style={{ color: '#d97706', borderColor: '#fde68a', background: '#fffbeb' }}
+ >
  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="7.5" cy="15.5" r="5.5" /><path d="m21 2-9.6 9.6" /><path d="m15.5 7.5 3 3L22 7l-3-3" /></svg>
- Reset Pass
+ Change Pass
  </button>
  </div>
  </td>
  </tr>
- ))}
+ );
+ })}
  </tbody>
  </table>
  </div>
@@ -2827,11 +3448,13 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <thead>
  <tr>
  <th style={{ minWidth: '90px' }}>Faculty ID</th>
- <th style={{ minWidth: '180px' }}>Faculty Name</th>
- <th style={{ minWidth: '160px' }}>Primary Subject</th>
- <th style={{ minWidth: '130px' }}>Assigned Class</th>
+ <th style={{ minWidth: '170px' }}>Faculty Name</th>
+ <th style={{ minWidth: '140px' }}>Primary Subject</th>
+ <th style={{ minWidth: '120px' }}>Assigned Class</th>
+ <th style={{ minWidth: '170px' }}>Email Address</th>
+ <th style={{ minWidth: '150px' }}>Portal Password</th>
  <th style={{ minWidth: '90px', textAlign: 'center' }}>Status</th>
- <th style={{ minWidth: '120px', textAlign: 'center' }}>Actions</th>
+ <th style={{ minWidth: '170px', textAlign: 'center' }}>Actions</th>
  </tr>
  </thead>
  <tbody>
@@ -2842,23 +3465,67 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  t.id.toLowerCase().includes(teacherSearch.toLowerCase()) ||
  t.subject.toLowerCase().includes(teacherSearch.toLowerCase())
  )
- .map((t) => (
+ .map((t) => {
+ const creds = getUserCredentials(t, 'Teacher');
+ const rowKey = `teacher_${t.id}`;
+ return (
  <tr key={t.id}>
  <td data-label="Faculty ID"><code>{t.id}</code></td>
  <td data-label="Faculty Name"><strong>{t.name}</strong></td>
  <td data-label="Primary Subject">{t.subject}</td>
  <td data-label="Assigned Class"><span className="badge badge-info">{t.class}</span></td>
+ <td data-label="Email Address">
+   <span style={{ fontSize: '0.84rem', color: '#1e3a8a', fontWeight: 600 }}>{t.email || creds.email}</span>
+ </td>
+ <td data-label="Portal Password">
+   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+     <code style={{
+       background: '#f8fafc',
+       border: '1px solid #cbd5e1',
+       padding: '2px 8px',
+       borderRadius: '6px',
+       fontSize: '0.82rem',
+       fontWeight: 700,
+       color: '#0f172a',
+       fontFamily: 'monospace'
+     }}>
+       {visiblePasswords[rowKey] ? creds.password : '••••••••'}
+     </code>
+     <button
+       type="button"
+       onClick={() => setVisiblePasswords(prev => ({ ...prev, [rowKey]: !prev[rowKey] }))}
+       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
+       title={visiblePasswords[rowKey] ? 'Hide password' : 'Show password'}
+     >
+       {visiblePasswords[rowKey] ? (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+       ) : (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+       )}
+     </button>
+   </div>
+ </td>
  <td data-label="Status" style={{ textAlign: 'center' }}><span className="badge badge-success">{t.status || 'Active'}</span></td>
  <td data-label="Actions" style={{ textAlign: 'center' }}>
- <div className="sa-actions-cell" style={{ justifyContent: 'center' }}>
+ <div className="sa-actions-cell" style={{ justifyContent: 'center', gap: '6px' }}>
  <button className="sa-tbl-action edit" onClick={() => handleOpenTeacherModal(t)}>
  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
  Edit
  </button>
+ <button
+   className="sa-tbl-action admin"
+   onClick={() => handleOpenChangePassword(t, 'Teacher')}
+   title="Change / Update Password"
+   style={{ color: '#d97706', borderColor: '#fde68a', background: '#fffbeb' }}
+ >
+ <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="7.5" cy="15.5" r="5.5" /><path d="m21 2-9.6 9.6" /><path d="m15.5 7.5 3 3L22 7l-3-3" /></svg>
+ Pass
+ </button>
  </div>
  </td>
  </tr>
- ))}
+ );
+ })}
  </tbody>
  </table>
  </div>
@@ -3017,21 +3684,22 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <table className="sa-schools-table">
  <thead>
  <tr>
- <th style={{ minWidth: '120px' }}>Roll & Reg No</th>
- <th style={{ minWidth: '170px' }}>Student Name</th>
- <th style={{ minWidth: '100px' }}>Class</th>
- <th style={{ minWidth: '90px' }}>Blood Group</th>
- <th style={{ minWidth: '140px' }}>Emergency Contact</th>
- <th style={{ minWidth: '95px' }}>Attendance</th>
- <th style={{ minWidth: '120px', textAlign: 'center' }}>Performance</th>
- <th style={{ minWidth: '130px', textAlign: 'center' }}>Action</th>
+ <th style={{ minWidth: '110px' }}>Roll & Reg No</th>
+ <th style={{ minWidth: '160px' }}>Student Name</th>
+ <th style={{ minWidth: '95px' }}>Class</th>
+ <th style={{ minWidth: '160px' }}>Email Address</th>
+ <th style={{ minWidth: '140px' }}>Portal Password</th>
+ <th style={{ minWidth: '85px', textAlign: 'center' }}>Blood Group</th>
+ <th style={{ minWidth: '130px' }}>Emergency Contact</th>
+ <th style={{ minWidth: '85px', textAlign: 'center' }}>Attendance</th>
+ <th style={{ minWidth: '100px', textAlign: 'center' }}>Performance</th>
+ <th style={{ minWidth: '170px', textAlign: 'center' }}>Action</th>
  </tr>
  </thead>
  <tbody>
  {filteredStudents.length === 0 ? (
  <tr>
- <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
- 
+ <td colSpan="10" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
  <strong>No students found matching the selected Class / Section filters.</strong>
  </td>
  </tr>
@@ -3040,6 +3708,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  const bloodGroups = ['B+ve', 'O+ve', 'A+ve', 'AB+ve', 'A-ve'];
  const blood = s.bloodGroup || bloodGroups[idx % bloodGroups.length];
  const emergency = s.emergencyContact || s.parentPhone || `+91 98456 ${12301 + idx}`;
+ const creds = getUserCredentials(s, 'Student');
+ const rowKey = `student_${s.roll}`;
  return (
  <tr key={s.roll}>
  <td data-label="Roll & Reg No">
@@ -3055,23 +3725,63 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  </div>
  </td>
  <td data-label="Class"><span className="badge badge-info">{s.class}</span></td>
- <td data-label="Blood Group"><strong style={{ color: '#dc2626' }}>{blood}</strong></td>
+ <td data-label="Email Address">
+   <span style={{ fontSize: '0.84rem', color: '#1e3a8a', fontWeight: 600 }}>{s.studentEmail || creds.email}</span>
+ </td>
+ <td data-label="Portal Password">
+   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+     <code style={{
+       background: '#f8fafc',
+       border: '1px solid #cbd5e1',
+       padding: '2px 8px',
+       borderRadius: '6px',
+       fontSize: '0.82rem',
+       fontWeight: 700,
+       color: '#0f172a',
+       fontFamily: 'monospace'
+     }}>
+       {visiblePasswords[rowKey] ? creds.password : '••••••••'}
+     </code>
+     <button
+       type="button"
+       onClick={() => setVisiblePasswords(prev => ({ ...prev, [rowKey]: !prev[rowKey] }))}
+       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
+       title={visiblePasswords[rowKey] ? 'Hide password' : 'Show password'}
+     >
+       {visiblePasswords[rowKey] ? (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+       ) : (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+       )}
+     </button>
+   </div>
+ </td>
+ <td data-label="Blood Group" style={{ textAlign: 'center' }}><strong style={{ color: '#dc2626' }}>{blood}</strong></td>
  <td data-label="Emergency Contact">
  <span style={{ fontWeight: 600, color: 'var(--color-text-dark)', fontSize: '0.85rem' }}>{emergency}</span>
  </td>
- <td data-label="Attendance"><strong>{s.attendance || '100%'}</strong></td>
+ <td data-label="Attendance" style={{ textAlign: 'center' }}><strong>{s.attendance || '100%'}</strong></td>
  <td data-label="Performance" style={{ textAlign: 'center' }}>
  <span className={`badge ${s.performance === 'Outstanding' || s.performance === 'Very Good' ? 'badge-success' : 'badge-warning'}`}>
  {s.performance || 'Good'}
  </span>
  </td>
  <td data-label="Action" style={{ textAlign: 'center' }}>
- <div className="sa-actions-cell" style={{ justifyContent: 'center' }}>
+ <div className="sa-actions-cell" style={{ justifyContent: 'center', gap: '4px' }}>
  <button className="sa-tbl-action edit" onClick={() => handleOpenStudentModal(s)} title="Edit Student Profile">
  Edit
  </button>
  <button className="sa-tbl-action view" onClick={() => handleOpenMarks(s)} title="Manage Exam Marks">
  Marks
+ </button>
+ <button
+   className="sa-tbl-action admin"
+   onClick={() => handleOpenChangePassword(s, 'Student')}
+   title="Change / Update Student Password"
+   style={{ color: '#d97706', borderColor: '#fde68a', background: '#fffbeb' }}
+ >
+ <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="7.5" cy="15.5" r="5.5" /><path d="m21 2-9.6 9.6" /><path d="m15.5 7.5 3 3L22 7l-3-3" /></svg>
+ Pass
  </button>
  </div>
  </td>
@@ -3138,6 +3848,22 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
             <span className="badge badge-purple" style={{ padding: '6px 14px', fontSize: '0.84rem', fontWeight: 700 }}>
                Total Enrolled Parents: {parentList.length}
             </span>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                setLinkParentForm({
+                  name: '',
+                  relationship: 'Father',
+                  phone: '',
+                  email: '',
+                  password: 'Zen@' + Math.floor(10000 + Math.random() * 90000),
+                  studentRoll: studentList[0] ? studentList[0].roll : 'S101'
+                });
+                setIsLinkParentOpen(true);
+              }}
+            >
+              + Link / Add Parent
+            </button>
           </div>
         </div>
 
@@ -3245,10 +3971,11 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <table className="sa-schools-table">
  <thead>
  <tr>
- <th style={{ minWidth: '180px' }}>Parent Name</th>
- <th style={{ minWidth: '120px' }}>Relationship</th>
- <th style={{ minWidth: '140px' }}>Phone Number</th>
- <th style={{ minWidth: '180px' }}>Contact Email</th>
+ <th style={{ minWidth: '170px' }}>Parent Name</th>
+ <th style={{ minWidth: '110px' }}>Relationship</th>
+ <th style={{ minWidth: '130px' }}>Phone Number</th>
+ <th style={{ minWidth: '170px' }}>Contact Email</th>
+ <th style={{ minWidth: '140px' }}>Portal Password</th>
  <th style={{ minWidth: '170px' }}>Linked Ward (Student & Class)</th>
  <th style={{ minWidth: '130px', textAlign: 'right' }}>Actions</th>
  </tr>
@@ -3256,7 +3983,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <tbody>
  {filteredParents.length === 0 ? (
  <tr>
- <td colSpan="6" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+ <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
  
  <strong>No parent records found for the selected Class filter.</strong>
  </td>
@@ -3265,6 +3992,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  filteredParents.map((p) => {
  const linkedStudent = studentList.find(s => s.roll === p.studentRoll || s.name === p.studentName);
  const sClass = linkedStudent ? linkedStudent.class : (p.class || 'Grade 10-A');
+ const creds = getUserCredentials(p, 'Parent');
+ const rowKey = `parent_${p.id || p.phone}`;
  return (
  <tr key={p.id}>
  <td data-label="Parent Name"><strong>{p.name}</strong></td>
@@ -3274,7 +4003,37 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  </span>
  </td>
  <td data-label="Phone Number"><span style={{ fontWeight: 600, color: 'var(--color-text-dark)' }}>{p.phone}</span></td>
- <td data-label="Contact Email">{p.email}</td>
+ <td data-label="Contact Email">
+   <span style={{ fontSize: '0.84rem', color: '#1e3a8a', fontWeight: 600 }}>{p.email || creds.email}</span>
+ </td>
+ <td data-label="Portal Password">
+   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+     <code style={{
+       background: '#f8fafc',
+       border: '1px solid #cbd5e1',
+       padding: '2px 8px',
+       borderRadius: '6px',
+       fontSize: '0.82rem',
+       fontWeight: 700,
+       color: '#0f172a',
+       fontFamily: 'monospace'
+     }}>
+       {visiblePasswords[rowKey] ? creds.password : '••••••••'}
+     </code>
+     <button
+       type="button"
+       onClick={() => setVisiblePasswords(prev => ({ ...prev, [rowKey]: !prev[rowKey] }))}
+       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#64748b' }}
+       title={visiblePasswords[rowKey] ? 'Hide password' : 'Show password'}
+     >
+       {visiblePasswords[rowKey] ? (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+       ) : (
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+       )}
+     </button>
+   </div>
+ </td>
  <td data-label="Linked Ward">
  <div className="school-meta-line">
  <strong>{p.studentName}</strong>
@@ -3286,9 +4045,14 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  </td>
  <td data-label="Actions" style={{ textAlign: 'right' }}>
  <div className="sa-actions-cell" style={{ justifyContent: 'flex-end' }}>
- <button className="sa-tbl-action admin" onClick={() => handleResetPassword(p.name, p.email)}>
+ <button
+   className="sa-tbl-action admin"
+   onClick={() => handleOpenChangePassword(p, 'Parent')}
+   title="Change / Update Password"
+   style={{ color: '#d97706', borderColor: '#fde68a', background: '#fffbeb' }}
+ >
  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="7.5" cy="15.5" r="5.5" /><path d="m21 2-9.6 9.6" /><path d="m15.5 7.5 3 3L22 7l-3-3" /></svg>
- Reset Password
+ Pass
  </button>
  </div>
  </td>
@@ -5400,275 +6164,424 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  
  
  {activeTab === 'view-reports' && (() => {
- 
- const totalStudents = (data.students || []).length;
- const totalStaff = (data.teachers || []).length;
- const totalClasses = (data.classes || []).length;
- const totalSubjects = (data.subjects || []).length;
+    const studentsList = data.students || [];
+    const teachersList = data.teachers || [];
+    const classesList = data.classes || [];
+    const subjectsList = data.subjects || [];
+    const attendanceLogsList = data.attendanceLogs || [];
+    const timetablesList = data.classTimetables || [];
+    const servicesList = (data.services && data.services.length > 0) ? data.services : [
+      { id: 'SRV-01', name: 'Coding for Kids & Python', category: 'Technology', cost: '₹0 (Included)', visibleRoles: ['student', 'teacher'], description: 'Interactive Python coding and algorithmic problem solving.', status: 'Active' },
+      { id: 'SRV-02', name: 'Robotics & STEM Labs', category: 'STEM', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Hands-on electronic circuits, sensors, and robotics workshops.', status: 'Active' },
+      { id: 'SRV-03', name: 'Chess Grandmaster Academy', category: 'Mind Sports', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Tactical opening theory, endgames, and tournament preparation.', status: 'Active' },
+      { id: 'SRV-04', name: 'Athletics & Sports Conditioning', category: 'Athletics', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Track & field physical fitness and team sports coaching.', status: 'Active' },
+      { id: 'SRV-05', name: 'Fine Arts & Creative Design', category: 'Arts & Culture', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Watercolor painting, sketching, digital art, and clay pottery.', status: 'Active' },
+      { id: 'SRV-06', name: 'Vocal Music & Classical Arts', category: 'Arts & Culture', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Carnatic vocal exercises, rhythm training, and group choir.', status: 'Active' }
+    ];
 
- 
- const totalFeeSum = feeRecords.reduce((acc, r) => acc + (parseInt(r.totalFee.replace(/[^0-9]/g, ''), 10) || 0), 0);
- const totalPaidSum = feeRecords.reduce((acc, r) => acc + (parseInt(r.paid.replace(/[^0-9]/g, ''), 10) || 0), 0);
- const totalDueSum = feeRecords.reduce((acc, r) => acc + (parseInt(r.due.replace(/[^0-9]/g, ''), 10) || 0), 0);
- const feeClearanceRate = totalFeeSum > 0 ? Math.round((totalPaidSum / totalFeeSum) * 100) : 78;
+    const totalStudents = studentsList.length;
+    const totalStaff = teachersList.length;
+    const totalClasses = classesList.length;
+    const totalSubjects = subjectsList.length;
 
- 
- let allMarkScores = [];
- (data.students || []).forEach(st => {
- (st.marks || []).forEach(m => {
- if (typeof m.scored === 'number') allMarkScores.push(m.scored);
- });
- });
- const avgSchoolScore = allMarkScores.length > 0 ? Math.round(allMarkScores.reduce((a, b) => a + b, 0) / allMarkScores.length) : 84;
+    // 1. Live Fee Collection Statistics
+    const totalFeeSum = feeRecords.reduce((acc, r) => acc + (parseInt(String(r.totalFee || '0').replace(/[^0-9]/g, ''), 10) || 0), 0);
+    const totalPaidSum = feeRecords.reduce((acc, r) => acc + (parseInt(String(r.paid || '0').replace(/[^0-9]/g, ''), 10) || 0), 0);
+    const totalDueSum = feeRecords.reduce((acc, r) => acc + (parseInt(String(r.due || '0').replace(/[^0-9]/g, ''), 10) || 0), 0);
+    const feeClearanceRate = totalFeeSum > 0 ? Math.round((totalPaidSum / totalFeeSum) * 100) : 0;
 
- 
- const reportsList = [
- {
- id: 'REP-ENROLLMENT',
- title: 'Student Enrollment & Demographic Report',
- category: 'Enrollment',
- icon: '',
- badgeColor: '#2563eb',
- badgeBg: '#eff6ff',
- description: 'Comprehensive roster of all students, class section assignments, parent contacts, gender split, and admission timestamps.',
- metricLabel: 'Total Enrolled',
- metricValue: `${totalStudents} Active Students`,
- subMetric: `Across ${totalClasses} Sections (Grade 9 & 10)`,
- actionLabel: ' View Enrollment Registry',
- type: 'students'
- },
- {
- id: 'REP-ACADEMIC',
- title: 'Academic Term Examination & Marks Ledger',
- category: 'Academics',
- icon: '',
- badgeColor: '#7c3aed',
- badgeBg: '#f5f3ff',
- description: 'Student-by-student examination performance across Mathematics, Physics, Chemistry, Tamil, and English with grades and absentees.',
- metricLabel: 'School Average Score',
- metricValue: `${avgSchoolScore}% (Grade A)`,
- subMetric: '100% Pass Rate in Grade 10 Pre-Boards',
- actionLabel: ' View Marks & Grade Ledger',
- type: 'marks'
- },
- {
- id: 'REP-FEES',
- title: 'Fee Collection & Dues Register Audit',
- category: 'Finance',
- icon: '',
- badgeColor: '#059669',
- badgeBg: '#ecfdf5',
- description: 'Detailed audited statement of tuition fees collected, pending balances, UPI transaction verifications, and WhatsApp reminder dispatch logs.',
- metricLabel: 'Collection Efficiency',
- metricValue: `${feeClearanceRate}% Cleared`,
- subMetric: `₹${totalPaidSum.toLocaleString('en-IN')} Received • ₹${totalDueSum.toLocaleString('en-IN')} Pending`,
- actionLabel: ' View Fee Audit Statement',
- type: 'fees'
- },
- {
- id: 'REP-STAFF',
- title: 'Faculty Workload & Class Timetable Allocation',
- category: 'Staff & HR',
- icon: '',
- badgeColor: '#d97706',
- badgeBg: '#fffbeb',
- description: 'Subject specialization, weekly periods assigned, classroom allocations, teacher qualifications, and department distributions.',
- metricLabel: 'Teaching Faculty',
- metricValue: `${totalStaff} Certified Staff`,
- subMetric: `${totalSubjects} Core Curriculums • 1:19 Staff-Student Ratio`,
- actionLabel: ' View Faculty Workload Roster',
- type: 'staff'
- },
- {
- id: 'REP-ATTENDANCE',
- title: 'Daily Student & Staff Attendance Audit',
- category: 'Attendance',
- icon: '',
- badgeColor: '#0891b2',
- badgeBg: '#ecfeff',
- description: 'Classroom daily roll-call attendance logs, leave records, absentee alerts sent to parents, and monthly trend curves.',
- metricLabel: 'Campus Daily Average',
- metricValue: '94.8% Attendance',
- subMetric: 'Peak Day: Monday (98.2%) • Target: 95.0%',
- actionLabel: ' View Attendance Logs',
- type: 'attendance'
- },
- {
- id: 'REP-SERVICES',
- title: 'Campus Activities & Extracurricular Participation',
- category: 'Activities',
- icon: '',
- badgeColor: '#db2777',
- badgeBg: '#fdf2f8',
- description: 'Student enrollment across Coding for Kids, Chess Academy, Robotics Club, Art, and Athletic training programs.',
- metricLabel: 'Active Programs',
- metricValue: '8 Co-Curricular Clubs',
- subMetric: '88% Student Engagement in Sports & STEM',
- actionLabel: ' View Activity Enrollments',
- type: 'services'
- }
- ];
+    // 2. Live Academic & Examination Ledger
+    let allMarkScores = [];
+    let passingScoresCount = 0;
+    studentsList.forEach((st) => {
+      let stSum = 0;
+      let stCount = 0;
+      (st.marks || []).forEach((m) => {
+        if (typeof m.scored === 'number') {
+          allMarkScores.push(m.scored);
+          stSum += m.scored;
+          stCount++;
+        }
+      });
+      if (stCount > 0 && (stSum / stCount) >= 50) {
+        passingScoresCount++;
+      }
+    });
+    const avgSchoolScore = allMarkScores.length > 0
+      ? Math.round(allMarkScores.reduce((a, b) => a + b, 0) / allMarkScores.length)
+      : 85;
+    const passPercentage = totalStudents > 0
+      ? Math.round((passingScoresCount / totalStudents) * 100)
+      : 98;
+    const avgGrade = avgSchoolScore >= 90 ? 'A+' : avgSchoolScore >= 80 ? 'A' : avgSchoolScore >= 70 ? 'B' : avgSchoolScore >= 60 ? 'C' : 'D';
 
- return (
- <div>
- 
+    // 3. Live Daily Attendance Statistics
+    let totalAttPctSum = 0;
+    let studentsWithAtt = 0;
+    studentsList.forEach((st) => {
+      if (st.attendance) {
+        const num = parseInt(String(st.attendance).replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(num)) {
+          totalAttPctSum += num;
+          studentsWithAtt++;
+        }
+      }
+    });
+    const avgAttendancePct = studentsWithAtt > 0
+      ? Math.round(totalAttPctSum / studentsWithAtt)
+      : 95;
 
- 
- <div className="sa-schools-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
- <div>
- <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>
- Official School Audit & Analytics Reports
- </h3>
- <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
- Click "View Report" on any audit card below to open detailed registers, print official sheets, or export to Excel.
- </p>
- </div>
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayLogs = attendanceLogsList.filter((l) => l.date === todayStr);
+    let todayPresent = 0;
+    let todayMarkedTotal = 0;
+    todayLogs.forEach((l) => {
+      if (l.records) {
+        Object.values(l.records).forEach((stat) => {
+          todayMarkedTotal++;
+          if (stat === 'present') todayPresent++;
+        });
+      }
+    });
+    const todayPresentText = todayMarkedTotal > 0
+      ? `${todayPresent} of ${todayMarkedTotal} Students Present Today`
+      : `${Math.round((totalStudents * avgAttendancePct) / 100)} Estimated Present Today`;
 
- <button
- type="button"
- className="btn btn-outline btn-sm"
- style={{ fontWeight: 700, borderColor: '#2563eb', color: '#2563eb' }}
- onClick={() => {
- 
- const summaryExport = reportsList.map(r => ({
- 'Report ID': r.id,
- 'Report Name': r.title,
- 'Category': r.category,
- 'Key Metric': r.metricValue,
- 'Subtext': r.subMetric,
- 'Generated Date': new Date().toISOString().slice(0, 10),
- 'Status': 'Audited & Verified'
- }));
- const ws = XLSX.utils.json_to_sheet(summaryExport);
- const wb = XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb, ws, 'School Reports Summary');
- XLSX.writeFile(wb, `School_Audit_Reports_Summary_${new Date().toISOString().slice(0, 10)}.xlsx`);
- setFeedback({
- title: 'All School Reports Exported!',
- body: 'Consolidated report summaries downloaded as Excel spreadsheet.'
- });
- }}
- >
- Export All Reports Summary (Excel)
- </button>
- </div>
+    const classNamesPreview = classesList.map(c => c.name).slice(0, 4).join(', ') + (classesList.length > 4 ? ` +${classesList.length - 4} more` : '');
+    const staffRatio = totalStaff > 0 && totalStudents > 0 ? `1:${Math.round(totalStudents / totalStaff)}` : '1:18';
 
- 
- <div style={{
- display: 'grid',
- gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
- gap: '20px'
- }}>
- {reportsList.map((rep) => (
- <div
- key={rep.id}
- style={{
- background: '#ffffff',
- border: '1px solid #e2e8f0',
- borderRadius: '16px',
- padding: '24px',
- display: 'flex',
- flexDirection: 'column',
- boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
- transition: 'all 0.2s ease',
- position: 'relative'
- }}
- onMouseEnter={(e) => {
- e.currentTarget.style.transform = 'translateY(-3px)';
- e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.09)';
- e.currentTarget.style.borderColor = rep.badgeColor;
- }}
- onMouseLeave={(e) => {
- e.currentTarget.style.transform = 'translateY(0)';
- e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)';
- e.currentTarget.style.borderColor = '#e2e8f0';
- }}
- >
- 
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
- <div style={{
- width: '48px',
- height: '48px',
- borderRadius: '12px',
- background: rep.badgeBg,
- display: 'flex',
- alignItems: 'center',
- justifyContent: 'center',
- fontSize: '1.6rem'
- }}>
- {rep.icon}
- </div>
- <span style={{
- fontSize: '0.74rem',
- fontWeight: 800,
- color: rep.badgeColor,
- background: rep.badgeBg,
- border: `1px solid ${rep.badgeColor}33`,
- padding: '4px 10px',
- borderRadius: '20px',
- textTransform: 'uppercase',
- letterSpacing: '0.4px'
- }}>
- {rep.category}
- </span>
- </div>
+    const reportsList = [
+      {
+        id: 'REP-ENROLLMENT',
+        title: 'Student Enrollment & Demographic Report',
+        category: 'Enrollment',
+        badgeColor: '#2563eb',
+        badgeBg: '#eff6ff',
+        description: 'Comprehensive roster of all students, class section assignments, parent contacts, gender split, and live admission timestamps.',
+        metricLabel: 'Total Enrolled',
+        metricValue: `${totalStudents} Active Students`,
+        subMetric: `Across ${totalClasses} Sections (${classNamesPreview || 'All Classes'})`,
+        actionLabel: 'View Enrollment Registry',
+        type: 'students'
+      },
+      {
+        id: 'REP-ACADEMIC',
+        title: 'Academic Term Examination & Marks Ledger',
+        category: 'Academics',
+        badgeColor: '#7c3aed',
+        badgeBg: '#f5f3ff',
+        description: 'Student-by-student examination performance across Mathematics, Physics, Chemistry, Tamil, and English with real marks and grades.',
+        metricLabel: 'School Average Score',
+        metricValue: `${avgSchoolScore}% (Grade ${avgGrade})`,
+        subMetric: `${passPercentage}% Overall Pass Rate • ${allMarkScores.length} Exam Scores Audited`,
+        actionLabel: 'View Marks & Grade Ledger',
+        type: 'marks'
+      },
+      {
+        id: 'REP-FEES',
+        title: 'Fee Collection & Dues Register Audit',
+        category: 'Finance',
+        badgeColor: '#059669',
+        badgeBg: '#ecfdf5',
+        description: 'Detailed audited statement of tuition fees collected, pending balances, transaction verifications, and reminder dispatch logs.',
+        metricLabel: 'Collection Efficiency',
+        metricValue: `${feeClearanceRate}% Cleared`,
+        subMetric: `₹${totalPaidSum.toLocaleString('en-IN')} Received • ₹${totalDueSum.toLocaleString('en-IN')} Pending Balance`,
+        actionLabel: 'View Fee Audit Statement',
+        type: 'fees'
+      },
+      {
+        id: 'REP-STAFF',
+        title: 'Faculty Workload & Class Timetable Allocation',
+        category: 'Staff & HR',
+        badgeColor: '#d97706',
+        badgeBg: '#fffbeb',
+        description: 'Subject specialization, weekly periods assigned, classroom allocations, teacher qualifications, and department distributions.',
+        metricLabel: 'Teaching Faculty',
+        metricValue: `${totalStaff} Certified Staff`,
+        subMetric: `${totalSubjects} Core Curriculums • ${staffRatio} Staff-to-Student Ratio`,
+        actionLabel: 'View Faculty Workload Roster',
+        type: 'staff'
+      },
+      {
+        id: 'REP-ATTENDANCE',
+        title: 'Daily Student & Staff Attendance Audit',
+        category: 'Attendance',
+        badgeColor: '#0891b2',
+        badgeBg: '#ecfeff',
+        description: 'Classroom daily roll-call attendance logs, leave records, live section averages, and absentee records synchronized across portals.',
+        metricLabel: 'Campus Daily Average',
+        metricValue: `${avgAttendancePct}% Daily Attendance`,
+        subMetric: `${todayPresentText} • Target: 95%`,
+        actionLabel: 'View Attendance Logs',
+        type: 'attendance'
+      },
+      {
+        id: 'REP-SERVICES',
+        title: 'Campus Activities & Extracurricular Participation',
+        category: 'Activities',
+        badgeColor: '#db2777',
+        badgeBg: '#fdf2f8',
+        description: 'Student enrollment across Coding for Kids, Chess Academy, Robotics Club, Art, and Athletic training programs.',
+        metricLabel: 'Active Programs',
+        metricValue: `${servicesList.length} Active Programs`,
+        subMetric: 'Technology, STEM, Mind Sports & Co-Curriculars',
+        actionLabel: 'View Activity Enrollments',
+        type: 'services'
+      }
+    ];
 
- 
- <h4 style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', lineHeight: '1.35' }}>
- {rep.title}
- </h4>
- <p style={{ margin: '0 0 16px', fontSize: '0.84rem', color: '#64748b', lineHeight: '1.5', flex: 1 }}>
- {rep.description}
- </p>
+    return (
+      <div>
+        {/* Real-Time Live Campus Performance Hub Banner */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            borderRadius: '16px',
+            padding: '22px 26px',
+            color: '#ffffff',
+            marginBottom: '22px',
+            boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.25)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}
+        >
+          <div>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'rgba(16, 185, 129, 0.18)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                color: '#34d399',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '8px'
+              }}
+            >
+              <span
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#10b981',
+                  display: 'inline-block',
+                  boxShadow: '0 0 8px #10b981'
+                }}
+              ></span>
+              Live Real-Time Performance Engine
+            </div>
+            <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#ffffff' }}>
+              Institutional Intelligence & Operational Reports
+            </h3>
+            <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#94a3b8' }}>
+              Real-time audit statements across Enrolled Students, Examination Marks, Fee Collections, Daily Roll Calls & Staff Allocation.
+            </p>
+          </div>
 
- 
- <div style={{
- background: '#f8fafc',
- borderRadius: '10px',
- padding: '12px 14px',
- border: '1px solid #f1f5f9',
- marginBottom: '18px'
- }}>
- <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>
- {rep.metricLabel}
- </div>
- <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '2px 0' }}>
- {rep.metricValue}
- </div>
- <div style={{ fontSize: '0.76rem', color: '#475569' }}>
- {rep.subMetric}
- </div>
- </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              style={{ borderColor: 'rgba(255,255,255,0.3)', color: '#ffffff', fontWeight: 700, padding: '8px 16px' }}
+              onClick={() => {
+                refreshData();
+                setFeedback({
+                  title: 'Reports Refreshed in Real Time ✓',
+                  body: 'All audit ledger cards and rosters have been re-synchronized with live database records.'
+                });
+              }}
+            >
+              ↻ Refresh Live Data
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              style={{
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                borderColor: '#2563eb',
+                boxShadow: '0 4px 12px rgba(37,99,235,0.35)',
+                padding: '8px 18px'
+              }}
+              onClick={() => {
+                const summaryExport = reportsList.map(r => ({
+                  'Report ID': r.id,
+                  'Report Name': r.title,
+                  'Category': r.category,
+                  'Key Metric': r.metricValue,
+                  'Subtext': r.subMetric,
+                  'Generated Date': new Date().toISOString().slice(0, 10),
+                  'Audit Status': 'Live Audited & Verified'
+                }));
+                const ws = XLSX.utils.json_to_sheet(summaryExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'School Reports Summary');
+                XLSX.writeFile(wb, `School_Audit_Reports_Summary_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                setFeedback({
+                  title: 'All School Reports Exported!',
+                  body: 'Consolidated report summaries downloaded as Excel spreadsheet.'
+                });
+              }}
+            >
+              Export Summary (Excel)
+            </button>
+          </div>
+        </div>
 
- 
- <button
- type="button"
- className="btn btn-primary btn-sm"
- style={{
- width: '100%',
- padding: '9px 16px',
- fontWeight: 700,
- fontSize: '0.86rem',
- display: 'flex',
- alignItems: 'center',
- justifyContent: 'center',
- gap: '6px'
- }}
- onClick={() => setActiveReportViewer(rep)}
- >
- {rep.actionLabel} &rarr;
- </button>
- </div>
- ))}
- </div>
- </div>
- );
- })()}
+        {/* Real-Time Live KPI Strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '22px' }}>
+          <div style={{ background: '#ffffff', padding: '14px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, display: 'block' }}>Students</span>
+            <strong style={{ fontSize: '1.35rem', color: '#1e3a8a' }}>{totalStudents}</strong>
+            <span style={{ fontSize: '0.74rem', color: '#10b981', display: 'block', marginTop: '2px', fontWeight: 600 }}>● Active Roster</span>
+          </div>
+          <div style={{ background: '#ffffff', padding: '14px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, display: 'block' }}>Faculty</span>
+            <strong style={{ fontSize: '1.35rem', color: '#b45309' }}>{totalStaff}</strong>
+            <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: '2px' }}>{staffRatio} Ratio</span>
+          </div>
+          <div style={{ background: '#ffffff', padding: '14px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, display: 'block' }}>Sections</span>
+            <strong style={{ fontSize: '1.35rem', color: '#2563eb' }}>{totalClasses}</strong>
+            <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: '2px' }}>Classrooms</span>
+          </div>
+          <div style={{ background: '#ffffff', padding: '14px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, display: 'block' }}>Academic Avg</span>
+            <strong style={{ fontSize: '1.35rem', color: '#7c3aed' }}>{avgSchoolScore}%</strong>
+            <span style={{ fontSize: '0.74rem', color: '#059669', display: 'block', marginTop: '2px', fontWeight: 600 }}>Grade {avgGrade}</span>
+          </div>
+          <div style={{ background: '#ffffff', padding: '14px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, display: 'block' }}>Fee Collection</span>
+            <strong style={{ fontSize: '1.35rem', color: '#059669' }}>{feeClearanceRate}%</strong>
+            <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: '2px' }}>Cleared</span>
+          </div>
+          <div style={{ background: '#ffffff', padding: '14px 16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, display: 'block' }}>Attendance</span>
+            <strong style={{ fontSize: '1.35rem', color: '#0891b2' }}>{avgAttendancePct}%</strong>
+            <span style={{ fontSize: '0.74rem', color: '#059669', display: 'block', marginTop: '2px', fontWeight: 600 }}>● Live Register</span>
+          </div>
+        </div>
 
- 
- 
- 
- {activeTab === 'secure-messaging' && <ChatBox />}
+        {/* Reports Grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+            gap: '20px'
+          }}
+        >
+          {reportsList.map((rep) => (
+            <div
+              key={rep.id}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                transition: 'all 0.2s ease',
+                position: 'relative'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.09)';
+                e.currentTarget.style.borderColor = rep.badgeColor;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                <span
+                  style={{
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    color: rep.badgeColor,
+                    background: rep.badgeBg,
+                    border: `1px solid ${rep.badgeColor}33`,
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.4px'
+                  }}
+                >
+                  {rep.category}
+                </span>
+                <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+                  Live
+                </span>
+              </div>
+
+              <h4 style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', lineHeight: '1.35' }}>
+                {rep.title}
+              </h4>
+              <p style={{ margin: '0 0 16px', fontSize: '0.84rem', color: '#64748b', lineHeight: '1.5', flex: 1 }}>
+                {rep.description}
+              </p>
+
+              <div
+                style={{
+                  background: '#f8fafc',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  border: '1px solid #f1f5f9',
+                  marginBottom: '18px'
+                }}
+              >
+                <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>
+                  {rep.metricLabel}
+                </div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '2px 0' }}>
+                  {rep.metricValue}
+                </div>
+                <div style={{ fontSize: '0.76rem', color: '#475569' }}>
+                  {rep.subMetric}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                style={{
+                  width: '100%',
+                  padding: '9px 16px',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+                onClick={() => {
+                  setReportClassFilter('All');
+                  setReportSearchQuery('');
+                  setActiveReportViewer(rep);
+                }}
+              >
+                {rep.actionLabel} &rarr;
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  })()}
+
+  {activeTab === 'secure-messaging' && <ChatBox />}
  </div>
 
  
@@ -5925,6 +6838,30 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  />
  </div>
 
+ <div className="wizard-field">
+ <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+   <label>Portal Login Password <span className="req">*</span></label>
+   <button
+     type="button"
+     onClick={() => {
+       const pass = (staffForm.role === 'Principal' ? 'Principal@' : staffForm.role === 'Non-Teaching' ? 'Staff@' : 'Teach@') + Math.floor(1000 + Math.random() * 9000);
+       setStaffForm((prev) => ({ ...prev, password: pass }));
+     }}
+     style={{ background: 'none', border: 'none', color: '#4338ca', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+   >
+     Auto-Generate
+   </button>
+ </div>
+ <input
+ type="text"
+ required
+ placeholder="e.g. Staff@123"
+ value={staffForm.password || ''}
+ onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+ style={{ fontFamily: 'monospace' }}
+ />
+ </div>
+
  
  <div className="wizard-field span-2">
  <label>
@@ -6139,6 +7076,29 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  onChange={(e) => setPrincipalForm({ ...principalForm, email: e.target.value })}
  />
  </div>
+ <div className="wizard-field">
+ <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+   <label>Portal Login Password <span className="req">*</span></label>
+   <button
+     type="button"
+     onClick={() => {
+       const pass = 'Principal@' + Math.floor(1000 + Math.random() * 9000);
+       setPrincipalForm((prev) => ({ ...prev, password: pass }));
+     }}
+     style={{ background: 'none', border: 'none', color: '#4338ca', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+   >
+     Auto-Generate
+   </button>
+ </div>
+ <input
+ type="text"
+ required
+ placeholder="e.g. Principal@123"
+ value={principalForm.password || ''}
+ onChange={(e) => setPrincipalForm({ ...principalForm, password: e.target.value })}
+ style={{ fontFamily: 'monospace' }}
+ />
+ </div>
  <div className="wizard-field span-2">
  <label>Account Status <span className="req">*</span></label>
  <select
@@ -6318,6 +7278,63 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
                   placeholder="+91 98456 12301"
                   value={studentForm.emergencyContact}
                   onChange={(e) => setStudentForm({ ...studentForm, emergencyContact: e.target.value })}
+                />
+              </div>
+
+              <div className="wizard-field">
+                <label>Student Portal Email <span className="req">*</span></label>
+                <input
+                  type="email"
+                  required
+                  placeholder="student@ssvschool.com"
+                  value={studentForm.studentEmail || ''}
+                  onChange={(e) => setStudentForm({ ...studentForm, studentEmail: e.target.value })}
+                />
+              </div>
+
+              <div className="wizard-field">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label>Student Portal Password <span className="req">*</span></label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentForm((prev) => ({ ...prev, password: 'Student@' + Math.floor(1000 + Math.random() * 9000) }));
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#4338ca', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                  >
+                    Auto-Generate
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Student@123"
+                  value={studentForm.password || ''}
+                  onChange={(e) => setStudentForm({ ...studentForm, password: e.target.value })}
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </div>
+
+              <div className="wizard-field">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label>Parent Portal Password <span className="req">*</span></label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentForm((prev) => ({ ...prev, parentPassword: 'Parent@' + Math.floor(1000 + Math.random() * 9000) }));
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#4338ca', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                  >
+                    Auto-Generate
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Parent@123"
+                  value={studentForm.parentPassword || ''}
+                  onChange={(e) => setStudentForm({ ...studentForm, parentPassword: e.target.value })}
+                  style={{ fontFamily: 'monospace' }}
                 />
               </div>
 
@@ -6531,6 +7548,976 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
     </div>
   )}
 
+  {/* BROADCAST CAMPUS ANNOUNCEMENT / CIRCULAR MODAL */}
+  {isAnnouncementOpen && (
+    <div
+      className="modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(15, 23, 42, 0.75)',
+        backdropFilter: 'blur(5px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100000,
+        padding: '16px',
+        boxSizing: 'border-box'
+      }}
+      onClick={() => setIsAnnouncementOpen(false)}
+    >
+      <div
+        style={{
+          maxWidth: '680px',
+          width: '100%',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#ffffff',
+          borderRadius: '16px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
+          overflow: 'hidden'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          style={{
+            flexShrink: 0,
+            background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+            color: '#ffffff',
+            padding: '18px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+                Post Campus Announcement
+              </h3>
+              <p style={{ margin: '3px 0 0', fontSize: '0.82rem', opacity: 0.9 }}>
+                Broadcast circular to Students, Teachers, and Parents across this school.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsAnnouncementOpen(false)}
+            style={{
+              color: '#ffffff',
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              cursor: 'pointer',
+              fontSize: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700
+            }}
+          >
+            &times;
+          </button>
+        </div>
+
+        {/* Scrollable Form Body */}
+        <form
+          onSubmit={(e) => handleSaveAnnouncement(e)}
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '24px',
+            margin: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}
+        >
+          <div>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '6px' }}>
+              Notice Headline / Title <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Annual Sports Meet 2026 - Schedule Released"
+              value={announcementForm.title}
+              onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                border: '1.5px solid #cbd5e1',
+                fontSize: '0.92rem',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', marginBottom: '6px' }}>
+                Target Audience <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={announcementForm.target}
+                onChange={(e) => setAnnouncementForm({ ...announcementForm, target: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #cbd5e1',
+                  fontSize: '0.88rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  background: '#ffffff'
+                }}
+              >
+                <option value="All">All Campus Stakeholders</option>
+                <option value="Students">Students Only</option>
+                <option value="Teachers">Faculty & Staff</option>
+                <option value="Parents">Parents Only</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', marginBottom: '6px' }}>
+                Notice Category <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <select
+                value={announcementForm.category}
+                onChange={(e) => setAnnouncementForm({ ...announcementForm, category: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #cbd5e1',
+                  fontSize: '0.88rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  background: '#ffffff'
+                }}
+              >
+                <option value="General">General Campus Notice</option>
+                <option value="Academic">Academic / Examinations</option>
+                <option value="Sports">Sports & Cultural Events</option>
+                <option value="Holidays">Official Holidays</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', marginBottom: '6px' }}>
+                Broadcast Priority
+              </label>
+              <select
+                value={announcementForm.priority || 'Normal'}
+                onChange={(e) => setAnnouncementForm({ ...announcementForm, priority: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #cbd5e1',
+                  fontSize: '0.88rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  background: '#ffffff'
+                }}
+              >
+                <option value="Normal">Normal Notice</option>
+                <option value="High">High Priority</option>
+                <option value="Urgent">Urgent / Important</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', marginBottom: '6px' }}>
+              Issuing Authority / Author
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Principal Office / School Administration"
+              value={announcementForm.author || ''}
+              onChange={(e) => setAnnouncementForm({ ...announcementForm, author: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: '1.5px solid #cbd5e1',
+                fontSize: '0.88rem',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '6px' }}>
+              Detailed Announcement Notice <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <textarea
+              rows="5"
+              required
+              placeholder="Enter complete announcement details, dates, instructions, or venue..."
+              value={announcementForm.content}
+              onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                border: '1.5px solid #cbd5e1',
+                fontSize: '0.9rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+                resize: 'vertical',
+                lineHeight: 1.5
+              }}
+            ></textarea>
+          </div>
+
+          {/* Sticky Actions Footer */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              paddingTop: '16px',
+              borderTop: '1px solid #e2e8f0',
+              marginTop: '4px'
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setIsAnnouncementOpen(false)}
+              style={{ padding: '8px 18px' }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              style={{
+                padding: '9px 24px',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+                color: '#ffffff',
+                boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
+                cursor: 'pointer'
+              }}
+            >
+              Broadcast Announcement ✓
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
+
+  {/* DEDICATED CHANGE PASSWORD MODAL FOR ALL ROLES */}
+  {changePasswordModal.isOpen && (
+    <div
+      className="modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(15, 23, 42, 0.75)',
+        backdropFilter: 'blur(5px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100000,
+        padding: '16px',
+        overflowY: 'auto'
+      }}
+      onClick={() => setChangePasswordModal((prev) => ({ ...prev, isOpen: false }))}
+    >
+      <div
+        style={{
+          maxWidth: '560px',
+          width: '100%',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#ffffff',
+          borderRadius: '16px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
+          overflow: 'hidden'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header - Fixed & Pinned */}
+        <div
+          style={{
+            flexShrink: 0,
+            background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)',
+            color: '#ffffff',
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="7.5" cy="15.5" r="5.5" />
+                <path d="m21 2-9.6 9.6" />
+                <path d="m15.5 7.5 3 3L22 7l-3-3" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: '#ffffff' }}>
+                Change Portal Password
+              </h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', opacity: 0.9 }}>
+                {changePasswordModal.name} &bull; <span style={{ textTransform: 'uppercase', fontWeight: 700 }}>{changePasswordModal.role}</span>
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setChangePasswordModal((prev) => ({ ...prev, isOpen: false }))}
+            style={{
+              color: '#ffffff',
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              cursor: 'pointer',
+              fontSize: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700
+            }}
+          >
+            &times;
+          </button>
+        </div>
+
+        {/* Scrollable Form Body */}
+        <form
+          onSubmit={(e) => handleUpdatePassword(e)}
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '20px 24px 10px',
+            margin: 0
+          }}
+        >
+          {/* User Details Overview Card */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '0.85rem' }}>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Full Name</span>
+                <strong style={{ color: '#0f172a' }}>{changePasswordModal.name}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Role / Category</span>
+                <span className="badge badge-primary" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>{changePasswordModal.role}</span>
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Portal Username / Email</span>
+                <code style={{ fontSize: '0.88rem', color: '#1e3a8a', background: '#eff6ff', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                  {changePasswordModal.email || 'N/A'}
+                </code>
+              </div>
+              {changePasswordModal.currentPassword && (
+                <div style={{ gridColumn: 'span 2' }}>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Current Password</span>
+                  <code style={{ fontSize: '0.88rem', color: '#b45309', background: '#fef3c7', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                    {changePasswordModal.currentPassword}
+                  </code>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* New Password Input Field */}
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ margin: 0, fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>
+                New Password <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const rolePrefix = (changePasswordModal.role || 'Zen').replace(/[^a-zA-Z]/g, '').slice(0, 5);
+                  const generated = `${rolePrefix.charAt(0).toUpperCase() + rolePrefix.slice(1).toLowerCase()}@${Math.floor(1000 + Math.random() * 9000)}`;
+                  setChangePasswordModal((prev) => ({ ...prev, newPassword: generated, showPassword: true }));
+                }}
+                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              >
+                Auto-Generate Strong Password
+              </button>
+            </div>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input
+                type={changePasswordModal.showPassword ? 'text' : 'password'}
+                required
+                placeholder="Enter new password (min 4 characters)"
+                value={changePasswordModal.newPassword || ''}
+                onChange={(e) => setChangePasswordModal((prev) => ({ ...prev, newPassword: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '10px 42px 10px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #cbd5e1',
+                  fontSize: '0.95rem',
+                  fontFamily: 'monospace',
+                  fontWeight: 600,
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setChangePasswordModal((prev) => ({ ...prev, showPassword: !prev.showPassword }))}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '4px'
+                }}
+                title={changePasswordModal.showPassword ? 'Hide password' : 'Show password'}
+              >
+                {changePasswordModal.showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Presets */}
+          <div style={{ marginBottom: '14px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '6px' }}>Quick Presets / Auto-fill:</span>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const def = getDefaultRolePassword(changePasswordModal.role);
+                  setChangePasswordModal((prev) => ({ ...prev, newPassword: def, showPassword: true }));
+                }}
+                style={{
+                  background: '#fef3c7',
+                  border: '1px solid #fde68a',
+                  borderRadius: '6px',
+                  padding: '5px 10px',
+                  fontSize: '0.78rem',
+                  fontFamily: 'monospace',
+                  cursor: 'pointer',
+                  color: '#92400e',
+                  fontWeight: 700
+                }}
+                title="Fill default password"
+              >
+                Reset ({getDefaultRolePassword(changePasswordModal.role)})
+              </button>
+              {[
+                `${(changePasswordModal.name || 'User').split(' ')[0]}@2026`,
+                'Zen@12345',
+                `${(changePasswordModal.role || 'Pass').toLowerCase()}123`
+              ].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setChangePasswordModal((prev) => ({ ...prev, newPassword: p, showPassword: true }))}
+                  style={{
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    padding: '5px 10px',
+                    fontSize: '0.78rem',
+                    fontFamily: 'monospace',
+                    cursor: 'pointer',
+                    color: '#334155',
+                    fontWeight: 600
+                  }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        </form>
+
+        {/* Sticky Action Footer - ALWAYS PINNED & 100% VISIBLE */}
+        <div
+          style={{
+            flexShrink: 0,
+            background: '#f8fafc',
+            borderTop: '1px solid #e2e8f0',
+            padding: '14px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '10px'
+          }}
+        >
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => {
+              const def = getDefaultRolePassword(changePasswordModal.role);
+              handleUpdatePassword(null, def);
+            }}
+            title="Reset directly to default role password"
+            style={{ fontSize: '0.8rem', borderColor: '#fde68a', background: '#fffbeb', color: '#b45309', fontWeight: 700 }}
+          >
+            Reset to Default ({getDefaultRolePassword(changePasswordModal.role)})
+          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setChangePasswordModal((prev) => ({ ...prev, isOpen: false }))}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              style={{
+                padding: '9px 24px',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                borderColor: '#15803d',
+                color: '#ffffff',
+                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.35)',
+                cursor: 'pointer'
+              }}
+              onClick={(e) => handleUpdatePassword(e)}
+            >
+              Confirm & Save Password
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* ADD / EDIT TEACHER MODAL */}
+  {isTeacherModalOpen && (
+    <div className="modal-overlay" style={{ display: 'flex', zIndex: 100000 }}>
+      <div className="modal-content wizard-modal-lg" style={{ maxWidth: '640px', width: '95vw', borderRadius: '16px', overflow: 'hidden' }}>
+        <div className="modal-header" style={{ background: 'linear-gradient(135deg, #4338ca 0%, #6366f1 100%)', color: '#ffffff', padding: '18px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+                {editingTeacher ? 'Edit Teacher Faculty' : 'Register New Teacher'}
+              </h3>
+              <p style={{ margin: '3px 0 0', fontSize: '0.8rem', opacity: 0.9 }}>
+                Assign faculty subject, classroom section, and login credentials.
+              </p>
+            </div>
+          </div>
+          <button className="modal-close" onClick={() => setIsTeacherModalOpen(false)} style={{ color: '#ffffff', background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '1.2rem' }}>&times;</button>
+        </div>
+
+        <form onSubmit={handleSaveTeacher} style={{ padding: '24px' }}>
+          <div className="wizard-grid-2">
+            <div className="wizard-field span-2">
+              <label>Teacher Full Name <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Mrs. Priya Krishnan"
+                value={teacherForm.name}
+                onChange={(e) => setTeacherForm({ ...teacherForm, name: e.target.value })}
+              />
+            </div>
+
+            <div className="wizard-field">
+              <label>Teaching Subject <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <select
+                value={teacherForm.subject}
+                onChange={(e) => setTeacherForm({ ...teacherForm, subject: e.target.value })}
+              >
+                <option value="Mathematics">Mathematics</option>
+                <option value="Physics">Physics</option>
+                <option value="Chemistry">Chemistry</option>
+                <option value="Biology">Biology</option>
+                <option value="Computer Science">Computer Science</option>
+                <option value="English">English</option>
+                <option value="Tamil">Tamil</option>
+                <option value="Social Science">Social Science</option>
+              </select>
+            </div>
+
+            <div className="wizard-field">
+              <label>Assigned Class & Section <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <select
+                value={teacherForm.class}
+                onChange={(e) => setTeacherForm({ ...teacherForm, class: e.target.value })}
+              >
+                {['Grade 10-A', 'Grade 10-B', 'Grade 9-A', 'Grade 9-B', 'Grade 8-A', 'Grade 8-B', 'Grade 7-A', 'Grade 6-A'].map((cName) => {
+                  const existingCls = (data.classes || []).find((c) => c.name === cName);
+                  const isCurrentTeacher = editingTeacher && existingCls && existingCls.teacher === editingTeacher.name;
+                  const hasOtherTeacher = existingCls && existingCls.teacher && (!editingTeacher || existingCls.teacher !== editingTeacher.name);
+                  const tag = isCurrentTeacher
+                    ? ' (Current In-charge)'
+                    : (hasOtherTeacher ? ` (In-charge: ${existingCls.teacher})` : ' (No Class Teacher)');
+                  return (
+                    <option key={cName} value={cName}>
+                      {cName} • {tag}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div className="wizard-field">
+              <label>Contact Phone <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <input
+                type="text"
+                required
+                placeholder="+91 98401 23450"
+                value={teacherForm.phone}
+                onChange={(e) => setTeacherForm({ ...teacherForm, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="wizard-field">
+              <label>Email Address <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <input
+                type="email"
+                required
+                placeholder="teacher@ssvschool.com"
+                value={teacherForm.email}
+                onChange={(e) => setTeacherForm({ ...teacherForm, email: e.target.value })}
+              />
+            </div>
+
+            <div className="wizard-field">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label>Portal Login Password <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTeacherForm((prev) => ({ ...prev, password: 'Teach@' + Math.floor(1000 + Math.random() * 9000) }));
+                  }}
+                  style={{ background: 'none', border: 'none', color: '#4338ca', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                >
+                  Auto-Generate
+                </button>
+              </div>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Teacher@123"
+                value={teacherForm.password || ''}
+                onChange={(e) => setTeacherForm({ ...teacherForm, password: e.target.value })}
+                style={{ fontFamily: 'monospace' }}
+              />
+            </div>
+
+            <div className="wizard-field">
+              <label>Account Status</label>
+              <select
+                value={teacherForm.status || 'Active'}
+                onChange={(e) => setTeacherForm({ ...teacherForm, status: e.target.value })}
+              >
+                <option value="Active">Active</option>
+                <option value="On Leave">On Leave</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setIsTeacherModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary btn-sm" style={{ padding: '8px 22px' }}>
+              {editingTeacher ? 'Save Changes' : 'Register Teacher'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
+
+  {/* LINK / REGISTER PARENT MODAL */}
+  {isLinkParentOpen && (
+    <div
+      className="modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(15, 23, 42, 0.75)',
+        backdropFilter: 'blur(5px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100000,
+        padding: '16px',
+        overflowY: 'auto'
+      }}
+      onClick={() => setIsLinkParentOpen(false)}
+    >
+      <div
+        style={{
+          maxWidth: '600px',
+          width: '100%',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#ffffff',
+          borderRadius: '16px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
+          overflow: 'hidden'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header - Fixed & Pinned */}
+        <div
+          style={{
+            flexShrink: 0,
+            background: 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)',
+            color: '#ffffff',
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800, color: '#ffffff' }}>Link / Add Parent</h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', opacity: 0.9 }}>
+                Link parent/guardian to student ward with portal credentials.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsLinkParentOpen(false)}
+            style={{
+              color: '#ffffff',
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              cursor: 'pointer',
+              fontSize: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700
+            }}
+          >
+            &times;
+          </button>
+        </div>
+
+        {/* Scrollable Form Body */}
+        <form
+          id="linkParentFormSubmit"
+          onSubmit={handleSaveLinkParent}
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '20px 24px 14px',
+            margin: 0
+          }}
+        >
+          <div className="wizard-grid-2">
+            <div className="wizard-field span-2">
+              <label>Parent Full Name <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Ramesh Kumar"
+                value={linkParentForm.name}
+                onChange={(e) => setLinkParentForm({ ...linkParentForm, name: e.target.value })}
+              />
+            </div>
+
+            <div className="wizard-field">
+              <label>Relationship <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <select
+                value={linkParentForm.relationship}
+                onChange={(e) => setLinkParentForm({ ...linkParentForm, relationship: e.target.value })}
+              >
+                <option value="Father">Father</option>
+                <option value="Mother">Mother</option>
+                <option value="Guardian">Guardian</option>
+              </select>
+            </div>
+
+            <div className="wizard-field">
+              <label>Student Ward (Roll No) <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <select
+                value={linkParentForm.studentRoll}
+                onChange={(e) => setLinkParentForm({ ...linkParentForm, studentRoll: e.target.value })}
+              >
+                {(data.students || []).map((s) => (
+                  <option key={s.roll} value={s.roll}>
+                    {s.roll} &mdash; {s.name} ({s.class})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="wizard-field">
+              <label>Contact Phone <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <input
+                type="text"
+                required
+                placeholder="+91 98456 12301"
+                value={linkParentForm.phone}
+                onChange={(e) => setLinkParentForm({ ...linkParentForm, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="wizard-field">
+              <label>Email Address <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+              <input
+                type="email"
+                required
+                placeholder="parent@ssvschool.com"
+                value={linkParentForm.email}
+                onChange={(e) => setLinkParentForm({ ...linkParentForm, email: e.target.value })}
+              />
+            </div>
+
+            <div className="wizard-field span-2">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label>Parent Portal Login Password <span className="req" style={{ color: '#ef4444' }}>*</span></label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLinkParentForm((prev) => ({ ...prev, password: 'Parent@' + Math.floor(1000 + Math.random() * 9000) }));
+                  }}
+                  style={{ background: 'none', border: 'none', color: '#0d9488', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                >
+                  Auto-Generate Strong Password
+                </button>
+              </div>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Parent@123"
+                value={linkParentForm.password || ''}
+                onChange={(e) => setLinkParentForm({ ...linkParentForm, password: e.target.value })}
+                style={{ fontFamily: 'monospace', fontWeight: 600 }}
+              />
+            </div>
+          </div>
+        </form>
+
+        {/* Sticky Pinned Footer - ALWAYS 100% VISIBLE */}
+        <div
+          style={{
+            flexShrink: 0,
+            background: '#f8fafc',
+            borderTop: '1px solid #e2e8f0',
+            padding: '14px 20px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '10px'
+          }}
+        >
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => setIsLinkParentOpen(false)}
+            style={{ padding: '8px 18px', fontWeight: 600 }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="linkParentFormSubmit"
+            className="btn btn-primary btn-sm"
+            style={{
+              padding: '9px 24px',
+              fontWeight: 800,
+              background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+              borderColor: '#0f766e',
+              color: '#ffffff',
+              boxShadow: '0 4px 12px rgba(13, 148, 136, 0.35)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            ✓ Link & Save Parent
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
   
   {isClassModalOpen && (
     <div className="modal-overlay" style={{ display: 'flex' }}>
@@ -6582,17 +8569,52 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
                   required
                 >
                   <option value="">-- Choose Assigned Class Teacher --</option>
-                  {(data.teachers || []).map((t) => (
-                    <option key={t.id} value={t.name}>
-                      {t.name} • {t.subject}
-                    </option>
-                  ))}
+                  {(data.teachers || []).map((t) => {
+                    const assignedCls = (data.classes || []).find((c) => c.teacher === t.name);
+                    const currentClsName = assignedCls ? assignedCls.name : (t.class || null);
+                    const isAssignedHere = editingClass && currentClsName === editingClass.name;
+                    const isAssignedElsewhere = currentClsName && (!editingClass || currentClsName !== editingClass.name);
+                    const statusTag = isAssignedHere
+                      ? ` [✓ Current In-charge]`
+                      : (isAssignedElsewhere ? ` [⚠️ Already Assigned to ${currentClsName}]` : ` [✓ Available / Unassigned]`);
+                    return (
+                      <option key={t.id} value={t.name}>
+                        {t.name} • {t.subject}{statusTag}
+                      </option>
+                    );
+                  })}
                   {(data.principals || []).map((p) => (
                     <option key={p.id} value={p.name}>
-                      {p.name} (Principal)
+                      {p.name} (Principal) [✓ Available]
                     </option>
                   ))}
                 </select>
+
+                {classForm.teacher && (() => {
+                  const assignedCls = (data.classes || []).find((c) => c.teacher === classForm.teacher);
+                  const tRecord = (data.teachers || []).find((t) => t.name === classForm.teacher);
+                  const currentClsName = assignedCls ? assignedCls.name : (tRecord?.class || null);
+                  const isAssignedElsewhere = currentClsName && (!editingClass || currentClsName !== editingClass.name);
+
+                  if (isAssignedElsewhere) {
+                    return (
+                      <div style={{ marginTop: '8px', padding: '10px 14px', borderRadius: '8px', background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                        <div>
+                          <strong>{classForm.teacher}</strong> is currently assigned as Class Teacher for <strong>{currentClsName}</strong>. Selecting them will re-assign their primary mentorship to <strong>{classForm.name || 'this class'}</strong>.
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ marginTop: '8px', padding: '10px 14px', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>✓</span>
+                      <div>
+                        <strong>{classForm.teacher}</strong> is available and not assigned to any other classroom.
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="wizard-field span-2">
@@ -6795,13 +8817,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
                 >
                   <option value="">-- Choose Assigned Teacher --</option>
                   {(data.teachers || []).map((t) => (
-                    <option key={t.id} value={t.name}>
+                    <option key={t.id || t.name} value={t.name}>
                       {t.name}
-                    </option>
-                  ))}
-                  {(data.principals || []).map((p) => (
-                    <option key={p.id} value={p.name}>
-                      {p.name}
                     </option>
                   ))}
                 </select>
@@ -7111,8 +9128,14 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  {selectedStaffSchedule && (() => {
  const staffName = selectedStaffSchedule;
  const staffObj = (data.teachers || []).find((t) => t.name === staffName) ||
- (data.principals || []).find((p) => p.name === staffName);
- const staffSlots = (data.classTimetables || []).filter((t) => t.teacherName === staffName);
+ (data.principals || []).find((p) => p.name === staffName) ||
+ (data.nonTeachingStaff || []).find((s) => s.name === staffName);
+ const staffSlots = (data.classTimetables || []).filter((t) => {
+   if (!t || !t.teacherName) return false;
+   const a = t.teacherName.toLowerCase().replace(/^(mrs\.|ms\.|mr\.|dr\.|prof\.)\s*/i, '').replace(/[^a-z0-9]/g, '').trim();
+   const b = staffName.toLowerCase().replace(/^(mrs\.|ms\.|mr\.|dr\.|prof\.)\s*/i, '').replace(/[^a-z0-9]/g, '').trim();
+   return a === b || a.includes(b) || b.includes(a);
+ });
  const assignedSubjects = (data.subjects || []).filter((s) => s.teacher === staffName);
 
  return (
@@ -7576,412 +9599,656 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  )}
 
  
- {activeReportViewer && (
- <div
- className="modal-backdrop"
- onClick={() => setActiveReportViewer(null)}
- style={{
- position: 'fixed',
- top: 0,
- left: 0,
- right: 0,
- bottom: 0,
- background: 'rgba(15, 23, 42, 0.75)',
- backdropFilter: 'blur(5px)',
- display: 'flex',
- alignItems: 'center',
- justifyContent: 'center',
- zIndex: 10000,
- padding: '20px'
- }}
- >
- <div
- className="modal-container"
- onClick={(e) => e.stopPropagation()}
- style={{
- maxWidth: '980px',
- width: '100%',
- maxHeight: '90vh',
- display: 'flex',
- flexDirection: 'column',
- borderRadius: '16px',
- background: '#ffffff',
- boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
- overflow: 'hidden'
- }}
- >
- 
- <div className="modal-header" style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
- <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
- <div style={{
- width: '46px',
- height: '46px',
- borderRadius: '12px',
- background: activeReportViewer.badgeBg || '#eff6ff',
- display: 'flex',
- alignItems: 'center',
- justifyContent: 'center',
- fontSize: '1.6rem'
- }}>
- {activeReportViewer.icon}
- </div>
- <div>
- <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
- <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a', fontWeight: 800 }}>
- {activeReportViewer.title}
- </h3>
- <span style={{
- fontSize: '0.72rem',
- fontWeight: 800,
- color: activeReportViewer.badgeColor,
- background: activeReportViewer.badgeBg,
- padding: '2px 8px',
- borderRadius: '12px',
- textTransform: 'uppercase'
- }}>
- {activeReportViewer.category}
- </span>
- </div>
- <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
- Sri Sankara Vidhyasala Girls High School &bull; Generated: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
- </p>
- </div>
- </div>
- <button className="modal-close" onClick={() => setActiveReportViewer(null)}>&times;</button>
- </div>
+ {activeReportViewer && (() => {
+    const studentsList = data.students || [];
+    const teachersList = data.teachers || [];
+    const classesList = data.classes || [];
+    const timetablesList = data.classTimetables || [];
+    const attendanceLogsList = data.attendanceLogs || [];
+    const servicesList = (data.services && data.services.length > 0) ? data.services : [
+      { id: 'SRV-01', name: 'Coding for Kids & Python', category: 'Technology', cost: '₹0 (Included)', visibleRoles: ['student', 'teacher'], description: 'Interactive Python coding and algorithmic problem solving.', status: 'Active' },
+      { id: 'SRV-02', name: 'Robotics & STEM Labs', category: 'STEM', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Hands-on electronic circuits, sensors, and robotics workshops.', status: 'Active' },
+      { id: 'SRV-03', name: 'Chess Grandmaster Academy', category: 'Mind Sports', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Tactical opening theory, endgames, and tournament preparation.', status: 'Active' },
+      { id: 'SRV-04', name: 'Athletics & Sports Conditioning', category: 'Athletics', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Track & field physical fitness and team sports coaching.', status: 'Active' },
+      { id: 'SRV-05', name: 'Fine Arts & Creative Design', category: 'Arts & Culture', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Watercolor painting, sketching, digital art, and clay pottery.', status: 'Active' },
+      { id: 'SRV-06', name: 'Vocal Music & Classical Arts', category: 'Arts & Culture', cost: '₹0 (Included)', visibleRoles: ['student'], description: 'Carnatic vocal exercises, rhythm training, and group choir.', status: 'Active' }
+    ];
 
- 
- <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
- 
- <div style={{
- background: '#f8fafc',
- border: '1px solid #e2e8f0',
- borderRadius: '12px',
- padding: '14px 18px',
- marginBottom: '18px',
- display: 'flex',
- justifyContent: 'space-between',
- alignItems: 'center',
- flexWrap: 'wrap',
- gap: '12px'
- }}>
- <div>
- <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>
- {activeReportViewer.metricLabel}
- </div>
- <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
- {activeReportViewer.metricValue}
- </div>
- <div style={{ fontSize: '0.78rem', color: '#475569' }}>
- {activeReportViewer.subMetric}
- </div>
- </div>
+    const todayStr = new Date().toISOString().split('T')[0];
 
- <div style={{ display: 'flex', gap: '8px' }}>
- <button
- type="button"
- className="btn btn-outline btn-sm"
- style={{ fontSize: '0.78rem', fontWeight: 700 }}
- onClick={() => window.print()}
- >
- Print Report
- </button>
- <button
- type="button"
- className="btn btn-primary btn-sm"
- style={{ fontSize: '0.78rem', fontWeight: 700 }}
- onClick={() => {
- let exportRows = [];
- if (activeReportViewer.type === 'students') {
- exportRows = (data.students || []).map(s => ({
- 'Roll No': s.roll,
- 'Student Name': s.name,
- 'Class': s.class,
- 'Attendance': s.attendance || '92%',
- 'Academic Standing': s.performance || 'Good',
- 'Status': 'Enrolled'
- }));
- } else if (activeReportViewer.type === 'marks') {
- (data.students || []).forEach(st => {
- const row = { 'Roll No': st.roll, 'Student Name': st.name, 'Class': st.class };
- (st.marks || []).forEach(m => {
- row[m.subject] = m.scored;
- });
- exportRows.push(row);
- });
- } else if (activeReportViewer.type === 'fees') {
- exportRows = feeRecords.map(f => ({
- 'Roll No': f.roll,
- 'Student Name': f.name,
- 'Class': f.class,
- 'Parent': f.parent,
- 'Phone': f.phone,
- 'Total Fee': f.totalFee,
- 'Paid Amount': f.paid,
- 'Due Amount': f.due,
- 'Status': f.status
- }));
- } else if (activeReportViewer.type === 'staff') {
- exportRows = (data.teachers || []).map(t => ({
- 'Teacher ID': t.id,
- 'Full Name': t.name,
- 'Subject Specialization': t.subject,
- 'Primary Section': t.class,
- 'Status': t.status || 'Active'
- }));
- } else {
- exportRows = [
- { 'Report Name': activeReportViewer.title, 'Category': activeReportViewer.category, 'Summary': activeReportViewer.metricValue, 'Scope': activeReportViewer.subMetric }
- ];
- }
+    // Filter Students
+    let filteredStudents = studentsList;
+    if (reportClassFilter !== 'All') {
+      filteredStudents = filteredStudents.filter(s => isClassMatch(s.class, reportClassFilter));
+    }
+    if (reportSearchQuery) {
+      const q = reportSearchQuery.toLowerCase();
+      filteredStudents = filteredStudents.filter(s =>
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.roll && s.roll.toLowerCase().includes(q)) ||
+        (s.class && s.class.toLowerCase().includes(q))
+      );
+    }
 
- const ws = XLSX.utils.json_to_sheet(exportRows);
- const wb = XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb, ws, activeReportViewer.category);
- XLSX.writeFile(wb, `${activeReportViewer.id}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    // Filter Fees
+    let filteredFees = feeRecords;
+    if (reportClassFilter !== 'All') {
+      filteredFees = filteredFees.filter(f => isClassMatch(f.class, reportClassFilter));
+    }
+    if (reportSearchQuery) {
+      const q = reportSearchQuery.toLowerCase();
+      filteredFees = filteredFees.filter(f =>
+        (f.name && f.name.toLowerCase().includes(q)) ||
+        (f.roll && f.roll.toLowerCase().includes(q)) ||
+        (f.parent && f.parent.toLowerCase().includes(q)) ||
+        (f.class && f.class.toLowerCase().includes(q))
+      );
+    }
 
- setFeedback({
- title: 'Audit Report Exported to Excel!',
- body: `Exported ${exportRows.length} audited rows from ${activeReportViewer.title}.`
- });
- }}
- >
- Download Excel Sheet
- </button>
- </div>
- </div>
+    // Filter Teachers
+    let filteredTeachers = teachersList;
+    if (reportSearchQuery) {
+      const q = reportSearchQuery.toLowerCase();
+      filteredTeachers = filteredTeachers.filter(t =>
+        (t.name && t.name.toLowerCase().includes(q)) ||
+        (t.subject && t.subject.toLowerCase().includes(q)) ||
+        (t.class && t.class.toLowerCase().includes(q))
+      );
+    }
 
- 
- <div className="table-responsive">
- {activeReportViewer.type === 'students' && (
- <table className="sa-schools-table">
- <thead>
- <tr>
- <th>Roll No</th>
- <th>Student Full Name</th>
- <th>Class Section</th>
- <th>Attendance</th>
- <th>Standing</th>
- <th>Admission Status</th>
- </tr>
- </thead>
- <tbody>
- {(data.students || []).map((s) => (
- <tr key={s.roll}>
- <td data-label="Roll No"><code>{s.roll}</code></td>
- <td data-label="Student Full Name"><strong>{s.name}</strong></td>
- <td data-label="Class Section"><span className="badge badge-info">{s.class}</span></td>
- <td data-label="Attendance"><strong style={{ color: '#059669' }}>{s.attendance || '92%'}</strong></td>
- <td data-label="Standing"><span className="badge badge-active">{s.performance || 'Good'}</span></td>
- <td data-label="Admission Status"><span className="badge badge-success">✓ Enrolled</span></td>
- </tr>
- ))}
- </tbody>
- </table>
- )}
+    // Filter Classes
+    let filteredClasses = classesList;
+    if (reportClassFilter !== 'All') {
+      filteredClasses = filteredClasses.filter(c => isClassMatch(c.name, reportClassFilter));
+    }
+    if (reportSearchQuery) {
+      const q = reportSearchQuery.toLowerCase();
+      filteredClasses = filteredClasses.filter(c =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.teacher && c.teacher.toLowerCase().includes(q))
+      );
+    }
 
- {activeReportViewer.type === 'marks' && (
- <table className="sa-schools-table">
- <thead>
- <tr>
- <th>Roll No</th>
- <th>Student Name</th>
- <th>Class</th>
- <th style={{ textAlign: 'center' }}>Maths</th>
- <th style={{ textAlign: 'center' }}>Physics</th>
- <th style={{ textAlign: 'center' }}>Chemistry</th>
- <th style={{ textAlign: 'center' }}>Tamil</th>
- <th style={{ textAlign: 'center' }}>English</th>
- <th style={{ textAlign: 'center' }}>Term Grade</th>
- </tr>
- </thead>
- <tbody>
- {(data.students || []).map((s) => {
- const marksMap = {};
- (s.marks || []).forEach(m => { marksMap[m.subject] = m.scored; });
- return (
- <tr key={s.roll}>
- <td data-label="Roll No"><code>{s.roll}</code></td>
- <td data-label="Student Name"><strong>{s.name}</strong></td>
- <td data-label="Class"><span className="badge badge-info">{s.class}</span></td>
- <td data-label="Maths" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['Mathematics'] ?? '85'}</td>
- <td data-label="Physics" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['Physics'] ?? '88'}</td>
- <td data-label="Chemistry" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['Chemistry'] ?? '80'}</td>
- <td data-label="Tamil" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['Tamil'] ?? '90'}</td>
- <td data-label="English" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['English'] ?? '84'}</td>
- <td data-label="Term Grade" style={{ textAlign: 'center' }}>
- <span className="badge badge-success" style={{ fontWeight: 800 }}>Grade A+</span>
- </td>
- </tr>
- );
- })}
- </tbody>
- </table>
- )}
+    // Filter Services
+    let filteredServices = servicesList;
+    if (reportSearchQuery) {
+      const q = reportSearchQuery.toLowerCase();
+      filteredServices = filteredServices.filter(s =>
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.category && s.category.toLowerCase().includes(q))
+      );
+    }
 
- {activeReportViewer.type === 'fees' && (
- <table className="sa-schools-table">
- <thead>
- <tr>
- <th>Roll No</th>
- <th>Student Name</th>
- <th>Class</th>
- <th>Parent Name</th>
- <th>Total Fee</th>
- <th>Paid</th>
- <th>Due Balance</th>
- <th>Audit Status</th>
- </tr>
- </thead>
- <tbody>
- {feeRecords.map((f) => (
- <tr key={f.id}>
- <td data-label="Roll No"><code>{f.roll}</code></td>
- <td data-label="Student Name"><strong>{f.name}</strong></td>
- <td data-label="Class"><span className="badge badge-info">{f.class}</span></td>
- <td data-label="Parent Name">{f.parent}</td>
- <td data-label="Total Fee"><strong>{f.totalFee}</strong></td>
- <td data-label="Paid" style={{ color: '#059669', fontWeight: 700 }}>{f.paid}</td>
- <td data-label="Due Balance" style={{ color: f.due !== '₹0' ? '#dc2626' : '#64748b', fontWeight: 800 }}>{f.due}</td>
- <td data-label="Audit Status">
- <span className={`badge ${f.status === 'PAID' ? 'badge-active' : f.status === 'PARTIAL' ? 'badge-warning' : 'badge-danger'}`}>
- {f.status}
- </span>
- </td>
- </tr>
- ))}
- </tbody>
- </table>
- )}
+    return (
+      <div
+        className="modal-backdrop"
+        onClick={() => setActiveReportViewer(null)}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100000,
+          padding: '20px'
+        }}
+      >
+        <div
+          className="modal-container"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            maxWidth: '1040px',
+            width: '100%',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: '16px',
+            background: '#ffffff',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Header */}
+          <div className="modal-header" style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div
+                style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '12px',
+                  background: activeReportViewer.badgeBg || '#eff6ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.6rem'
+                }}
+              >
+                📊
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a', fontWeight: 800 }}>
+                    {activeReportViewer.title}
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: activeReportViewer.badgeColor,
+                      background: activeReportViewer.badgeBg,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      textTransform: 'uppercase'
+                    }}
+                  >
+                    {activeReportViewer.category}
+                  </span>
+                </div>
+                <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                  Sri Sankara Vidhyasala Girls High School &bull; Live Audit Generated: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setActiveReportViewer(null)}
+              style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b', fontWeight: 700 }}
+            >
+              &times;
+            </button>
+          </div>
 
- {activeReportViewer.type === 'staff' && (
- <table className="sa-schools-table">
- <thead>
- <tr>
- <th>Faculty ID</th>
- <th>Teacher Name</th>
- <th>Curriculum Specialization</th>
- <th>Primary Section</th>
- <th>Weekly Periods Assigned</th>
- <th>Employment Status</th>
- </tr>
- </thead>
- <tbody>
- {(data.teachers || []).map((t) => (
- <tr key={t.id}>
- <td data-label="Faculty ID"><code>{t.id}</code></td>
- <td data-label="Teacher Name"><strong>{t.name}</strong></td>
- <td data-label="Specialization"><span className="badge badge-info">{t.subject}</span></td>
- <td data-label="Section"><strong>{t.class}</strong></td>
- <td data-label="Weekly Periods"><strong style={{ color: 'var(--color-primary)' }}>18 Periods / Wk</strong></td>
- <td data-label="Employment Status"><span className="badge badge-success">✓ Full-Time Faculty</span></td>
- </tr>
- ))}
- </tbody>
- </table>
- )}
+          {/* Modal Body */}
+          <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+            {/* Live KPI Card */}
+            <div
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '14px 18px',
+                marginBottom: '16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>
+                  {activeReportViewer.metricLabel}
+                </div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                  {activeReportViewer.metricValue}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#475569' }}>
+                  {activeReportViewer.subMetric}
+                </div>
+              </div>
 
- {activeReportViewer.type === 'attendance' && (
- <table className="sa-schools-table">
- <thead>
- <tr>
- <th>Class Section</th>
- <th>Enrolled Strength</th>
- <th>Average Attendance</th>
- <th>Monthly Working Days</th>
- <th>Total Attendance Logs</th>
- <th>Absentee Alerts Dispatched</th>
- </tr>
- </thead>
- <tbody>
- <tr>
- <td data-label="Class Section"><span className="badge badge-info">Grade 10-A</span></td>
- <td data-label="Strength">38 Students</td>
- <td data-label="Avg Attendance"><strong style={{ color: '#059669' }}>94.6%</strong></td>
- <td data-label="Working Days">22 Days</td>
- <td data-label="Total Logs">790 Logs</td>
- <td data-label="Alerts Dispatched">32 SMS Dispatched</td>
- </tr>
- <tr>
- <td data-label="Class Section"><span className="badge badge-info">Grade 10-B</span></td>
- <td data-label="Strength">36 Students</td>
- <td data-label="Avg Attendance"><strong style={{ color: '#059669' }}>95.2%</strong></td>
- <td data-label="Working Days">22 Days</td>
- <td data-label="Total Logs">754 Logs</td>
- <td data-label="Alerts Dispatched">28 SMS Dispatched</td>
- </tr>
- <tr>
- <td data-label="Class Section"><span className="badge badge-info">Grade 9-A</span></td>
- <td data-label="Strength">40 Students</td>
- <td data-label="Avg Attendance"><strong style={{ color: '#059669' }}>93.8%</strong></td>
- <td data-label="Working Days">22 Days</td>
- <td data-label="Total Logs">825 Logs</td>
- <td data-label="Alerts Dispatched">41 SMS Dispatched</td>
- </tr>
- </tbody>
- </table>
- )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  style={{ fontSize: '0.78rem', fontWeight: 700 }}
+                  onClick={() => window.print()}
+                >
+                  Print Report
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  style={{ fontSize: '0.78rem', fontWeight: 700 }}
+                  onClick={() => {
+                    let exportRows = [];
+                    if (activeReportViewer.type === 'students') {
+                      exportRows = filteredStudents.map(s => ({
+                        'Roll No': s.roll,
+                        'Student Name': s.name,
+                        'Class': s.class,
+                        'Attendance': s.attendance || '94%',
+                        'Academic Standing': s.performance || 'Good',
+                        'Status': 'Enrolled'
+                      }));
+                    } else if (activeReportViewer.type === 'marks') {
+                      filteredStudents.forEach(st => {
+                        const marksMap = {};
+                        (st.marks || []).forEach(m => { marksMap[m.subject] = m.scored; });
+                        const row = {
+                          'Roll No': st.roll,
+                          'Student Name': st.name,
+                          'Class': st.class,
+                          'Mathematics': marksMap['Mathematics'] ?? 'N/A',
+                          'Physics': marksMap['Physics'] ?? 'N/A',
+                          'Chemistry': marksMap['Chemistry'] ?? 'N/A',
+                          'Tamil': marksMap['Tamil'] ?? 'N/A',
+                          'English': marksMap['English'] ?? 'N/A'
+                        };
+                        exportRows.push(row);
+                      });
+                    } else if (activeReportViewer.type === 'fees') {
+                      exportRows = filteredFees.map(f => ({
+                        'Roll No': f.roll,
+                        'Student Name': f.name,
+                        'Class': f.class,
+                        'Parent': f.parent,
+                        'Phone': f.phone,
+                        'Total Fee': f.totalFee,
+                        'Paid Amount': f.paid,
+                        'Due Amount': f.due,
+                        'Status': f.status
+                      }));
+                    } else if (activeReportViewer.type === 'staff') {
+                      exportRows = filteredTeachers.map(t => {
+                        const periodCount = timetablesList.filter(tt => isStaffMatch(tt.teacherName, t.name)).length;
+                        return {
+                          'Teacher ID': t.id,
+                          'Full Name': t.name,
+                          'Subject Specialization': t.subject,
+                          'Primary Section': t.class || 'N/A',
+                          'Weekly Periods': periodCount > 0 ? `${periodCount} Periods` : 'Class Advisor',
+                          'Status': t.status || 'Active'
+                        };
+                      });
+                    } else if (activeReportViewer.type === 'attendance') {
+                      exportRows = filteredClasses.map(cls => {
+                        const classSt = studentsList.filter(s => isClassMatch(s.class, cls.name));
+                        let attSum = 0;
+                        classSt.forEach(s => {
+                          attSum += parseInt(String(s.attendance || '94').replace(/[^0-9]/g, ''), 10) || 94;
+                        });
+                        const avgAtt = classSt.length > 0 ? Math.round(attSum / classSt.length) : 95;
+                        const todayLog = attendanceLogsList.find(l => l.date === todayStr && isClassMatch(l.className, cls.name));
+                        return {
+                          'Class Section': cls.name,
+                          'Class Advisor': cls.teacher || 'Unassigned',
+                          'Enrolled Students': classSt.length,
+                          'Average Attendance': `${avgAtt}%`,
+                          'Today Call Status': todayLog ? 'Logged Today' : 'Pending Call'
+                        };
+                      });
+                    } else {
+                      exportRows = filteredServices.map(srv => ({
+                        'Program Name': srv.name,
+                        'Category': srv.category,
+                        'Cost / Fee': srv.cost || 'Free',
+                        'Description': srv.description,
+                        'Status': srv.status || 'Active'
+                      }));
+                    }
 
- {activeReportViewer.type === 'services' && (
- <table className="sa-schools-table">
- <thead>
- <tr>
- <th>Club / Activity Program</th>
- <th>Category</th>
- <th>Enrolled Students</th>
- <th>Instructor in Charge</th>
- <th>Weekly Schedule</th>
- <th>Program Status</th>
- </tr>
- </thead>
- <tbody>
- <tr>
- <td data-label="Program"><strong>Coding for Kids & Python</strong></td>
- <td data-label="Category"><span className="badge badge-info">Technology</span></td>
- <td data-label="Enrolled">42 Students</td>
- <td data-label="Instructor">Dr. Anandhi Rajan</td>
- <td data-label="Schedule">Mon & Wed (3:30 PM - 4:30 PM)</td>
- <td data-label="Status"><span className="badge badge-success">Active</span></td>
- </tr>
- <tr>
- <td data-label="Program"><strong>Chess Grandmaster Academy</strong></td>
- <td data-label="Category"><span className="badge badge-info">Mind Sports</span></td>
- <td data-label="Enrolled">28 Students</td>
- <td data-label="Instructor">Mr. K. Manickam</td>
- <td data-label="Schedule">Tue & Thu (3:30 PM - 4:30 PM)</td>
- <td data-label="Status"><span className="badge badge-success">Active</span></td>
- </tr>
- <tr>
- <td data-label="Program"><strong>Robotics & STEM Labs</strong></td>
- <td data-label="Category"><span className="badge badge-info">STEM</span></td>
- <td data-label="Enrolled">35 Students</td>
- <td data-label="Instructor">Mrs. Selvi Murugan</td>
- <td data-label="Schedule">Friday (2:45 PM - 4:15 PM)</td>
- <td data-label="Status"><span className="badge badge-success">Active</span></td>
- </tr>
- </tbody>
- </table>
- )}
- </div>
- </div>
+                    const ws = XLSX.utils.json_to_sheet(exportRows);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, activeReportViewer.category);
+                    XLSX.writeFile(wb, `${activeReportViewer.id}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
- 
- <div style={{ padding: '14px 24px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'flex-end' }}>
- <button
- type="button"
- className="btn btn-primary btn-sm"
- style={{ padding: '8px 24px' }}
- onClick={() => setActiveReportViewer(null)}
- >
- Close Audit Viewer 
- </button>
- </div>
- </div>
- </div>
- )}
+                    setFeedback({
+                      title: 'Audit Report Exported to Excel!',
+                      body: `Exported ${exportRows.length} audited records from ${activeReportViewer.title}.`
+                    });
+                  }}
+                >
+                  Download Excel
+                </button>
+              </div>
+            </div>
 
- 
- <InteractiveServicePlayerModal
+            {/* Real-Time Filter Toolbar */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px',
+                marginBottom: '16px',
+                background: '#ffffff',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: '1px solid #e2e8f0'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {(activeReportViewer.type === 'students' || activeReportViewer.type === 'marks' || activeReportViewer.type === 'fees' || activeReportViewer.type === 'attendance') && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Class Filter:</label>
+                    <select
+                      value={reportClassFilter}
+                      onChange={(e) => setReportClassFilter(e.target.value)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        background: '#f8fafc',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="All">All Classes ({classesList.length})</option>
+                      {classesList.map(c => (
+                        <option key={c.name} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input
+                    type="text"
+                    placeholder="Search report records..."
+                    value={reportSearchQuery}
+                    onChange={(e) => setReportSearchQuery(e.target.value)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.82rem',
+                      minWidth: '200px',
+                      outline: 'none'
+                    }}
+                  />
+                  {reportSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setReportSearchQuery('')}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '0.82rem', fontWeight: 700 }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+                Live Real-Time Record
+              </span>
+            </div>
+
+            {/* Table Content */}
+            <div className="table-responsive">
+              {activeReportViewer.type === 'students' && (
+                <table className="sa-schools-table">
+                  <thead>
+                    <tr>
+                      <th>Roll No</th>
+                      <th>Student Full Name</th>
+                      <th>Class Section</th>
+                      <th>Attendance</th>
+                      <th>Academic Standing</th>
+                      <th>Admission Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudents.length === 0 ? (
+                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>No students match the selected filter.</td></tr>
+                    ) : (
+                      filteredStudents.map((s) => (
+                        <tr key={s.roll}>
+                          <td data-label="Roll No"><code>{s.roll}</code></td>
+                          <td data-label="Student Full Name"><strong>{s.name}</strong></td>
+                          <td data-label="Class Section"><span className="badge badge-info">{s.class}</span></td>
+                          <td data-label="Attendance"><strong style={{ color: '#059669' }}>{s.attendance || '94%'}</strong></td>
+                          <td data-label="Standing"><span className="badge badge-active">{s.performance || 'Good'}</span></td>
+                          <td data-label="Admission Status"><span className="badge badge-success">✓ Enrolled</span></td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {activeReportViewer.type === 'marks' && (
+                <table className="sa-schools-table">
+                  <thead>
+                    <tr>
+                      <th>Roll No</th>
+                      <th>Student Name</th>
+                      <th>Class</th>
+                      <th style={{ textAlign: 'center' }}>Maths</th>
+                      <th style={{ textAlign: 'center' }}>Physics</th>
+                      <th style={{ textAlign: 'center' }}>Chemistry</th>
+                      <th style={{ textAlign: 'center' }}>Tamil</th>
+                      <th style={{ textAlign: 'center' }}>English</th>
+                      <th style={{ textAlign: 'center' }}>Term Average</th>
+                      <th style={{ textAlign: 'center' }}>Standing</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudents.length === 0 ? (
+                      <tr><td colSpan="10" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>No academic records match the selected filter.</td></tr>
+                    ) : (
+                      filteredStudents.map((s) => {
+                        const marksMap = {};
+                        (s.marks || []).forEach(m => { marksMap[m.subject] = m.scored; });
+                        const subs = ['Mathematics', 'Physics', 'Chemistry', 'Tamil', 'English'];
+                        let sum = 0;
+                        let count = 0;
+                        subs.forEach(sub => {
+                          if (typeof marksMap[sub] === 'number') {
+                            sum += marksMap[sub];
+                            count++;
+                          }
+                        });
+                        const avg = count > 0 ? Math.round(sum / count) : 84;
+                        const grade = avg >= 90 ? 'Grade A+' : avg >= 80 ? 'Grade A' : avg >= 70 ? 'Grade B' : avg >= 60 ? 'Grade C' : 'Grade D';
+                        const badgeColor = avg >= 75 ? 'badge-success' : avg >= 50 ? 'badge-primary' : 'badge-warning';
+
+                        return (
+                          <tr key={s.roll}>
+                            <td data-label="Roll No"><code>{s.roll}</code></td>
+                            <td data-label="Student Name"><strong>{s.name}</strong></td>
+                            <td data-label="Class"><span className="badge badge-info">{s.class}</span></td>
+                            <td data-label="Maths" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['Mathematics'] ?? '85'}</td>
+                            <td data-label="Physics" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['Physics'] ?? '88'}</td>
+                            <td data-label="Chemistry" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['Chemistry'] ?? '80'}</td>
+                            <td data-label="Tamil" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['Tamil'] ?? '90'}</td>
+                            <td data-label="English" style={{ textAlign: 'center', fontWeight: 700 }}>{marksMap['English'] ?? '84'}</td>
+                            <td data-label="Term Average" style={{ textAlign: 'center', fontWeight: 800, color: '#1e3a8a' }}>{avg}%</td>
+                            <td data-label="Standing" style={{ textAlign: 'center' }}>
+                              <span className={`badge ${badgeColor}`} style={{ fontWeight: 800 }}>{grade}</span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {activeReportViewer.type === 'fees' && (
+                <table className="sa-schools-table">
+                  <thead>
+                    <tr>
+                      <th>Roll No</th>
+                      <th>Student Name</th>
+                      <th>Class</th>
+                      <th>Parent Name</th>
+                      <th>Total Fee</th>
+                      <th>Paid</th>
+                      <th>Due Balance</th>
+                      <th>Audit Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredFees.length === 0 ? (
+                      <tr><td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>No fee records match the selected filter.</td></tr>
+                    ) : (
+                      filteredFees.map((f) => (
+                        <tr key={f.id || f.roll}>
+                          <td data-label="Roll No"><code>{f.roll}</code></td>
+                          <td data-label="Student Name"><strong>{f.name}</strong></td>
+                          <td data-label="Class"><span className="badge badge-info">{f.class}</span></td>
+                          <td data-label="Parent Name">{f.parent}</td>
+                          <td data-label="Total Fee"><strong>{f.totalFee}</strong></td>
+                          <td data-label="Paid" style={{ color: '#059669', fontWeight: 700 }}>{f.paid}</td>
+                          <td data-label="Due Balance" style={{ color: f.due !== '₹0' ? '#dc2626' : '#64748b', fontWeight: 800 }}>{f.due}</td>
+                          <td data-label="Audit Status">
+                            <span className={`badge ${f.status === 'PAID' ? 'badge-active' : f.status === 'PARTIAL' ? 'badge-warning' : 'badge-danger'}`}>
+                              {f.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {activeReportViewer.type === 'staff' && (
+                <table className="sa-schools-table">
+                  <thead>
+                    <tr>
+                      <th>Faculty ID</th>
+                      <th>Teacher Name</th>
+                      <th>Curriculum Specialization</th>
+                      <th>Primary Section</th>
+                      <th>Weekly Assigned Periods</th>
+                      <th>Faculty Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTeachers.length === 0 ? (
+                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>No faculty records match the selected search.</td></tr>
+                    ) : (
+                      filteredTeachers.map((t) => {
+                        const periodCount = timetablesList.filter(tt => isStaffMatch(tt.teacherName, t.name)).length;
+                        return (
+                          <tr key={t.id}>
+                            <td data-label="Faculty ID"><code>{t.id}</code></td>
+                            <td data-label="Teacher Name"><strong>{t.name}</strong></td>
+                            <td data-label="Specialization"><span className="badge badge-info">{t.subject}</span></td>
+                            <td data-label="Section"><strong>{t.class || 'All Grades'}</strong></td>
+                            <td data-label="Weekly Periods">
+                              <strong style={{ color: 'var(--color-primary)' }}>
+                                {periodCount > 0 ? `${periodCount} Periods / Wk` : (t.class ? 'Class Advisor (18 / Wk)' : '16 Periods / Wk')}
+                              </strong>
+                            </td>
+                            <td data-label="Faculty Status"><span className="badge badge-success">✓ Full-Time Faculty</span></td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {activeReportViewer.type === 'attendance' && (
+                <table className="sa-schools-table">
+                  <thead>
+                    <tr>
+                      <th>Class Section</th>
+                      <th>Advisor Teacher</th>
+                      <th>Enrolled Strength</th>
+                      <th>Class Average</th>
+                      <th>Today Roll Call</th>
+                      <th>Total Logged Days</th>
+                      <th>Audit Standing</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredClasses.length === 0 ? (
+                      <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>No classroom sections match the filter.</td></tr>
+                    ) : (
+                      filteredClasses.map((cls) => {
+                        const classStudents = studentsList.filter(s => isClassMatch(s.class, cls.name));
+                        const str = classStudents.length;
+                        let attSum = 0;
+                        classStudents.forEach(s => {
+                          attSum += parseInt(String(s.attendance || '94').replace(/[^0-9]/g, ''), 10) || 94;
+                        });
+                        const avgAtt = str > 0 ? Math.round(attSum / str) : 95;
+                        const todayLog = attendanceLogsList.find(l => l.date === todayStr && isClassMatch(l.className, cls.name));
+                        const totalLogsCount = attendanceLogsList.filter(l => isClassMatch(l.className, cls.name)).length;
+                        return (
+                          <tr key={cls.name}>
+                            <td data-label="Class Section"><span className="badge badge-info">{cls.name}</span></td>
+                            <td data-label="Advisor Teacher"><strong>{cls.teacher || 'Class Teacher'}</strong></td>
+                            <td data-label="Enrolled Strength"><strong>{str} Students</strong></td>
+                            <td data-label="Class Average">
+                              <strong style={{ color: avgAtt >= 95 ? '#059669' : avgAtt >= 90 ? '#2563eb' : '#dc2626' }}>{avgAtt}%</strong>
+                            </td>
+                            <td data-label="Today Roll Call">
+                              <span className={`badge ${todayLog ? 'badge-success' : 'badge-warning'}`}>
+                                {todayLog ? '✓ Logged Today' : '⏳ Pending Call'}
+                              </span>
+                            </td>
+                            <td data-label="Total Logged Days"><strong>{totalLogsCount > 0 ? `${totalLogsCount} Days` : '18 Days (Term)'}</strong></td>
+                            <td data-label="Audit Standing">
+                              <span className={`badge ${avgAtt >= 95 ? 'badge-active' : avgAtt >= 90 ? 'badge-primary' : 'badge-danger'}`}>
+                                {avgAtt >= 95 ? 'Optimal 95%+' : avgAtt >= 90 ? 'Normal' : 'Requires Follow-up'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {activeReportViewer.type === 'services' && (
+                <table className="sa-schools-table">
+                  <thead>
+                    <tr>
+                      <th>Program Name</th>
+                      <th>Category</th>
+                      <th>Cost / Fee</th>
+                      <th>Eligible Audience</th>
+                      <th>Curriculum Description</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredServices.length === 0 ? (
+                      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>No enrichment services match your search.</td></tr>
+                    ) : (
+                      filteredServices.map((srv) => (
+                        <tr key={srv.id || srv.name}>
+                          <td data-label="Program Name"><strong>{srv.name}</strong></td>
+                          <td data-label="Category"><span className="badge badge-info">{srv.category}</span></td>
+                          <td data-label="Cost / Fee"><strong style={{ color: '#059669' }}>{srv.cost || 'Free / Included'}</strong></td>
+                          <td data-label="Eligible Audience">{srv.visibleRoles ? srv.visibleRoles.join(', ') : 'All Students'}</td>
+                          <td data-label="Description" style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '320px' }}>{srv.description}</td>
+                          <td data-label="Status">
+                            <span className={`badge ${srv.status === 'Active' ? 'badge-success' : 'badge-secondary'}`}>
+                              {srv.status || 'Active'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div style={{ padding: '14px 24px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              style={{ padding: '8px 24px' }}
+              onClick={() => setActiveReportViewer(null)}
+            >
+              Close Audit Viewer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  })()}
+
+  <InteractiveServicePlayerModal
  isOpen={!!activePlayService}
  service={activePlayService}
  onClose={() => setActivePlayService(null)}
@@ -8004,23 +10271,20 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  const staff = selectedStaffHistory;
  const curDateObj = new Date(staff.baseDate || staffAttendanceDate);
  const curDayName = curDateObj.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+ const allLeaves = (data.staffLeaves && data.staffLeaves.length > 0) ? data.staffLeaves : (getPortalData()?.staffLeaves || []);
 
  const past7Days = Array.from({ length: 7 }).map((_, i) => {
  const d = new Date(curDateObj);
  d.setDate(d.getDate() - i);
- const isSun = d.getDay() === 0;
- const dayName = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
  const dateStr = d.toISOString().split('T')[0];
- const hash = (staff.name.charCodeAt(0) + d.getDate() * 3 + d.getMonth() * 5) % 9;
- const isLeave = !isSun && (hash === 2);
- const status = isSun ? 'Holiday (Sun)' : isLeave ? 'On Leave (Casual)' : 'Present on Duty';
- const inTime = isSun ? '—' : isLeave ? '—' : '08:' + (10 + (hash * 2)).toString().padStart(2, '0') + ' AM';
- const outTime = isSun ? '—' : isLeave ? '—' : '04:30 PM';
- return { dateStr, dayName, status, inTime, outTime, isLeave, isSun };
+ return getStaffDailyAttendance(staff.name, dateStr, allLeaves, staff.currentStatus || staff.status);
  });
 
- const totalPresent7 = past7Days.filter(d => !d.isSun && !d.isLeave).length;
- const totalLeave7 = past7Days.filter(d => d.isLeave).length;
+ const totalPresent7 = past7Days.filter((d) => !d.isSun && !d.isLeave).length;
+ const totalLeave7 = past7Days.filter((d) => d.isLeave).length;
+
+ const targetDateStr = staff.baseDate || staffAttendanceDate;
+ const targetLog = getStaffDailyAttendance(staff.name, targetDateStr, allLeaves, staff.currentStatus || staff.status);
 
  return (
  <div
@@ -8161,18 +10425,49 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{curDayName}</strong>
  <div style={{ marginTop: '4px' }}>
  {(() => {
- const targetLog = past7Days.find(d => d.dateStr === (staff.baseDate || staffAttendanceDate)) || past7Days[0];
  const isPresentDuty = targetLog && targetLog.status.includes('Present');
  const isHoliday = targetLog && targetLog.status.includes('Holiday');
  const displayStatus = targetLog ? targetLog.status : (staff.currentStatus || 'Present on Duty');
  const displayPunch = targetLog ? targetLog.inTime : (staff.currentPunch || '08:15 AM');
  return (
+ <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
  <span
  className={`badge ${isPresentDuty ? 'badge-success' : isHoliday ? 'badge-info' : 'badge-danger'}`}
  style={{ fontSize: '0.86rem', padding: '5px 12px', fontWeight: 700 }}
  >
  ● {displayStatus} {displayPunch && displayPunch !== '—' ? `(Punch: ${displayPunch})` : ''}
  </span>
+ {!isHoliday && (
+ <button
+ type="button"
+ className="btn btn-outline btn-sm"
+ style={{
+ fontSize: '0.74rem',
+ padding: '3px 10px',
+ fontWeight: 700,
+ borderColor: targetLog.isLeave ? '#86efac' : '#fca5a5',
+ color: targetLog.isLeave ? '#16a34a' : '#dc2626',
+ background: targetLog.isLeave ? '#f0fdf4' : '#fef2f2',
+ cursor: 'pointer'
+ }}
+ onClick={() => {
+ const updatedLeaves = toggleStaffLeaveOnDate(staff.name, targetDateStr, !targetLog.isLeave);
+ if (updatedLeaves) {
+ const p = getPortalData() || {};
+ p.staffLeaves = updatedLeaves;
+ savePortalData(p);
+ setData({ ...p });
+ setFeedback({
+ title: targetLog.isLeave ? 'Leave Revoked / Marked Present' : 'Leave Logged & Counted',
+ body: `${staff.name} is now marked ${targetLog.isLeave ? 'Present on Duty' : 'On Leave'} for ${targetDateStr}. Attendance & Duty Log has been updated live.`
+ });
+ }
+ }}
+ >
+ {targetLog.isLeave ? '✓ Revoke Leave & Mark Present' : '📅 Log Leave for this Date'}
+ </button>
+ )}
+ </div>
  );
  })()}
  </div>
@@ -8394,6 +10689,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  day: 'numeric',
  });
 
+ const allLeaves = (data.staffLeaves && data.staffLeaves.length > 0) ? data.staffLeaves : (getPortalData()?.staffLeaves || []);
  const facultyPool = [
  { name: 'Mrs. Priya Krishnan', dept: 'Mathematics', cls: 'Grade 10-A', punch: '08:15 AM', periods: '5 Periods', phone: '+91 98401 23451' },
  { name: 'Dr. Anandhi Rajan', dept: 'Physics', cls: 'Grade 11-A', punch: '08:20 AM', periods: '4 Periods + Lab', phone: '+91 98401 23452' },
@@ -8405,17 +10701,27 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  { name: 'Mr. V. Balaji', dept: 'Biology', cls: 'Grade 9-B', punch: '—', periods: 'Substituted by Ms. Meena', phone: '+91 98401 23460' },
  ];
 
- const dateSeed = (sDate.getDate() * 7 + sDate.getMonth() * 11) % 8;
- const computedFaculty = facultyPool.map((f, idx) => {
+ const baseList = (data.teachers && data.teachers.length > 0) ? data.teachers.map((t) => ({
+ name: t.name,
+ dept: t.subject || t.onboardSubject || 'General',
+ cls: t.class || 'Grade 10-A',
+ punch: '08:15 AM',
+ periods: '5 Periods',
+ phone: t.phone || '+91 98401 23450',
+ status: t.status
+ })) : facultyPool;
+
+ const computedFaculty = baseList.map((f) => {
  if (isSunday) {
  return { ...f, status: 'Holiday (Sunday)', punch: '—', isPresent: false };
  }
- const isLeave = (idx === (dateSeed % facultyPool.length)) || (idx === ((dateSeed + 3) % facultyPool.length));
- const isPresent = !isLeave;
+ const leaveRec = getStaffLeaveOnDate(f.name, staffAttendanceDate, allLeaves);
+ const isPresent = !leaveRec && f.status !== 'On Leave';
  return {
  ...f,
- status: isPresent ? 'On Duty' : 'On Approved Leave',
+ status: isPresent ? 'On Duty' : (leaveRec ? (leaveRec.status === 'Approved' ? `On Approved Leave (${leaveRec.type || 'Casual'})` : `On Leave (${leaveRec.type || 'Applied'})`) : 'On Leave'),
  punch: isPresent ? f.punch : '—',
+ periods: leaveRec && leaveRec.substituteTeacher ? `Substituted by ${leaveRec.substituteTeacher}` : f.periods,
  isPresent
  };
  });
@@ -8591,17 +10897,18 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  });
 
  const rawList = data.nonTeachingStaff || [];
- const dateSeed = rawList.length ? (sDate.getDate() * 5 + sDate.getMonth() * 7) % rawList.length : 0;
+ const allLeaves = (data.staffLeaves && data.staffLeaves.length > 0) ? data.staffLeaves : (getPortalData()?.staffLeaves || []);
 
- const computedNonTeaching = rawList.map((st, idx) => {
+ const computedNonTeaching = rawList.map((st) => {
  if (isSunday) {
  return { ...st, status: 'Holiday (Sunday)', isPresent: false };
  }
- const isLeave = (idx === dateSeed);
+ const leaveRec = getStaffLeaveOnDate(st.name, staffAttendanceDate, allLeaves);
+ const isPresent = !leaveRec && st.status !== 'On Leave';
  return {
  ...st,
- status: isLeave ? 'On Approved Leave' : 'On Duty',
- isPresent: !isLeave
+ status: isPresent ? 'On Duty' : (leaveRec ? (leaveRec.status === 'Approved' ? `On Approved Leave (${leaveRec.type || 'Casual'})` : `On Leave (${leaveRec.type || 'Applied'})`) : 'On Leave'),
+ isPresent
  };
  });
 

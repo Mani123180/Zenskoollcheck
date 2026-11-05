@@ -73,16 +73,61 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const store = getPortalData() || {};
-      const allUsers = [...(defaultPortalUsers || []), ...(store.users || [])];
-      const allSchools = [...(defaultPortalSchools || []), ...(store.schools || [])];
+      const allUsers = [...(store.users || []), ...(defaultPortalUsers || [])];
+      const allSchools = [...(store.schools || []), ...(defaultPortalSchools || [])];
 
       let matchedUser = allUsers.find((u) => {
         const uUname = (u.username || '').toLowerCase();
         const uEmail = (u.email || '').toLowerCase();
+        const uName = (u.name || '').toLowerCase();
         const uId = (u.id || u.userId || '').toLowerCase();
         const hasAlias = Array.isArray(u.aliases) && u.aliases.some((a) => a.toLowerCase() === cleanQuery);
-        return uUname === cleanQuery || uEmail === cleanQuery || uId === cleanQuery || hasAlias;
+        return uUname === cleanQuery || uEmail === cleanQuery || uId === cleanQuery || uName === cleanQuery || hasAlias;
       });
+
+      if (!matchedUser && store.teachers) {
+        const tMatch = store.teachers.find((t) => {
+          const tName = (t.name || '').toLowerCase();
+          const tEmail = (t.email || '').toLowerCase();
+          const tId = (t.id || '').toLowerCase();
+          return tName === cleanQuery || tName.includes(cleanQuery) || tEmail === cleanQuery || tId === cleanQuery;
+        });
+        if (tMatch) {
+          matchedUser = {
+            id: tMatch.id || 'USR_TCH',
+            userId: tMatch.id || 'USR_TCH',
+            teacherId: tMatch.id,
+            name: tMatch.name,
+            email: tMatch.email || `${cleanQuery}@ssvschool.com`,
+            username: tMatch.email ? tMatch.email.split('@')[0] : cleanQuery,
+            role: 'teacher',
+            class: tMatch.class,
+            subject: tMatch.subject || tMatch.onboardSubject || 'General',
+            schoolId: tMatch.schoolId || 'SCHOOL002',
+            password: tMatch.password || 'teacher123',
+            status: tMatch.status || 'Active'
+          };
+        }
+      }
+
+      if (!matchedUser && store.classes) {
+        const clsMatch = store.classes.find((c) => c.teacher && c.teacher.toLowerCase().includes(cleanQuery));
+        if (clsMatch) {
+          matchedUser = {
+            id: 'USR_DAVID',
+            userId: 'USR_DAVID',
+            name: clsMatch.teacher,
+            email: `${cleanQuery}@ssvschool.com`,
+            username: cleanQuery,
+            role: 'teacher',
+            class: clsMatch.name,
+            subject: 'General',
+            schoolId: 'SCHOOL002',
+            password: 'teacher123',
+            status: 'Active'
+          };
+        }
+      }
 
       if (!matchedUser) {
         const school = allSchools.find((s) => {
@@ -122,7 +167,7 @@ export const AuthProvider = ({ children }) => {
             schoolName: 'Zenith Central Trust',
             password: 'SuperAdmin@123',
             status: 'Active',
-            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+            avatar: '',
           };
         } else if (cleanQuery === 'admin@ssvschool.com' || cleanQuery === 'admin_ssv') {
           matchedUser = {
@@ -135,7 +180,7 @@ export const AuthProvider = ({ children }) => {
             schoolName: 'Sri Sankara Vidhyasala Girls High School',
             password: 'Admin@12345',
             status: 'Active',
-            avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+            avatar: '',
           };
         } else if (cleanQuery === 'finance@ssvschool.com' || cleanQuery === 'finance_ssv') {
           matchedUser = {
@@ -148,7 +193,7 @@ export const AuthProvider = ({ children }) => {
             schoolName: 'Sri Sankara Vidhyasala Girls High School',
             password: 'Finance@12345',
             status: 'Active',
-            avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=150&q=80',
+            avatar: '',
           };
         } else if (cleanQuery === 'principal@ssvschool.com' || cleanQuery === 'principal') {
           matchedUser = {
@@ -161,7 +206,7 @@ export const AuthProvider = ({ children }) => {
             schoolName: 'Sri Sankara Vidhyasala Girls High School',
             password: 'principal123',
             status: 'Active',
-            avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80',
+            avatar: '',
           };
         } else if (cleanQuery === 'teacher@ssvschool.com' || cleanQuery === 'teacher') {
           matchedUser = {
@@ -174,7 +219,7 @@ export const AuthProvider = ({ children }) => {
             schoolName: 'Sri Sankara Vidhyasala Girls High School',
             password: 'teacher123',
             status: 'Active',
-            avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
+            avatar: '',
           };
         } else if (cleanQuery === 'student@ssvschool.com' || cleanQuery === 'student') {
           matchedUser = {
@@ -187,7 +232,7 @@ export const AuthProvider = ({ children }) => {
             schoolName: 'Sri Sankara Vidhyasala Girls High School',
             password: 'student123',
             status: 'Active',
-            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+            avatar: '',
           };
         } else if (cleanQuery === 'parent@ssvschool.com' || cleanQuery === 'parent') {
           matchedUser = {
@@ -200,7 +245,7 @@ export const AuthProvider = ({ children }) => {
             schoolName: 'Sri Sankara Vidhyasala Girls High School',
             password: 'parent123',
             status: 'Active',
-            avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
+            avatar: '',
           };
         }
       }
@@ -216,7 +261,7 @@ export const AuthProvider = ({ children }) => {
           else if ((role === 'schooladmin' || role === 'school_admin') && (cleanPass === 'Admin@12345' || lowerPass === 'admin123' || lowerPass === 'admin@12345' || lowerPass === 'admin')) passMatches = true;
           else if (role === 'finance' && (cleanPass === 'Finance@12345' || lowerPass === 'finance123' || lowerPass === 'finance@12345' || lowerPass === 'finance')) passMatches = true;
           else if (role === 'principal' && (lowerPass === 'principal123' || cleanPass === 'Principal@123')) passMatches = true;
-          else if (role === 'teacher' && (lowerPass === 'teacher123' || cleanPass === 'Teacher@123')) passMatches = true;
+          else if (role === 'teacher' && (lowerPass === 'teacher123' || cleanPass === 'Teacher@123' || lowerPass === 'david123' || lowerPass === 'david')) passMatches = true;
           else if (role === 'student' && (lowerPass === 'student123' || cleanPass === 'Student@123')) passMatches = true;
           else if (role === 'parent' && (lowerPass === 'parent123' || cleanPass === 'Parent@123')) passMatches = true;
         }
@@ -246,17 +291,83 @@ export const AuthProvider = ({ children }) => {
             }
           }
 
+          const uRole = (role || matchedUser.role || 'schooladmin').toLowerCase();
+          let extraProps = {};
+          if (uRole === 'student') {
+            const stList = store.students || [];
+            const stMatch = stList.find((s) =>
+              (matchedUser.roll && s.roll === matchedUser.roll) ||
+              (matchedUser.email && (s.studentEmail === matchedUser.email || s.email === matchedUser.email)) ||
+              (matchedUser.name && s.name && s.name.toLowerCase() === matchedUser.name.toLowerCase()) ||
+              (s.roll && cleanQuery && s.roll.toLowerCase() === cleanQuery)
+            );
+            if (stMatch) {
+              extraProps = {
+                roll: stMatch.roll,
+                studentRoll: stMatch.roll,
+                class: stMatch.class,
+                parentName: stMatch.parentName,
+                parentPhone: stMatch.parentPhone,
+                emergencyContact: stMatch.emergencyContact
+              };
+            }
+          } else if (uRole === 'teacher') {
+            const tList = store.teachers || [];
+            const tMatch = tList.find((t) =>
+              (matchedUser.id && t.id === matchedUser.id) ||
+              (matchedUser.email && t.email && t.email.toLowerCase() === matchedUser.email.toLowerCase()) ||
+              (matchedUser.name && t.name && t.name.toLowerCase() === matchedUser.name.toLowerCase())
+            );
+            if (tMatch) {
+              extraProps = {
+                class: tMatch.class,
+                subject: tMatch.subject,
+                teacherId: tMatch.id
+              };
+            }
+          } else if (uRole === 'parent') {
+            const parList = store.parents || [];
+            const parMatch = parList.find((p) =>
+              (matchedUser.id && p.id === matchedUser.id) ||
+              (matchedUser.email && p.email && p.email.toLowerCase() === matchedUser.email.toLowerCase()) ||
+              (matchedUser.name && p.name && p.name.toLowerCase() === matchedUser.name.toLowerCase()) ||
+              (matchedUser.phone && p.phone === matchedUser.phone)
+            );
+            if (parMatch) {
+              extraProps = {
+                studentRoll: parMatch.studentRoll,
+                studentName: parMatch.studentName,
+                relationship: parMatch.relationship
+              };
+            }
+          } else if (uRole === 'principal') {
+            const prList = store.principals || [];
+            const prMatch = prList.find((pr) =>
+              (matchedUser.id && pr.id === matchedUser.id) ||
+              (matchedUser.email && pr.email && pr.email.toLowerCase() === matchedUser.email.toLowerCase()) ||
+              (matchedUser.name && pr.name && pr.name.toLowerCase() === matchedUser.name.toLowerCase())
+            );
+            if (prMatch) {
+              extraProps = {
+                qualification: prMatch.qualification,
+                experience: prMatch.experience
+              };
+            }
+          }
+
           const safeUser = {
+            ...matchedUser,
+            ...extraProps,
             userId: matchedUser.userId || matchedUser.id || 'USR_' + Date.now(),
             username: matchedUser.username || cleanQuery,
             name: matchedUser.name || 'User',
             email: matchedUser.email || cleanQuery,
             phone: matchedUser.phone || '',
-            role: role || 'schooladmin',
+            role: uRole,
             schoolId: targetSchoolId,
             schoolName: matchedUser.schoolName || 'Sri Sankara Vidhyasala Girls High School',
             status: matchedUser.status || 'Active',
-            avatar: matchedUser.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+            avatar: matchedUser.avatar || '',
           };
           const localToken = 'jwt_zen_' + btoa(unescape(encodeURIComponent(JSON.stringify(safeUser))));
           setUser(safeUser);
@@ -279,6 +390,16 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     try {
       api.sendOffline();
+      if (user) {
+        const rawId = user.userId || user.id || (user.name ? `USR_${user.name.replace(/\s+/g, '')}` : '');
+        const uname = (user.username || '').toLowerCase();
+        const name = (user.name || '').trim().toLowerCase();
+        const store = JSON.parse(localStorage.getItem('ssv_presence_map') || '{}');
+        if (rawId) delete store[rawId];
+        if (uname) delete store[uname];
+        if (name) delete store[name];
+        localStorage.setItem('ssv_presence_map', JSON.stringify(store));
+      }
     } catch (e) {}
     setUser(null);
     setToken('');

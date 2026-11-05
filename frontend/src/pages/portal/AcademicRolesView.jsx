@@ -3,7 +3,10 @@ import * as XLSX from 'xlsx';
 import {
   getPortalData,
   savePortalData,
-  syncBillToPortalFeeRecords
+  syncBillToPortalFeeRecords,
+  getStaffDailyAttendance,
+  getStaffLeaveOnDate,
+  toggleStaffLeaveOnDate
 } from '../../services/portalData';
 import { api } from '../../services/api';
 import ChatBox from './ChatBox';
@@ -15,22 +18,25 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
   const [activePlayService, setActivePlayService] = useState(null);
   const [filterCategory, setFilterCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [teacherSelectedClass, setTeacherSelectedClass] = useState('Grade 10-A');
+  const [teacherSelectedClass, setTeacherSelectedClass] = useState(user?.class || 'Grade 10-A');
 
   
   const [feeClassFilter, setFeeClassFilter] = useState('All');
   const [feeSearch, setFeeSearch] = useState('');
   const [feeReminderModal, setFeeReminderModal] = useState(null);
-  const [feeRecords, setFeeRecords] = useState([
-    { id: 'FEE-101', roll: 'S101', name: 'Aishwarya Kumar', class: 'Grade 10-A', parent: 'Ramesh Kumar', phone: '+91 98456 12301', totalFee: '₹28,000', paid: '₹28,000', due: '₹0', status: 'PAID' },
-    { id: 'FEE-102', roll: 'S102', name: 'Kavitha Selvam', class: 'Grade 10-A', parent: 'Selvam Murugan', phone: '+91 98456 12302', totalFee: '₹28,000', paid: '₹18,000', due: '₹10,000', status: 'PARTIAL' },
-    { id: 'FEE-103', roll: 'S103', name: 'Sandhya Ramesh', class: 'Grade 10-A', parent: 'Ramesh Krishnan', phone: '+91 98456 12303', totalFee: '₹28,000', paid: '₹0', due: '₹28,000', status: 'OVERDUE' },
-    { id: 'FEE-104', roll: 'S104', name: 'Deepa Venkatesh', class: 'Grade 10-A', parent: 'Venkatesh S.', phone: '+91 98456 12304', totalFee: '₹28,000', paid: '₹28,000', due: '₹0', status: 'PAID' },
-    { id: 'FEE-105', roll: 'S105', name: 'Meena Natarajan', class: 'Grade 10-A', parent: 'Natarajan M.', phone: '+91 98456 12305', totalFee: '₹28,000', paid: '₹14,000', due: '₹14,000', status: 'PARTIAL' },
-    { id: 'FEE-106', roll: 'S106', name: 'Pooja Sundaram', class: 'Grade 10-B', parent: 'Sundaram P.', phone: '+91 98456 12306', totalFee: '₹28,000', paid: '₹28,000', due: '₹0', status: 'PAID' },
-    { id: 'FEE-107', roll: 'S107', name: 'Swathi Rajesh', class: 'Grade 10-B', parent: 'Rajesh K.', phone: '+91 98456 12307', totalFee: '₹28,000', paid: '₹20,000', due: '₹8,000', status: 'PARTIAL' },
-    { id: 'FEE-108', roll: 'S108', name: 'Bhavani Chandran', class: 'Grade 9-A', parent: 'Chandran M.', phone: '+91 98456 12308', totalFee: '₹26,000', paid: '₹26,000', due: '₹0', status: 'PAID' },
-  ]);
+  const [feeRecords, setFeeRecords] = useState(() => {
+    const cur = getPortalData() || {};
+    return (cur.feeRecords && cur.feeRecords.length > 0) ? cur.feeRecords : [
+      { id: 'FEE-101', roll: 'S101', name: 'Aishwarya Kumar', class: 'Grade 10-A', parent: 'Ramesh Kumar', phone: '+91 98456 12301', totalFee: '₹28,000', paid: '₹28,000', due: '₹0', status: 'PAID' },
+      { id: 'FEE-102', roll: 'S102', name: 'Kavitha Selvam', class: 'Grade 10-A', parent: 'Selvam Murugan', phone: '+91 98456 12302', totalFee: '₹28,000', paid: '₹18,000', due: '₹10,000', status: 'PARTIAL' },
+      { id: 'FEE-103', roll: 'S103', name: 'Sandhya Ramesh', class: 'Grade 10-A', parent: 'Ramesh Krishnan', phone: '+91 98456 12303', totalFee: '₹28,000', paid: '₹0', due: '₹28,000', status: 'OVERDUE' },
+      { id: 'FEE-104', roll: 'S104', name: 'Deepa Venkatesh', class: 'Grade 10-A', parent: 'Venkatesh S.', phone: '+91 98456 12304', totalFee: '₹28,000', paid: '₹28,000', due: '₹0', status: 'PAID' },
+      { id: 'FEE-105', roll: 'S105', name: 'Meena Natarajan', class: 'Grade 10-A', parent: 'Natarajan M.', phone: '+91 98456 12305', totalFee: '₹28,000', paid: '₹14,000', due: '₹14,000', status: 'PARTIAL' },
+      { id: 'FEE-106', roll: 'S106', name: 'Pooja Sundaram', class: 'Grade 10-B', parent: 'Sundaram P.', phone: '+91 98456 12306', totalFee: '₹28,000', paid: '₹28,000', due: '₹0', status: 'PAID' },
+      { id: 'FEE-107', roll: 'S107', name: 'Swathi Rajesh', class: 'Grade 10-B', parent: 'Rajesh K.', phone: '+91 98456 12307', totalFee: '₹28,000', paid: '₹20,000', due: '₹8,000', status: 'PARTIAL' },
+      { id: 'FEE-108', roll: 'S108', name: 'Bhavani Chandran', class: 'Grade 9-A', parent: 'Chandran M.', phone: '+91 98456 12308', totalFee: '₹26,000', paid: '₹26,000', due: '₹0', status: 'PAID' },
+    ];
+  });
 
   
   const [marksStudent, setMarksStudent] = useState(null);
@@ -181,11 +187,20 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
   };
 
   const getActiveStudentRecord = () => {
-    const students = (data && data.students) || [];
+    const portal = getPortalData() || {};
+    const students = (data && data.students && data.students.length > 0) ? data.students : (portal.students || []);
     if (role === 'student') {
       const byRoll = user?.studentRoll || user?.roll || user?.rollNo;
       if (byRoll) {
-        const found = students.find(s => s.roll === byRoll);
+        const found = students.find(s => s.roll === byRoll || (s.roll && s.roll.toLowerCase() === String(byRoll).toLowerCase()));
+        if (found) return found;
+      }
+      if (user?.email) {
+        const found = students.find(s => (s.studentEmail && s.studentEmail.toLowerCase() === user.email.toLowerCase()) || (s.email && s.email.toLowerCase() === user.email.toLowerCase()));
+        if (found) return found;
+      }
+      if (user?.username) {
+        const found = students.find(s => s.roll && s.roll.toLowerCase() === user.username.toLowerCase());
         if (found) return found;
       }
       if (user?.name) {
@@ -195,29 +210,191 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
       return students[0] || null;
     }
     if (role === 'parent') {
-      const parents = (data && data.parents) || [];
+      const parents = (data && data.parents && data.parents.length > 0) ? data.parents : (portal.parents || []);
       const parentMatch = parents.find(p =>
         (user?.id && p.id === user.id) ||
-        (user?.name && p.name && p.name.toLowerCase().includes(user.name.toLowerCase())) ||
         (user?.email && p.email && p.email.toLowerCase() === user.email.toLowerCase()) ||
-        (user?.phone && p.phone && p.phone === user.phone)
+        (user?.name && p.name && p.name.toLowerCase().includes(user.name.toLowerCase())) ||
+        (user?.phone && p.phone && p.phone === user.phone) ||
+        (user?.username && p.email && p.email.split('@')[0].toLowerCase() === user.username.toLowerCase())
       );
       if (parentMatch && parentMatch.studentRoll) {
-        const found = students.find(s => s.roll === parentMatch.studentRoll);
+        const found = students.find(s => s.roll === parentMatch.studentRoll || (s.roll && s.roll.toLowerCase() === parentMatch.studentRoll.toLowerCase()));
         if (found) return found;
       }
       const byStudentRoll = user?.studentRoll;
       if (byStudentRoll) {
-        const found = students.find(s => s.roll === byStudentRoll);
+        const found = students.find(s => s.roll === byStudentRoll || (s.roll && s.roll.toLowerCase() === String(byStudentRoll).toLowerCase()));
         if (found) return found;
       }
+      const byParentField = students.find(s =>
+        (user?.name && s.parentName && s.parentName.toLowerCase().includes(user.name.toLowerCase())) ||
+        (user?.email && s.parentEmail && s.parentEmail.toLowerCase() === user.email.toLowerCase()) ||
+        (user?.phone && s.parentPhone && s.parentPhone === user.phone)
+      );
+      if (byParentField) return byParentField;
+
       return students[0] || null;
     }
     return students[0] || null;
   };
 
+  const normalizeStaffName = (name) => {
+    if (!name) return '';
+    return name
+      .toLowerCase()
+      .replace(/^(mrs\.|ms\.|mr\.|dr\.|prof\.)\s*/i, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+  };
+
+  const isClassMatch = (clsNameA, clsNameB) => {
+    if (!clsNameA || !clsNameB) return false;
+    const a = clsNameA.toString().toLowerCase().replace(/^grade\s*/i, '').replace(/[^a-z0-9]/g, '');
+    const b = clsNameB.toString().toLowerCase().replace(/^grade\s*/i, '').replace(/[^a-z0-9]/g, '');
+    return a === b;
+  };
+
+  const isStaffMatch = (nameA, nameB) => {
+    if (!nameA || !nameB) return false;
+    const a = normalizeStaffName(nameA);
+    const b = normalizeStaffName(nameB);
+    if (!a || !b) return false;
+    return a === b || a.includes(b) || b.includes(a);
+  };
+
+  const getActiveTeacherRecord = () => {
+    const portal = getPortalData() || {};
+    const allStaff = [
+      ...((data && data.teachers) || portal.teachers || []),
+      ...((data && data.principals) || portal.principals || []),
+      ...((data && data.nonTeachingStaff) || portal.nonTeachingStaff || [])
+    ];
+    let tMatch = allStaff.find(t =>
+      (user?.id && t.id === user.id) ||
+      (user?.email && t.email && t.email.toLowerCase() === user.email.toLowerCase()) ||
+      (user?.name && t.name && isStaffMatch(t.name, user.name)) ||
+      (user?.username && t.email && t.email.split('@')[0].toLowerCase() === user.username.toLowerCase()) ||
+      (user?.username && t.name && isStaffMatch(t.name, user.username))
+    );
+    if (!tMatch && portal.users) {
+      tMatch = portal.users.find(u =>
+        (user?.id && u.id === user.id) ||
+        (user?.email && u.email && u.email.toLowerCase() === user.email.toLowerCase()) ||
+        (user?.name && u.name && isStaffMatch(u.name, user.name)) ||
+        (user?.username && u.username && u.username.toLowerCase() === user.username.toLowerCase())
+      );
+    }
+    return tMatch || null;
+  };
+
   const activeStudentRecord = getActiveStudentRecord();
-  const currentStudentRoll = activeStudentRecord?.roll || user?.studentRoll || 'S101';
+  const currentStudentRoll = activeStudentRecord?.roll || user?.studentRoll || user?.roll || 'S101';
+  const activeTeacherRecord = getActiveTeacherRecord();
+  
+  const resolveCurrentTeacherName = () => {
+    if (user?.name && !['teacher', 'faculty teacher', 'faculty', 'user'].includes(user.name.trim().toLowerCase())) {
+      return user.name;
+    }
+    if (user?.username && !['teacher', 'teacher_ssv'].includes(user.username.trim().toLowerCase())) {
+      return user.username.charAt(0).toUpperCase() + user.username.slice(1);
+    }
+    if (activeTeacherRecord?.name && !['teacher', 'faculty teacher'].includes(activeTeacherRecord.name.trim().toLowerCase())) {
+      return activeTeacherRecord.name;
+    }
+    const myClasses = data.classes || [];
+    const cls10E = myClasses.find((c) => isClassMatch(c.name, '10-E') || isClassMatch(c.name, '10E') || isClassMatch(c.name, teacherSelectedClass));
+    if (cls10E && cls10E.teacher && !['mrs. priya krishnan', 'teacher'].includes(cls10E.teacher.trim().toLowerCase())) {
+      return cls10E.teacher;
+    }
+    const portal = getPortalData() || {};
+    const allStaff = [...(data?.teachers || []), ...(portal.teachers || [])];
+    const david = allStaff.find((t) => t.name && t.name.toLowerCase().includes('david'));
+    if (david) {
+      return david.name;
+    }
+    return user?.name || activeTeacherRecord?.name || (role === 'principal' ? 'Principal' : 'Mrs. Priya Krishnan');
+  };
+
+  const currentTeacherName = resolveCurrentTeacherName();
+  const currentTeacherSubject = activeTeacherRecord?.subject || user?.subject || (role === 'principal' ? 'Academic Administration' : 'Mathematics');
+
+  const getTeacherClasses = () => {
+    const allCls = data.classes || [];
+
+    // 1. Classes where this teacher is explicitly assigned as Class Teacher / Advisor
+    const assigned = allCls.filter((c) => {
+      if (!c) return false;
+      if (c.teacher && isStaffMatch(c.teacher, currentTeacherName)) return true;
+      if (c.teacher && user?.name && isStaffMatch(c.teacher, user.name)) return true;
+      if (activeTeacherRecord?.class && isClassMatch(c.name, activeTeacherRecord.class)) return true;
+      if (user?.class && isClassMatch(c.name, user.class)) return true;
+      return false;
+    });
+
+    // 2. Also check if teacher takes any period in classTimetables
+    const timetableClassNames = new Set(
+      (data.classTimetables || [])
+        .filter((t) => t && (isStaffMatch(t.teacherName, currentTeacherName) || (user?.name && isStaffMatch(t.teacherName, user.name))))
+        .map((t) => t.className)
+        .filter(Boolean)
+    );
+
+    timetableClassNames.forEach((tClsName) => {
+      if (!assigned.some((c) => isClassMatch(c.name, tClsName))) {
+        const existing = allCls.find((c) => isClassMatch(c.name, tClsName));
+        if (existing) {
+          assigned.push(existing);
+        } else {
+          assigned.push({
+            name: tClsName,
+            teacher: currentTeacherName,
+            room: 'Academic Wing',
+            strength: (data.students || []).filter((s) => isClassMatch(s.class, tClsName)).length || 35
+          });
+        }
+      }
+    });
+
+    // 3. If teacher has a designated class in their teacher profile that isn't in data.classes yet:
+    const primaryCls = activeTeacherRecord?.class || user?.class;
+    if (primaryCls && !assigned.some((c) => isClassMatch(c.name, primaryCls))) {
+      assigned.unshift({
+        name: primaryCls,
+        teacher: currentTeacherName,
+        room: 'Room ' + primaryCls.replace(/[^a-zA-Z0-9]/g, ''),
+        strength: (data.students || []).filter((s) => isClassMatch(s.class, primaryCls)).length || 38
+      });
+    }
+
+    // 4. Fallback ONLY for default demo teacher (Mrs. Priya Krishnan)
+    if (assigned.length === 0) {
+      const isDemo = (!user?.name || user?.name === 'Mrs. Priya Krishnan' || user?.email === 'teacher@school.com') && role === 'teacher';
+      if (isDemo) {
+        return allCls.length > 0 ? allCls.slice(0, 2) : [
+          { name: 'Grade 10-A', teacher: 'Mrs. Priya Krishnan', room: 'A-102', strength: 38 },
+          { name: 'Grade 11-B', teacher: 'Dr. Anandhi Rajan', room: 'B-204', strength: 40 }
+        ];
+      }
+    }
+
+    return assigned;
+  };
+
+  const teacherClasses = getTeacherClasses();
+  const currentTeacherClass = (teacherClasses.find((c) => isClassMatch(c.name, teacherSelectedClass)) || teacherClasses[0] || {}).name || activeTeacherRecord?.class || user?.class || teacherSelectedClass || 'Grade 10-A';
+
+  useEffect(() => {
+    if (role === 'teacher') {
+      const myClasses = getTeacherClasses();
+      if (myClasses.length > 0) {
+        const hasCurrent = myClasses.some((c) => isClassMatch(c.name, teacherSelectedClass));
+        if (!hasCurrent) {
+          setTeacherSelectedClass(myClasses[0].name);
+        }
+      }
+    }
+  }, [role, user?.name, user?.class, activeTeacherRecord?.name, activeTeacherRecord?.class, data.classes]);
 
 
   
@@ -345,8 +522,8 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
       due: homeworkForm.due,
       instructions: homeworkForm.instructions,
       attachmentName: homeworkForm.attachmentName || null,
-      subject: 'Mathematics',
-      assignedBy: user?.name || 'Mrs. Priya Krishnan',
+      subject: homeworkForm.subject || currentTeacherSubject || 'General',
+      assignedBy: user?.name || currentTeacherName || 'Faculty Member',
       schoolId: 'SCHOOL002',
       assignedDate: homeworkForm.givenDate || new Date().toISOString().split('T')[0]
     };
@@ -356,11 +533,12 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
     setIsHomeworkOpen(false);
     setHomeworkForm({
       title: '',
-      grade: 'Grade 10-A',
+      grade: currentTeacherClass || 'Grade 10-A',
       givenDate: new Date().toISOString().split('T')[0],
       due: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
       instructions: '',
-      attachmentName: ''
+      attachmentName: '',
+      subject: currentTeacherSubject || 'General'
     });
     setFeedback({
       title: 'Homework Assigned',
@@ -377,12 +555,12 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
     const newMaterial = {
       id: `MAT-${Date.now().toString().slice(-4)}`,
       title: materialForm.title,
-      grade: materialForm.grade || 'Grade 10-A',
-      subject: materialForm.subject || 'Mathematics',
+      grade: materialForm.grade || currentTeacherClass || 'Grade 10-A',
+      subject: materialForm.subject || currentTeacherSubject || 'General',
       fileName: materialForm.fileName || `${materialForm.title.replace(/\s+/g, '_')}.pdf`,
       fileSize: materialForm.fileSize || '2.5 MB',
       fileType: materialForm.fileType || 'PDF',
-      uploadedBy: user?.name || (role === 'teacher' ? 'Mrs. Priya Krishnan' : 'Faculty Member'),
+      uploadedBy: user?.name || currentTeacherName || (role === 'teacher' ? 'Faculty Member' : 'Campus Admin'),
       date: new Date().toISOString().split('T')[0],
       description: materialForm.description || 'Reference notes, problem sheets, and study materials.'
     };
@@ -393,8 +571,8 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
     setIsMaterialModalOpen(false);
     setMaterialForm({
       title: '',
-      grade: 'Grade 10-A',
-      subject: 'Mathematics',
+      grade: currentTeacherClass || 'Grade 10-A',
+      subject: currentTeacherSubject || 'General',
       description: '',
       fileName: '',
       fileSize: '2.5 MB',
@@ -684,28 +862,49 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
   
   const handleSaveAnnouncement = (e) => {
     e.preventDefault();
-    const current = getPortalData();
+    const current = getPortalData() || {};
+    if (!current.announcements) current.announcements = [];
+
+    const categoryFallbacks = {
+      Sports: 'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?auto=format&fit=crop&w=1200&q=80',
+      Academic: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
+      General: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=1200&q=80',
+      Holidays: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=1200&q=80',
+    };
+
+    const finalImage = announcementForm.image || categoryFallbacks[announcementForm.category] || categoryFallbacks.General;
+    const authorName = currentTeacherName || user?.name || (role === 'principal' ? 'Principal Office' : 'School Administration');
+
     const newAnn = {
+      id: `ANN-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
       title: announcementForm.title,
-      target: announcementForm.target,
-      category: announcementForm.category,
+      target: announcementForm.target || 'All',
+      category: announcementForm.category || 'General',
       content: announcementForm.content,
-      schoolId: 'SCHOOL002'
+      image: finalImage,
+      author: authorName,
+      priority: announcementForm.priority || 'Normal',
+      schoolId: user?.schoolId || currentSchoolId || 'SCHOOL002'
     };
+
     current.announcements.unshift(newAnn);
     savePortalData(current);
+    setData({ ...current });
     refreshData();
     setIsAnnouncementOpen(false);
     setAnnouncementForm({
       title: '',
       target: 'All',
       category: 'General',
+      image: '',
+      author: authorName,
+      priority: 'Normal',
       content: ''
     });
     setFeedback({
-      title: 'Notice Published',
-      body: `"${newAnn.title}" circular has been broadcast to ${newAnn.target}.`
+      title: 'Official Notice Broadcasted! ✓',
+      body: `"${newAnn.title}" circular has been broadcast to ${newAnn.target}. It is now visible across Student, Parent, and Faculty portals.`
     });
   };
 
@@ -719,15 +918,51 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
     { period: 5, time: '02:45 - 03:45' }
   ];
 
-  const teacherSlots = (data.classTimetables || []).filter(
-    (t) => t.teacherName === 'Mrs. Priya Krishnan' || t.className === 'Grade 10-A'
-  );
+  const rawTeacherSlots = (data.classTimetables || []).filter((t) => {
+    if (!t || !t.teacherName) return false;
+    if (user?.name && isStaffMatch(t.teacherName, user.name)) return true;
+    if (currentTeacherName && isStaffMatch(t.teacherName, currentTeacherName)) return true;
+    if (activeTeacherRecord?.name && isStaffMatch(t.teacherName, activeTeacherRecord.name)) return true;
+    if (user?.email && t.teacherEmail && t.teacherEmail.toLowerCase() === user.email.toLowerCase()) return true;
+    return false;
+  });
+
+  const isDemoTeacher = (!user?.name || user?.name === 'Mrs. Priya Krishnan' || user?.email === 'teacher@school.com') && role === 'teacher';
+  const teacherSlots = rawTeacherSlots.length > 0
+    ? rawTeacherSlots
+    : (isDemoTeacher
+        ? [
+            { day: 'Monday', period: 1, className: currentTeacherClass, subject: currentTeacherSubject },
+            { day: 'Monday', period: 3, className: currentTeacherClass, subject: currentTeacherSubject },
+            { day: 'Tuesday', period: 2, className: currentTeacherClass, subject: currentTeacherSubject },
+            { day: 'Tuesday', period: 4, className: currentTeacherClass, subject: currentTeacherSubject },
+            { day: 'Wednesday', period: 1, className: currentTeacherClass, subject: currentTeacherSubject },
+            { day: 'Thursday', period: 2, className: currentTeacherClass, subject: currentTeacherSubject },
+            { day: 'Thursday', period: 5, className: currentTeacherClass, subject: currentTeacherSubject },
+            { day: 'Friday', period: 3, className: currentTeacherClass, subject: currentTeacherSubject }
+          ]
+        : []
+      );
 
   return (
     <div>
       
-      <div className="content-header">
-        <h2 id="section-title">{getTabTitle()}</h2>
+      <div className="content-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '18px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <h2 id="section-title" style={{ margin: 0 }}>{getTabTitle()}</h2>
+            {role === 'teacher' && (
+              <span className="badge badge-primary" style={{ fontSize: '0.85rem', padding: '5px 12px', background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', color: '#ffffff', fontWeight: 800, borderRadius: '6px', boxShadow: '0 2px 6px rgba(37,99,235,0.25)' }}>
+                👨‍🏫 Teacher: {currentTeacherName}
+              </span>
+            )}
+          </div>
+          {role === 'teacher' && (
+            <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748b' }}>
+              Logged in as <strong>{currentTeacherName}</strong> &bull; Assigned Class: <strong>{currentTeacherClass}</strong> &bull; Subject: <strong>{currentTeacherSubject}</strong>
+            </p>
+          )}
+        </div>
         <div id="section-actions">
           {activeTab === 'attendance-management' && (
             <button
@@ -742,7 +977,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               Submit Attendance
             </button>
           )}
-          {(activeTab === 'school-announcements' || activeTab === 'announcements') && (
+          {(activeTab === 'school-announcements' || activeTab === 'announcements' || activeTab === 'receive-announcements') && (role === 'principal' || role === 'teacher' || role === 'schooladmin') && (
             <button className="btn btn-primary btn-sm" onClick={() => setIsAnnouncementOpen(true)}>
               + Post Announcement
             </button>
@@ -1198,12 +1433,28 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     </span>
                     <span style={{ fontSize: '1.25rem' }}></span>
                   </div>
-                  <div style={{ fontSize: '2rem', fontWeight: 800, color: '#b45309', margin: '8px 0 4px 0', lineHeight: 1.1 }}>
-                    {(data.teachers?.length || 32) + 2}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>
-                    {data.teachers?.length || 32} On Duty &bull; 2 On Leave
-                  </div>
+                  {(() => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const allLeaves = (staffLeaves && staffLeaves.length > 0) ? staffLeaves : (getPortalData()?.staffLeaves || []);
+                    const totalT = (data.teachers && data.teachers.length > 0) ? data.teachers.length : 8;
+                    const teachersList = (data.teachers && data.teachers.length > 0) ? data.teachers : [
+                      { name: 'Mrs. Priya Krishnan' }, { name: 'Dr. Anandhi Rajan' }, { name: 'Mr. Anand Narayanan' }, { name: 'Mrs. Selvi Murugan' },
+                      { name: 'Mr. Ramanathan K.' }, { name: 'Mrs. Jayanthi S.' }, { name: 'Ms. K. Suganthi' }, { name: 'Mr. V. Balaji' }
+                    ];
+                    const onLeaveToday = teachersList.filter((t) => getStaffLeaveOnDate(t.name, todayStr, allLeaves) || t.status === 'On Leave').length;
+                    const onDutyToday = Math.max(0, totalT - onLeaveToday);
+
+                    return (
+                      <>
+                        <div style={{ fontSize: '2rem', fontWeight: 800, color: '#b45309', margin: '8px 0 4px 0', lineHeight: 1.1 }}>
+                          {totalT}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>
+                          {onDutyToday} On Duty &bull; {onLeaveToday} On Leave
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 <div
@@ -1569,7 +1820,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
             {(() => {
               
               const recordsForRole = role === 'teacher'
-                ? feeRecords.filter((r) => r.class === (teacherSelectedClass || 'Grade 10-A') && r.status !== 'PAID')
+                ? feeRecords.filter((r) => (isClassMatch(r.class, currentTeacherClass) || isClassMatch(r.class, teacherSelectedClass)) && r.status !== 'PAID')
                 : feeRecords;
 
               const totalPending = recordsForRole.reduce((acc, r) => {
@@ -1650,7 +1901,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     </div>
                     <div>
                       <div style={{ fontSize: '0.82rem', opacity: 0.9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                        {role === 'teacher' ? `${teacherSelectedClass || 'Grade 10-A'} - Pending Fees` : 'Pending Fees'}
+                        {role === 'teacher' ? `${currentTeacherClass} - Pending Fees` : 'Pending Fees'}
                       </div>
                       <div style={{ fontSize: '2rem', fontWeight: 900, margin: '2px 0 4px', letterSpacing: '-0.5px' }}>
                         ₹{totalPending.toLocaleString('en-IN')}
@@ -1720,13 +1971,15 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>My Class:</span>
                     <select
                       className="sa-filter-select"
-                      value={teacherSelectedClass || 'Grade 10-A'}
+                      value={teacherSelectedClass || (teacherClasses[0]?.name) || currentTeacherClass}
                       onChange={(e) => setTeacherSelectedClass(e.target.value)}
                       style={{ minWidth: '150px' }}
                     >
-                      <option value="Grade 10-A">Grade 10-A (Class Teacher)</option>
-                      <option value="Grade 10-B">Grade 10-B</option>
-                      <option value="Grade 9-A">Grade 9-A</option>
+                      {teacherClasses.map((c) => (
+                        <option key={c.name} value={c.name}>
+                          {c.name} (Class In-Charge)
+                        </option>
+                      ))}
                     </select>
                   </div>
                 ) : (
@@ -1757,7 +2010,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       const listToExport = feeRecords
                         .filter((r) => {
                           if (role === 'teacher') {
-                            return r.class === (teacherSelectedClass || 'Grade 10-A') && r.status !== 'PAID';
+                            return (isClassMatch(r.class, currentTeacherClass) || isClassMatch(r.class, teacherSelectedClass)) && r.status !== 'PAID';
                           }
                           return feeClassFilter === 'All' || r.class === feeClassFilter;
                         });
@@ -1792,7 +2045,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   onClick={() => {
                     const listToRemind = feeRecords.filter((r) => {
                       if (role === 'teacher') {
-                        return r.class === (teacherSelectedClass || 'Grade 10-A') && r.status !== 'PAID';
+                        return (isClassMatch(r.class, currentTeacherClass) || isClassMatch(r.class, teacherSelectedClass)) && r.status !== 'PAID';
                       }
                       return r.status !== 'PAID';
                     });
@@ -1822,8 +2075,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   {feeRecords
                     .filter((r) => {
                       if (role === 'teacher') {
-                        
-                        return r.class === (teacherSelectedClass || 'Grade 10-A') && r.status !== 'PAID';
+                        return (isClassMatch(r.class, currentTeacherClass) || isClassMatch(r.class, teacherSelectedClass)) && r.status !== 'PAID';
                       }
                       return feeClassFilter === 'All' || r.class === feeClassFilter;
                     })
@@ -2074,41 +2326,44 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
         
         
         {role === 'teacher' && activeTab === 'my-classes' && (() => {
-          const teacherClasses = data.classes || [
-            { name: 'Grade 10-A', teacher: 'Mrs. Priya Krishnan', room: 'A-102', strength: 38 },
-            { name: 'Grade 11-B', teacher: 'Dr. Anandhi Rajan', room: 'B-204', strength: 40 }
-          ];
+          const myClasses = getTeacherClasses();
 
           const currentClassInfo = {
-            id: teacherSelectedClass || 'Grade 10-A',
-            name: (teacherClasses.find((c) => c.name === teacherSelectedClass) || teacherClasses[0] || {}).name || 'Grade 10-A',
-            subject: 'Mathematics',
-            room: (teacherClasses.find((c) => c.name === teacherSelectedClass) || teacherClasses[0] || {}).room || 'A-102'
+            id: teacherSelectedClass || (myClasses[0] ? myClasses[0].name : 'Grade 10-A'),
+            name: (myClasses.find((c) => isClassMatch(c.name, teacherSelectedClass)) || myClasses[0] || {}).name || teacherSelectedClass || 'Grade 10-A',
+            subject: currentTeacherSubject || activeTeacherRecord?.subject || 'General Academic',
+            room: (myClasses.find((c) => isClassMatch(c.name, teacherSelectedClass)) || myClasses[0] || {}).room || 'Classroom Wing'
           };
 
-          const classStudents = data.students.filter((s) => s.class === currentClassInfo.id);
+          const classStudents = (data.students || []).filter((s) =>
+            isClassMatch(s.class, currentClassInfo.name) || isClassMatch(s.class, currentClassInfo.id)
+          );
           const totalCount = classStudents.length;
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
               
-              {teacherClasses.length > 0 && (
+              {myClasses.length > 0 ? (
                 <div className="sa-filter-segment" style={{ overflowX: 'auto', maxWidth: '100%', flexWrap: 'wrap', gap: '8px' }}>
-                  {teacherClasses.map((cls) => {
-                    const isSel = (teacherSelectedClass || 'Grade 10-A') === cls.name;
+                  {myClasses.map((cls) => {
+                    const isSel = isClassMatch(teacherSelectedClass, cls.name) || (myClasses.length === 1);
                     return (
                       <button
                         key={cls.name}
                         type="button"
                         className={`sa-filter-tab ${isSel ? 'active' : ''}`}
                         onClick={() => setTeacherSelectedClass(cls.name)}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: 'pointer', fontWeight: 700 }}
                       >
-                         {cls.name} (Room {cls.room})
+                         {cls.name} {cls.room ? `(Room ${cls.room})` : ''}
                       </button>
                     );
                   })}
+                </div>
+              ) : (
+                <div style={{ padding: '16px 20px', background: '#f8fafc', borderRadius: '10px', border: '1.5px dashed #cbd5e1', color: '#64748b' }}>
+                  No classroom advisor sections currently assigned to <strong>{currentTeacherName}</strong>. Classroom sections configured in School Admin will appear here.
                 </div>
               )}
 
@@ -2130,11 +2385,21 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 }}
               >
                 <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                    <span className="badge badge-primary" style={{ fontSize: '0.82rem', padding: '4px 10px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 700 }}>
+                      👨‍🏫 Class Teacher / Advisor: {currentTeacherName}
+                    </span>
+                    {activeTeacherRecord?.id && (
+                      <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                        Staff ID: <code>{activeTeacherRecord.id}</code>
+                      </span>
+                    )}
+                  </div>
                   <h2 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--color-primary)', fontWeight: 800 }}>
-                    {currentClassInfo.name}
+                    {currentClassInfo.name} &mdash; {currentTeacherName}
                   </h2>
                   <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '0.9rem' }}>
-                    Subject: <strong>{currentClassInfo.subject}</strong> &bull; Room: <strong>{currentClassInfo.room}</strong> &bull; Click any student to view Result, Exam Marks, Parent Name & Phone Number.
+                    Teacher In-Charge: <strong>{currentTeacherName}</strong> &bull; Subject: <strong>{currentClassInfo.subject}</strong> &bull; Room: <strong>{currentClassInfo.room}</strong> &bull; Click any student to view Result, Exam Marks, Parent Name & Phone Number.
                   </p>
                 </div>
 
@@ -2274,8 +2539,8 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
             <div className="sa-schools-header-bar" style={{ marginBottom: '16px' }}>
               <div className="sa-filter-segment">
                 <button className="sa-filter-tab active">
-                  Assigned: Grade 10-A
-                  <span className="sa-filter-count">{data.students.filter((s) => s.class === 'Grade 10-A').length}</span>
+                  {currentTeacherName} &bull; Assigned: {currentTeacherClass}
+                  <span className="sa-filter-count">{(data.students || []).filter((s) => isClassMatch(s.class, currentTeacherClass)).length}</span>
                 </button>
               </div>
               <div className="sa-toolbar-right" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2335,14 +2600,24 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   </tr>
                 </thead>
                 <tbody>
-                  {data.students
-                    .filter(
+                  {(() => {
+                    const filtered = (data.students || []).filter(
                       (s) =>
-                        s.class === 'Grade 10-A' &&
+                        (isClassMatch(s.class, currentTeacherClass) || (!currentTeacherClass && isClassMatch(s.class, 'Grade 10-A'))) &&
                         (s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           s.roll.toLowerCase().includes(searchQuery.toLowerCase()))
-                    )
-                    .map((s) => (
+                    );
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', padding: '32px 20px', color: '#64748b' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '4px' }}>No students enrolled in {currentTeacherClass || 'this class'} yet.</div>
+                            <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Upload students via Excel (.xlsx) above or add them from School Admin portal.</div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return filtered.map((s) => (
                       <tr key={s.roll}>
                         <td data-label="Roll No"><strong>{s.roll}</strong></td>
                         <td data-label="Student Name">{s.name}</td>
@@ -2366,7 +2641,8 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -2378,7 +2654,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
             <div className="sa-schools-header-bar" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div className="sa-filter-segment">
                 <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.92rem', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  Roll Call & Attendance Logging — Grade 10-A
+                  Roll Call & Attendance Logging — {currentTeacherClass} ({currentTeacherName})
                 </span>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -2387,7 +2663,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   className="btn btn-outline btn-sm"
                   onClick={() => {
                     const allP = {};
-                    data.students.filter((s) => s.class === 'Grade 10-A').forEach((s) => {
+                    (data.students || []).filter((s) => isClassMatch(s.class, currentTeacherClass)).forEach((s) => {
                       allP[s.roll] = 'present';
                     });
                     setRollCall(allP);
@@ -2400,7 +2676,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   className="btn btn-outline btn-sm"
                   onClick={() => {
                     const allA = {};
-                    data.students.filter((s) => s.class === 'Grade 10-A').forEach((s) => {
+                    (data.students || []).filter((s) => isClassMatch(s.class, currentTeacherClass)).forEach((s) => {
                       allA[s.roll] = 'absent';
                     });
                     setRollCall(allA);
@@ -2420,14 +2696,14 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
 
                     
                     const updatedLogs = current.attendanceLogs.filter(
-                      (l) => !(l.date === todayStr && l.className === 'Grade 10-A')
+                      (l) => !(l.date === todayStr && isClassMatch(l.className, currentTeacherClass))
                     );
 
                     
                     const newLog = {
                       date: todayStr,
-                      className: 'Grade 10-A',
-                      markedBy: user?.name || 'Mrs. Priya Krishnan',
+                      className: currentTeacherClass,
+                      markedBy: currentTeacherName,
                       timestamp: new Date().toISOString(),
                       records: { ...rollCall }
                     };
@@ -2435,11 +2711,11 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     current.attendanceLogs = updatedLogs;
 
                     
-                    current.students = current.students.map((st) => {
-                      if (st.class === 'Grade 10-A' && rollCall[st.roll] !== undefined) {
+                    current.students = (current.students || []).map((st) => {
+                      if (isClassMatch(st.class, currentTeacherClass) && rollCall[st.roll] !== undefined) {
                         const status = rollCall[st.roll];
                         
-                        const studentLogs = updatedLogs.filter((l) => l.className === 'Grade 10-A' && l.records && l.records[st.roll]);
+                        const studentLogs = updatedLogs.filter((l) => isClassMatch(l.className, currentTeacherClass) && l.records && l.records[st.roll]);
                         const totalDays = studentLogs.length;
                         const presentDays = studentLogs.filter((l) => l.records[st.roll] === 'present').length;
                         const pct = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : (status === 'present' ? 100 : 0);
@@ -2456,7 +2732,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     setData(current);
 
                     const presentCount = Object.values(rollCall).filter((v) => v === 'present').length;
-                    const total = data.students.filter((s) => s.class === 'Grade 10-A').length;
+                    const total = (data.students || []).filter((s) => isClassMatch(s.class, currentTeacherClass)).length;
                     setFeedback({
                       title: 'Attendance Saved & Synced',
                       body: `Today's attendance (${todayStr}) successfully saved and updated across Student and Parent Dashboards.\n${presentCount} of ${total} students present (${Math.round((presentCount / (total || 1)) * 100)}%).`,
@@ -2477,9 +2753,19 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   </tr>
                 </thead>
                 <tbody>
-                  {data.students
-                    .filter((s) => s.class === 'Grade 10-A')
-                    .map((s) => {
+                  {(() => {
+                    const classStudents = (data.students || []).filter((s) => isClassMatch(s.class, currentTeacherClass));
+                    if (classStudents.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="3" style={{ textAlign: 'center', padding: '32px 20px', color: '#64748b' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '4px' }}>No students registered in {currentTeacherClass || 'this class'} yet.</div>
+                            <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Please enroll students or upload roster in Student List tab to take roll call.</div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return classStudents.map((s) => {
                       const isPresent = rollCall[s.roll] !== 'absent';
                       return (
                         <tr key={s.roll}>
@@ -2511,7 +2797,8 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                           </td>
                         </tr>
                       );
-                    })}
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -2731,8 +3018,11 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
         })()}
 
         {role === 'teacher' && activeTab === 'leave-request' && (() => {
-          const currentTeacherName = user?.name || 'Mrs. Priya Krishnan';
-          const myLeaves = staffLeaves.filter(lv => !lv.teacher || lv.teacher === currentTeacherName || lv.teacher.toLowerCase().includes('priya'));
+          const myLeaves = staffLeaves.filter(lv => 
+            lv.teacher === currentTeacherName || 
+            (activeTeacherRecord && lv.teacher === activeTeacherRecord.name) ||
+            (!user?.name && lv.teacher.toLowerCase().includes('priya'))
+          );
 
           const approvedCount = myLeaves.filter(l => l.status === 'Approved').length;
           const pendingCount = myLeaves.filter(l => l.status === 'Pending').length;
@@ -2743,10 +3033,12 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
             const newLeave = {
               id: `LV-${Math.floor(100 + Math.random() * 900)}`,
               teacher: currentTeacherName,
-              subject: 'Mathematics',
+              subject: currentTeacherSubject || 'General',
               dates: dateStr,
+              fromDate: leaveForm.fromDate,
+              toDate: leaveForm.toDate,
               reason: leaveForm.reason || 'Personal / Academic duty',
-              status: 'Pending',
+              status: 'Approved',
               type: leaveForm.leaveType,
               substituteTeacher: leaveForm.substituteTeacher,
               contact: leaveForm.contactDuringLeave,
@@ -2756,9 +3048,18 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
             const updatedLeaves = [newLeave, ...staffLeaves];
             setStaffLeaves(updatedLeaves);
 
-            const pData = getPortalData();
+            const pData = getPortalData() || {};
             pData.staffLeaves = updatedLeaves;
+            if (pData.teachers && Array.isArray(pData.teachers)) {
+              pData.teachers = pData.teachers.map((t) => {
+                if (t.name === currentTeacherName || (currentTeacherName && t.name.toLowerCase().includes(currentTeacherName.toLowerCase().replace(/^(dr|mr|mrs|ms)\.?\s+/i, '')))) {
+                  return { ...t, status: 'On Leave' };
+                }
+                return t;
+              });
+            }
             savePortalData(pData);
+            setData({ ...pData });
 
             setIsApplyLeaveOpen(false);
             setLeaveForm({
@@ -2785,7 +3086,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     My Leave Applications & Approval Status
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b' }}>
-                    Faculty: <strong>{currentTeacherName}</strong> &bull; Department: <strong>Mathematics</strong> &bull; Track Principal's decisions in real-time
+                    Faculty: <strong>{currentTeacherName}</strong> &bull; Department: <strong>{currentTeacherSubject}</strong> &bull; Track Principal's decisions in real-time
                   </p>
                 </div>
                 <button
@@ -3115,65 +3416,88 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
           );
         })()}
 
-        {role === 'teacher' && activeTab === 'timetable' && (
+        {['teacher', 'staff', 'nonteaching'].includes(role) && (activeTab === 'timetable' || activeTab === 'view-timetable') && (
           <div>
-            <div className="portal-card" style={{ marginBottom: '20px', borderLeftColor: 'var(--color-primary)', padding: '15px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <div className="portal-card" style={{ marginBottom: '20px', borderLeftColor: 'var(--color-primary)', padding: '16px 20px', background: '#ffffff', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <h3 style={{ color: 'var(--color-primary)', margin: '0 0 4px 0' }}>Weekly Timetable — Mrs. Priya Krishnan</h3>
-                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--color-text-light)' }}>
-                    Primary Subject: <strong>Mathematics</strong> | Assigned Class: <strong>Grade 10-A</strong>
+                  <h3 style={{ color: 'var(--color-primary)', margin: '0 0 4px 0', fontSize: '1.25rem', fontWeight: 800 }}>
+                    Weekly Timetable &mdash; {currentTeacherName}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b' }}>
+                    {activeTeacherRecord?.subject ? <>Department: <strong>{activeTeacherRecord.subject}</strong> &bull; </> : null}
+                    {activeTeacherRecord?.class ? <>Assigned Class: <strong>{activeTeacherRecord.class}</strong> &bull; </> : null}
+                    Role: <span className="badge badge-primary" style={{ textTransform: 'uppercase', fontSize: '0.72rem', padding: '2px 8px' }}>{role}</span>
                   </p>
                 </div>
-                <span className="badge badge-info" style={{ fontSize: '0.85rem' }}>
-                  Total Assigned Classes: {teacherSlots.length} Periods
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span className={`badge ${teacherSlots.length > 0 ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.85rem', padding: '6px 12px', fontWeight: 700 }}>
+                    {teacherSlots.length > 0 ? `✓ ${teacherSlots.length} Active Teaching Periods` : 'No Periods Assigned Yet'}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="table-responsive">
-              <table className="timetable-grid" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
-                <thead>
-                  <tr style={{ background: 'var(--color-bg-light)', borderBottom: '2px solid rgba(30,58,138,0.15)' }}>
-                    <th style={{ padding: '10px', minWidth: '120px', textAlign: 'left' }}>Time / Period</th>
-                    {days.map((d) => (
-                      <th key={d} style={{ padding: '10px', minWidth: '110px' }}>{d}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {periods.map((p) => (
-                    <tr key={p.period} style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-                      <td data-label="Period" style={{ padding: '10px', textAlign: 'left', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(30,58,138,0.02)' }}>
-                        <div>Period {p.period}</div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 'normal', color: 'var(--color-text-light)' }}>{p.time}</div>
-                      </td>
-                      {days.map((day) => {
-                        const slot = teacherSlots.find((s) => s.day === day && parseInt(s.period) === p.period);
-                        if (slot) {
-                          return (
-                            <td key={day} data-label={`${day} Period ${p.period}`} style={{ padding: '6px' }}>
-                              <div style={{ background: '#dcfce7', borderLeft: '3px solid #10b981', padding: '8px 6px', borderRadius: '4px', textAlign: 'left' }}>
-                                <div style={{ fontWeight: 700, color: '#047857', fontSize: '0.82rem' }}>{slot.className}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#065f46' }}>{slot.subject}</div>
-                              </div>
-                            </td>
-                          );
-                        } else {
-                          return (
-                            <td key={day} data-label={`${day} Period ${p.period}`} style={{ padding: '6px' }}>
-                              <div style={{ background: 'rgba(0,0,0,0.02)', border: '1px dashed rgba(0,0,0,0.08)', padding: '8px 6px', borderRadius: '4px', textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem' }}>
-                                <em>Free Period</em>
-                              </div>
-                            </td>
-                          );
-                        }
-                      })}
+            {teacherSlots.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 24px', background: '#f8fafc', borderRadius: '14px', border: '2px dashed #cbd5e1', margin: '10px 0' }}>
+                <div style={{ fontSize: '2.8rem', marginBottom: '12px' }}>📅</div>
+                <h4 style={{ margin: '0 0 8px 0', color: '#1e3a8a', fontWeight: 800, fontSize: '1.15rem' }}>
+                  No Timetable Periods Currently Assigned for {currentTeacherName}
+                </h4>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '0.92rem', maxWidth: '580px', marginInline: 'auto' }}>
+                  When School Administrator assigns classroom periods under <strong>School Admin &gt; Academic Management &gt; Class Timetable</strong> to <em>{currentTeacherName}</em>, they will instantly appear live here in real time.
+                </p>
+              </div>
+            ) : (
+              <div className="table-responsive" style={{ background: '#ffffff', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                <table className="timetable-grid" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid rgba(30,58,138,0.12)' }}>
+                      <th style={{ padding: '12px 14px', minWidth: '130px', textAlign: 'left', fontWeight: 800, color: '#1e3a8a' }}>Time / Period</th>
+                      {days.map((d) => (
+                        <th key={d} style={{ padding: '12px 14px', minWidth: '110px', fontWeight: 800, color: '#1e3a8a' }}>{d}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {periods.map((p) => (
+                      <tr key={p.period} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td data-label="Period" style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--color-primary)', background: '#fafbfc' }}>
+                          <div style={{ fontSize: '0.92rem' }}>Period {p.period}</div>
+                          <div style={{ fontSize: '0.74rem', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>{p.time}</div>
+                        </td>
+                        {days.map((day) => {
+                          const slot = teacherSlots.find((s) => {
+                            const slotDay = (s.day || '').toLowerCase();
+                            const targetDay = day.toLowerCase();
+                            const dayMatches = slotDay === targetDay || slotDay.slice(0, 3) === targetDay.slice(0, 3);
+                            return dayMatches && parseInt(s.period) === p.period;
+                          });
+                          if (slot) {
+                            return (
+                              <td key={day} data-label={`${day} Period ${p.period}`} style={{ padding: '8px' }}>
+                                <div style={{ background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)', borderLeft: '3.5px solid #16a34a', padding: '10px 8px', borderRadius: '6px', textAlign: 'left', boxShadow: '0 2px 6px rgba(22, 163, 74, 0.12)' }}>
+                                  <div style={{ fontWeight: 800, color: '#14532d', fontSize: '0.88rem' }}>{slot.className}</div>
+                                  <div style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 600, marginTop: '2px' }}>{slot.subject}</div>
+                                </div>
+                              </td>
+                            );
+                          } else {
+                            return (
+                              <td key={day} data-label={`${day} Period ${p.period}`} style={{ padding: '8px' }}>
+                                <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '10px 8px', borderRadius: '6px', textAlign: 'center', color: '#94a3b8', fontSize: '0.76rem', fontWeight: 500 }}>
+                                  <em>Free Period</em>
+                                </div>
+                              </td>
+                            );
+                          }
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -3229,12 +3553,23 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   <p style={{ fontSize: '2.2rem', fontWeight: 800, color: '#3b82f6', margin: '8px 0 4px 0' }}>
                     {upcomingExams.length} <span style={{ fontSize: '1.1rem', fontWeight: 500, color: '#64748b' }}>Scheduled</span>
                   </p>
-                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Grade 10-A Midterm</p>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+                    {upcomingExams.length > 0 ? (upcomingExams[0].name || `${studentClass} Examination`) : `${studentClass} Assessment`}
+                  </p>
                 </div>
 
                 {(() => {
-                  const studentFeeRec = feeRecords.find(r => r.roll === studentRoll) || feeRecords[0];
-                  const hasDue = studentFeeRec && studentFeeRec.status !== 'PAID';
+                  let studentFeeRec = feeRecords.find(r => r.roll === studentRoll || r.studentId === studentRoll || (currentStudent && r.name === currentStudent.name));
+                  if (!studentFeeRec && currentStudent?.feeItems && currentStudent.feeItems.length > 0) {
+                    const rawTotal = currentStudent.feeItems.reduce((acc, it) => acc + (parseFloat(it.netAmount || it.amount) || 0), 0);
+                    const rawPaid = currentStudent.feeItems.reduce((acc, it) => acc + (parseFloat(it.paidAmount) || 0), 0);
+                    const rawDue = Math.max(0, rawTotal - rawPaid);
+                    studentFeeRec = {
+                      due: `₹${rawDue.toLocaleString('en-IN')}`,
+                      status: rawDue === 0 ? 'PAID' : (rawPaid > 0 ? 'PARTIAL' : 'PENDING')
+                    };
+                  }
+                  const hasDue = studentFeeRec ? studentFeeRec.status !== 'PAID' : false;
                   const dueAmt = studentFeeRec ? studentFeeRec.due : '₹0';
                   return (
                     <div
@@ -3408,7 +3743,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                        Student Attendance & Real-Time Tracking
                     </h3>
                     <p style={{ margin: 0, color: '#64748b', fontSize: '0.86rem' }}>
-                      Live records recorded and locked by Class Teacher (Grade 10-A).
+                      Live records recorded and locked by Class Teacher ({studentClass}).
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -3503,8 +3838,13 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
           );
         })()}
 
-        {role === 'student' && activeTab === 'view-timetable' && (
+        {role === 'student' && activeTab === 'view-timetable' && (() => {
+          const studentClass = activeStudentRecord?.class || user?.class || 'Grade 10-A';
+          return (
           <div className="table-responsive">
+            <div style={{ marginBottom: '12px', fontWeight: 700, color: '#1e3a8a', fontSize: '1rem' }}>
+              Weekly Class Schedule &mdash; {studentClass} ({activeStudentRecord?.name || user?.name || 'Student'})
+            </div>
             <table className="timetable-grid" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
               <thead>
                 <tr style={{ background: 'var(--color-bg-light)', borderBottom: '2px solid rgba(30,58,138,0.15)' }}>
@@ -3522,7 +3862,15 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       <div style={{ fontSize: '0.72rem', fontWeight: 'normal', color: 'var(--color-text-light)' }}>{p.time}</div>
                     </td>
                     {days.map((day) => {
-                      const slot = (data.classTimetables || []).find((s) => s.className === 'Grade 10-A' && s.day === day && parseInt(s.period) === p.period);
+                      const fallbackByPeriod = {
+                        1: { subject: 'Mathematics', teacher: 'Faculty Dept' },
+                        2: { subject: 'Science / Physics', teacher: 'Science Faculty' },
+                        3: { subject: 'English Language', teacher: 'Language Dept' },
+                        4: { subject: 'Social Studies', teacher: 'Humanities Dept' },
+                        5: { subject: 'Computer & Lab', teacher: 'IT Faculty' }
+                      };
+                      const foundSlot = (data.classTimetables || []).find((s) => (s.className === studentClass || (s.className && s.className.toLowerCase().includes(studentClass.toLowerCase()))) && s.day === day && parseInt(s.period) === p.period);
+                      const slot = foundSlot || fallbackByPeriod[p.period];
                       return (
                         <td key={day} style={{ padding: '6px' }}>
                           {slot ? (
@@ -3543,7 +3891,8 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
               </tbody>
             </table>
           </div>
-        )}
+          );
+        })()}
 
         {role === 'student' && activeTab === 'submit-assignments' && (
           <div className="wizard-form-box" style={{ maxWidth: '680px', margin: '0 auto', background: 'var(--color-bg-white)', borderRadius: 'var(--radius-md)', padding: '24px', boxShadow: 'var(--shadow-sm)', border: '1px solid #e2e8f0' }}>
@@ -3594,7 +3943,8 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
         )}
 
         {(role === 'student' || role === 'parent') && (activeTab === 'view-homework' || activeTab === 'homework') && (() => {
-          const studentHw = (data.assignments || []).filter((h) => h.grade === 'Grade 10-A' || h.grade === 'All Grades');
+          const studentClass = activeStudentRecord?.class || user?.class || 'Grade 10-A';
+          const studentHw = (data.assignments || []).filter((h) => h.grade === studentClass || h.grade === 'All Grades' || !h.grade);
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="sa-schools-header-bar" style={{ marginBottom: '8px' }}>
@@ -3930,18 +4280,37 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
             
             {(() => {
               const myRoll = currentStudentRoll;
-              const myFee = feeRecords.find(r => r.roll === myRoll) || {
-                roll: myRoll,
-                name: activeStudentRecord?.name || 'Student',
-                class: activeStudentRecord?.class || 'Grade 10-A',
-                parent: activeStudentRecord?.parentName || 'Parent / Guardian',
-                phone: activeStudentRecord?.parentPhone || '+91 98456 12301',
-                totalFee: '₹0',
-                paid: '₹0',
-                due: '₹0',
-                status: 'PAID',
-                dueDate: '2026-10-15'
-              };
+              let myFee = feeRecords.find(r => r.roll === myRoll || r.studentId === myRoll || (activeStudentRecord && (r.name === activeStudentRecord.name || r.studentName === activeStudentRecord.name)));
+              if (!myFee && activeStudentRecord) {
+                const rawTotal = (activeStudentRecord.feeItems || []).reduce((acc, it) => acc + (parseFloat(it.netAmount || it.amount) || 0), 0) || (parseFloat(activeStudentRecord.totalFees) || 128000);
+                const rawPaid = (activeStudentRecord.feeItems || []).reduce((acc, it) => acc + (parseFloat(it.paidAmount) || 0), 0);
+                const rawDue = Math.max(0, rawTotal - rawPaid);
+                myFee = {
+                  roll: myRoll,
+                  name: activeStudentRecord.name || 'Student',
+                  class: activeStudentRecord.class || 'Grade 10-A',
+                  parent: activeStudentRecord.parentName || user?.name || 'Parent / Guardian',
+                  phone: activeStudentRecord.parentPhone || user?.phone || '+91 98456 12301',
+                  totalFee: `₹${rawTotal.toLocaleString('en-IN')}`,
+                  paid: `₹${rawPaid.toLocaleString('en-IN')}`,
+                  due: `₹${rawDue.toLocaleString('en-IN')}`,
+                  status: rawDue === 0 ? 'PAID' : (rawPaid > 0 ? 'PARTIAL' : 'PENDING'),
+                  dueDate: '2026-11-15'
+                };
+              } else if (!myFee) {
+                myFee = {
+                  roll: myRoll,
+                  name: activeStudentRecord?.name || 'Student',
+                  class: activeStudentRecord?.class || 'Grade 10-A',
+                  parent: activeStudentRecord?.parentName || 'Parent / Guardian',
+                  phone: activeStudentRecord?.parentPhone || '+91 98456 12301',
+                  totalFee: '₹0',
+                  paid: '₹0',
+                  due: '₹0',
+                  status: 'PAID',
+                  dueDate: '2026-10-15'
+                };
+              }
               const hasDue = myFee.status !== 'PAID';
               const dueAmount = myFee.due;
 
@@ -4021,66 +4390,104 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
           </div>
         )}
 
-        {role === 'parent' && activeTab === 'exam-results' && (
-          <div>
-            <div className="portal-card" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-              <div>
-                <h4>Exam Results & Evaluation — Aishwarya Kumar (96.5% Distinction)</h4>
-                <p style={{ margin: 0 }}>Mathematics: 98/100 (A+) | Physics: 92/100 (A+) | Chemistry: 86/100 (A)</p>
+        {role === 'parent' && activeTab === 'exam-results' && (() => {
+          const targetStudent = activeStudentRecord || data.students[0] || {};
+          const marksList = (targetStudent.marks && targetStudent.marks.length > 0)
+            ? targetStudent.marks
+            : [
+                { subject: 'Mathematics', max: 100, scored: 88, grade: 'A' },
+                { subject: 'Physics', max: 100, scored: 85, grade: 'A' },
+                { subject: 'Chemistry', max: 100, scored: 82, grade: 'A' },
+                { subject: 'Tamil', max: 100, scored: 90, grade: 'A+' },
+                { subject: 'English', max: 100, scored: 86, grade: 'A' }
+              ];
+          const totalScored = marksList.reduce((acc, m) => acc + (Number(m.scored) || 0), 0);
+          const totalMax = marksList.reduce((acc, m) => acc + (Number(m.max) || 100), 0);
+          const overallPct = totalMax > 0 ? ((totalScored / totalMax) * 100).toFixed(1) : '86.2';
+
+          return (
+            <div>
+              <div className="portal-card" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h4>Exam Results & Evaluation &mdash; {targetStudent.name || 'Student Ward'} ({overallPct}% Overall)</h4>
+                  <p style={{ margin: 0 }}>Class: {targetStudent.class || 'Grade 10-A'} &bull; Roll No: {targetStudent.roll || currentStudentRoll}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setReportCardStudent(targetStudent)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /></svg>
+                  View & Print Official Term Report Card
+                </button>
               </div>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setReportCardStudent(data.students[0])}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /></svg>
-                View & Print Official Term Report Card
-              </button>
-            </div>
-            <div className="table-responsive">
-              <table className="sa-schools-table">
-                <thead>
-                  <tr>
-                    <th>Subject</th>
-                    <th>Max Marks</th>
-                    <th>Scored Marks</th>
-                    <th>Grade</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.students[0]?.marks || []).map((m, idx) => (
-                    <tr key={idx}>
-                      <td data-label="Subject"><strong>{m.subject}</strong></td>
-                      <td data-label="Max Marks">{m.max}</td>
-                      <td data-label="Scored Marks"><strong>{m.scored}</strong></td>
-                      <td data-label="Grade"><span className="badge badge-success">{m.grade}</span></td>
+              <div className="table-responsive">
+                <table className="sa-schools-table">
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      <th>Max Marks</th>
+                      <th>Scored Marks</th>
+                      <th>Grade</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {marksList.map((m, idx) => (
+                      <tr key={idx}>
+                        <td data-label="Subject"><strong>{m.subject}</strong></td>
+                        <td data-label="Max Marks">{m.max}</td>
+                        <td data-label="Scored Marks"><strong>{m.scored}</strong></td>
+                        <td data-label="Grade"><span className="badge badge-success">{m.grade || 'A'}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {(role === 'parent' || role === 'student') && activeTab === 'fee-reminders' && (
           <div>
             {(() => {
               const myRoll = currentStudentRoll;
-              const myFee = feeRecords.find(r => r.roll === myRoll) || {
-                roll: myRoll,
-                name: activeStudentRecord?.name || (role === 'student' ? user?.name : 'Student'),
-                class: activeStudentRecord?.class || 'Grade 10-A',
-                parent: activeStudentRecord?.parentName || 'Parent / Guardian',
-                phone: activeStudentRecord?.parentPhone || '+91 98456 12301',
-                totalFee: '₹0',
-                paid: '₹0',
-                due: '₹0',
-                status: 'PAID',
-                invoiceNumber: 'INV-2026-' + myRoll,
-                dueDate: '2026-10-15',
-                billingMonth: 'October'
-              };
+              let myFee = feeRecords.find(r => r.roll === myRoll || r.studentId === myRoll || (activeStudentRecord && (r.name === activeStudentRecord.name || r.studentName === activeStudentRecord.name)));
+              if (!myFee && activeStudentRecord) {
+                const rawTotal = (activeStudentRecord.feeItems || []).reduce((acc, it) => acc + (parseFloat(it.netAmount || it.amount) || 0), 0) || (parseFloat(activeStudentRecord.totalFees) || 128000);
+                const rawPaid = (activeStudentRecord.feeItems || []).reduce((acc, it) => acc + (parseFloat(it.paidAmount) || 0), 0);
+                const rawDue = Math.max(0, rawTotal - rawPaid);
+                myFee = {
+                  roll: myRoll,
+                  name: activeStudentRecord.name || (role === 'student' ? user?.name : 'Student'),
+                  class: activeStudentRecord.class || 'Grade 10-A',
+                  parent: activeStudentRecord.parentName || 'Parent / Guardian',
+                  phone: activeStudentRecord.parentPhone || '+91 98456 12301',
+                  totalFee: `₹${rawTotal.toLocaleString('en-IN')}`,
+                  paid: `₹${rawPaid.toLocaleString('en-IN')}`,
+                  due: `₹${rawDue.toLocaleString('en-IN')}`,
+                  status: rawDue === 0 ? 'PAID' : (rawPaid > 0 ? 'PARTIAL' : 'PENDING'),
+                  invoiceNumber: 'INV-2026-' + myRoll,
+                  dueDate: '2026-11-15',
+                  billingMonth: new Date().toLocaleString('en-US', { month: 'long' }),
+                  feeItems: activeStudentRecord.feeItems
+                };
+              } else if (!myFee) {
+                myFee = {
+                  roll: myRoll,
+                  name: activeStudentRecord?.name || (role === 'student' ? user?.name : 'Student'),
+                  class: activeStudentRecord?.class || 'Grade 10-A',
+                  parent: activeStudentRecord?.parentName || 'Parent / Guardian',
+                  phone: activeStudentRecord?.parentPhone || '+91 98456 12301',
+                  totalFee: '₹0',
+                  paid: '₹0',
+                  due: '₹0',
+                  status: 'PAID',
+                  invoiceNumber: 'INV-2026-' + myRoll,
+                  dueDate: '2026-10-15',
+                  billingMonth: 'October'
+                };
+              }
               const hasDue = myFee.status !== 'PAID';
               const dueAmount = myFee.due;
 
@@ -4342,11 +4749,11 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
         )}
 
         
-        {(activeTab === 'school-announcements' || activeTab === 'announcements') && (
+        {(activeTab === 'school-announcements' || activeTab === 'announcements' || activeTab === 'receive-announcements') && (
           <div>
-            <div className="sa-schools-header-bar">
+            <div className="sa-schools-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '18px' }}>
               <div className="sa-filter-segment">
-                {['All', 'Academic', 'Sports', 'General'].map((cat) => (
+                {['All', 'Academic', 'Sports', 'General', 'Holidays'].map((cat) => (
                   <button
                     key={cat}
                     className={`sa-filter-tab ${filterCategory === cat ? 'active' : ''}`}
@@ -4356,25 +4763,54 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   </button>
                 ))}
               </div>
+              {(role === 'principal' || role === 'teacher' || role === 'schooladmin') && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setIsAnnouncementOpen(true)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700, padding: '7px 18px', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}
+                >
+                  + Post Announcement
+                </button>
+              )}
             </div>
             <div id="announcement-list">
-              {data.announcements
-                .filter((a) => filterCategory === 'All' || a.category === filterCategory)
-                .map((a, idx) => (
-                  <div key={idx} className="portal-card announcement-card" data-category={a.category || 'General'}>
-                    <div className="portal-card-header">
-                      <span className="portal-card-title">{a.title}</span>
-                      <div>
-                        <span className="badge badge-info" style={{ marginRight: '6px' }}>{a.category || 'Notice'}</span>
-                        <span className="badge badge-warning">{a.date}</span>
+              {(() => {
+                const list = (data.announcements || []).filter((a) => filterCategory === 'All' || a.category === filterCategory);
+                if (list.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '48px 20px', background: '#ffffff', borderRadius: '14px', border: '1.5px dashed #cbd5e1', color: '#64748b', marginTop: '14px' }}>
+                      <div style={{ fontSize: '2.2rem', marginBottom: '8px' }}>📢</div>
+                      <h4 style={{ margin: 0, color: '#0f172a' }}>No Announcements Found</h4>
+                      <p style={{ margin: '6px 0 16px', fontSize: '0.85rem' }}>No circular notices published under "{filterCategory}".</p>
+                      {(role === 'principal' || role === 'teacher' || role === 'schooladmin') && (
+                        <button type="button" className="btn btn-primary btn-sm" onClick={() => setIsAnnouncementOpen(true)}>
+                          + Post New Announcement
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+                return list.map((a, idx) => (
+                  <div key={a.id || idx} className="portal-card announcement-card" data-category={a.category || 'General'} style={{ borderRadius: '14px', marginBottom: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.04)' }}>
+                    <div className="portal-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <span className="portal-card-title" style={{ fontSize: '1.1rem', fontWeight: 800 }}>{a.title}</span>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <span className="badge badge-info">{a.category || 'Notice'}</span>
+                        {a.priority && a.priority !== 'Normal' && (
+                          <span className="badge badge-danger" style={{ fontWeight: 700 }}>{a.priority}</span>
+                        )}
+                        <span className="badge badge-warning" style={{ fontWeight: 600 }}>{a.date}</span>
                       </div>
                     </div>
-                    <p>{a.content}</p>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', marginTop: '10px' }}>
-                      Target Audience: <strong>{a.target}</strong>
-                    </p>
+                    <p style={{ marginTop: '10px', fontSize: '0.92rem', lineHeight: 1.6, color: '#334155' }}>{a.content}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.8rem', color: '#64748b' }}>
+                      <span>Target Audience: <strong style={{ color: '#1e3a8a' }}>{a.target || 'All'}</strong></span>
+                      <span>Published By: <strong>{a.author || 'School Administration'}</strong></span>
+                    </div>
                   </div>
-                ))}
+                ));
+              })()}
             </div>
           </div>
         )}
@@ -4694,10 +5130,18 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       value={homeworkForm.grade}
                       onChange={(e) => setHomeworkForm({ ...homeworkForm, grade: e.target.value })}
                     >
-                      <option value="Grade 10-A">Grade 10-A (Mathematics Core)</option>
+                      {currentTeacherClass && (
+                        <option value={currentTeacherClass}>{currentTeacherClass} (My Assigned Class)</option>
+                      )}
+                      <option value="Grade 10-A">Grade 10-A</option>
+                      <option value="Grade 10-B">Grade 10-B</option>
                       <option value="Grade 9-A">Grade 9-A</option>
+                      <option value="Grade 9-B">Grade 9-B</option>
+                      <option value="Grade 11-A">Grade 11-A</option>
                       <option value="Grade 11-B">Grade 11-B</option>
                       <option value="Grade 12-A">Grade 12-A</option>
+                      <option value="Grade 12-B">Grade 12-B</option>
+                      <option value="All Grades">All Grades</option>
                     </select>
                   </div>
                   <div className="wizard-field">
@@ -4804,10 +5248,17 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       value={materialForm.grade}
                       onChange={(e) => setMaterialForm({ ...materialForm, grade: e.target.value })}
                     >
+                      {currentTeacherClass && (
+                        <option value={currentTeacherClass}>{currentTeacherClass} (My Assigned Class)</option>
+                      )}
                       <option value="Grade 10-A">Grade 10-A</option>
+                      <option value="Grade 10-B">Grade 10-B</option>
                       <option value="Grade 9-A">Grade 9-A</option>
+                      <option value="Grade 9-B">Grade 9-B</option>
+                      <option value="Grade 11-A">Grade 11-A</option>
                       <option value="Grade 11-B">Grade 11-B</option>
                       <option value="Grade 12-A">Grade 12-A</option>
+                      <option value="Grade 12-B">Grade 12-B</option>
                       <option value="All Grades">All Grades</option>
                     </select>
                   </div>
@@ -4818,12 +5269,17 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                       value={materialForm.subject}
                       onChange={(e) => setMaterialForm({ ...materialForm, subject: e.target.value })}
                     >
+                      {currentTeacherSubject && (
+                        <option value={currentTeacherSubject}>{currentTeacherSubject}</option>
+                      )}
                       <option value="Mathematics">Mathematics</option>
                       <option value="Physics">Physics</option>
                       <option value="Chemistry">Chemistry</option>
                       <option value="Biology">Biology</option>
+                      <option value="Computer Science">Computer Science</option>
                       <option value="Tamil">Tamil</option>
                       <option value="English">English</option>
+                      <option value="General Science">General Science</option>
                     </select>
                   </div>
 
@@ -4888,73 +5344,267 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
 
       
       {isAnnouncementOpen && (
-        <div className="modal-overlay" style={{ display: 'flex' }}>
-          <div className="modal-content wizard-modal-lg" style={{ maxWidth: '640px' }}>
-            <div className="modal-header">
-              <h3>Post Campus Announcement</h3>
-              <button className="modal-close" onClick={() => setIsAnnouncementOpen(false)}>&times;</button>
-            </div>
-            <form onSubmit={handleSaveAnnouncement}>
-              <div className="wizard-form-box">
-                <div className="wizard-header-strip">
-                  <div className="wizard-header-icon" style={{ background: 'rgba(30, 58, 138, 0.08)', color: 'var(--color-primary)' }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
-                  </div>
-                  <div className="wizard-header-titles">
-                    <h4>Broadcast Circular / Notice</h4>
-                    <p>Publish an official notice to students, teachers, or parents across this campus.</p>
-                  </div>
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100000,
+            padding: '16px',
+            boxSizing: 'border-box'
+          }}
+          onClick={() => setIsAnnouncementOpen(false)}
+        >
+          <div
+            style={{
+              maxWidth: '680px',
+              width: '100%',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              background: '#ffffff',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                flexShrink: 0,
+                background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+                color: '#ffffff',
+                padding: '18px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
                 </div>
-                <div className="wizard-grid-2">
-                  <div className="wizard-field span-2">
-                    <label>Notice Headline / Title <span className="req">*</span></label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Annual Sports Meet 2026 - Schedule Released"
-                      required
-                      value={announcementForm.title}
-                      onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
-                    />
-                  </div>
-                  <div className="wizard-field">
-                    <label>Target Audience <span className="req">*</span></label>
-                    <select
-                      value={announcementForm.target}
-                      onChange={(e) => setAnnouncementForm({ ...announcementForm, target: e.target.value })}
-                    >
-                      <option value="All">All Campus Stakeholders</option>
-                      <option value="Students">Students Only</option>
-                      <option value="Teachers">Faculty & Staff</option>
-                      <option value="Parents">Parents Only</option>
-                    </select>
-                  </div>
-                  <div className="wizard-field">
-                    <label>Notice Category</label>
-                    <select
-                      value={announcementForm.category}
-                      onChange={(e) => setAnnouncementForm({ ...announcementForm, category: e.target.value })}
-                    >
-                      <option value="General">General Campus Notice</option>
-                      <option value="Academic">Academic / Examinations</option>
-                      <option value="Sports">Sports & Cultural Events</option>
-                      <option value="Holidays">Official Holidays</option>
-                    </select>
-                  </div>
-                  <div className="wizard-field span-2">
-                    <label>Detailed Announcement Notice <span className="req">*</span></label>
-                    <textarea
-                      rows="4"
-                      placeholder="Enter the complete circular information text..."
-                      required
-                      value={announcementForm.content}
-                      onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })}
-                    ></textarea>
-                  </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+                    Post Campus Announcement
+                  </h3>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.82rem', opacity: 0.9 }}>
+                    Broadcast circular notice to Students, Teachers, and Parents across this campus.
+                  </p>
                 </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => setIsAnnouncementOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary btn-sm" style={{ padding: '8px 22px' }}>Publish Announcement ✓</button>
+              <button
+                type="button"
+                onClick={() => setIsAnnouncementOpen(false)}
+                style={{
+                  color: '#ffffff',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  cursor: 'pointer',
+                  fontSize: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <form
+              onSubmit={handleSaveAnnouncement}
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '24px',
+                margin: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}
+            >
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '6px' }}>
+                  Notice Headline / Title <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Annual Sports Meet 2026 - Schedule Released"
+                  required
+                  value={announcementForm.title}
+                  onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #cbd5e1',
+                    fontSize: '0.92rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', marginBottom: '6px' }}>
+                    Target Audience <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select
+                    value={announcementForm.target}
+                    onChange={(e) => setAnnouncementForm({ ...announcementForm, target: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.88rem',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      background: '#ffffff'
+                    }}
+                  >
+                    <option value="All">All Campus Stakeholders</option>
+                    <option value="Students">Students Only</option>
+                    <option value="Teachers">Faculty & Staff</option>
+                    <option value="Parents">Parents Only</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', marginBottom: '6px' }}>
+                    Notice Category <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select
+                    value={announcementForm.category}
+                    onChange={(e) => setAnnouncementForm({ ...announcementForm, category: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.88rem',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      background: '#ffffff'
+                    }}
+                  >
+                    <option value="General">General Campus Notice</option>
+                    <option value="Academic">Academic / Examinations</option>
+                    <option value="Sports">Sports & Cultural Events</option>
+                    <option value="Holidays">Official Holidays</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', marginBottom: '6px' }}>
+                    Broadcast Priority
+                  </label>
+                  <select
+                    value={announcementForm.priority || 'Normal'}
+                    onChange={(e) => setAnnouncementForm({ ...announcementForm, priority: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.88rem',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      background: '#ffffff'
+                    }}
+                  >
+                    <option value="Normal">Normal Notice</option>
+                    <option value="High">High Priority</option>
+                    <option value="Urgent">Urgent / Important</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '6px' }}>
+                  Detailed Announcement Notice <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <textarea
+                  rows="5"
+                  placeholder="Enter complete circular notice text, instructions, timings, or venue..."
+                  required
+                  value={announcementForm.content}
+                  onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #cbd5e1',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
+                    lineHeight: 1.5
+                  }}
+                ></textarea>
+              </div>
+
+              {/* Actions Footer */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '12px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid #e2e8f0',
+                  marginTop: '4px'
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setIsAnnouncementOpen(false)}
+                  style={{ padding: '8px 18px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  style={{
+                    padding: '9px 24px',
+                    fontWeight: 800,
+                    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+                    color: '#ffffff',
+                    boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Publish Announcement ✓
+                </button>
               </div>
             </form>
           </div>
@@ -5863,6 +6513,7 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   day: 'numeric',
                 });
 
+                const allLeaves = (staffLeaves && staffLeaves.length > 0) ? staffLeaves : (getPortalData()?.staffLeaves || []);
                 const facultyPool = [
                   { name: 'Mrs. Priya Krishnan', dept: 'Mathematics', cls: 'Grade 10-A', punch: '08:15 AM', periods: '5 Periods', phone: '+91 98401 23451' },
                   { name: 'Dr. Anandhi Rajan', dept: 'Physics', cls: 'Grade 11-A', punch: '08:20 AM', periods: '4 Periods + Lab', phone: '+91 98401 23452' },
@@ -5874,17 +6525,27 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                   { name: 'Mr. V. Balaji', dept: 'Biology', cls: 'Grade 9-B', punch: '—', periods: 'Substituted by Ms. Meena', phone: '+91 98401 23460' },
                 ];
 
-                const dateSeed = (sDate.getDate() * 7 + sDate.getMonth() * 11) % 8;
-                const computedFaculty = facultyPool.map((f, idx) => {
+                const baseList = (data.teachers && data.teachers.length > 0) ? data.teachers.map((t) => ({
+                  name: t.name,
+                  dept: t.subject || t.onboardSubject || 'General',
+                  cls: t.class || 'Grade 10-A',
+                  punch: '08:15 AM',
+                  periods: '5 Periods',
+                  phone: t.phone || '+91 98401 23450',
+                  status: t.status
+                })) : facultyPool;
+
+                const computedFaculty = baseList.map((f) => {
                   if (isSunday) {
                     return { ...f, status: 'Holiday (Sunday)', punch: '—', isPresent: false };
                   }
-                  const isLeave = (idx === (dateSeed % facultyPool.length)) || (idx === ((dateSeed + 3) % facultyPool.length));
-                  const isPresent = !isLeave;
+                  const leaveRec = getStaffLeaveOnDate(f.name, staffAttendanceDate, allLeaves);
+                  const isPresent = !leaveRec && f.status !== 'On Leave';
                   return {
                     ...f,
-                    status: isPresent ? 'On Duty' : 'On Approved Leave',
+                    status: isPresent ? 'On Duty' : (leaveRec ? (leaveRec.status === 'Approved' ? `On Approved Leave (${leaveRec.type || 'Casual'})` : `On Leave (${leaveRec.type || 'Applied'})`) : 'On Leave'),
                     punch: isPresent ? f.punch : '—',
+                    periods: leaveRec && leaveRec.substituteTeacher ? `Substituted by ${leaveRec.substituteTeacher}` : f.periods,
                     isPresent
                   };
                 });
@@ -6338,17 +6999,18 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                 });
 
                 const rawList = data.nonTeachingStaff || [];
-                const dateSeed = (sDate.getDate() * 5 + sDate.getMonth() * 7) % rawList.length;
+                const allLeaves = (staffLeaves && staffLeaves.length > 0) ? staffLeaves : (getPortalData()?.staffLeaves || []);
 
-                const computedNonTeaching = rawList.map((st, idx) => {
+                const computedNonTeaching = rawList.map((st) => {
                   if (isSunday) {
                     return { ...st, status: 'Holiday (Sunday)', isPresent: false };
                   }
-                  const isLeave = (idx === dateSeed);
+                  const leaveRec = getStaffLeaveOnDate(st.name, staffAttendanceDate, allLeaves);
+                  const isPresent = !leaveRec && st.status !== 'On Leave';
                   return {
                     ...st,
-                    status: isLeave ? 'On Approved Leave' : 'On Duty',
-                    isPresent: !isLeave
+                    status: isPresent ? 'On Duty' : (leaveRec ? (leaveRec.status === 'Approved' ? `On Approved Leave (${leaveRec.type || 'Casual'})` : `On Leave (${leaveRec.type || 'Applied'})`) : 'On Leave'),
+                    isPresent
                   };
                 });
 
@@ -6741,35 +7403,20 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
         const staff = selectedStaffHistory;
         const curDateObj = new Date(staff.baseDate || staffAttendanceDate);
         const curDayName = curDateObj.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const allLeaves = (staffLeaves && staffLeaves.length > 0) ? staffLeaves : (getPortalData()?.staffLeaves || []);
 
-        
         const past7Days = Array.from({ length: 7 }).map((_, i) => {
           const d = new Date(curDateObj);
           d.setDate(d.getDate() - i);
-          const isSun = d.getDay() === 0;
-          const dayName = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
           const dateStr = d.toISOString().split('T')[0];
-
-          
-          const hash = (staff.name.charCodeAt(0) + d.getDate() * 3 + d.getMonth() * 5) % 9;
-          const isLeave = !isSun && (hash === 2);
-          const status = isSun ? 'Holiday (Sun)' : isLeave ? 'On Leave (Casual)' : 'Present on Duty';
-          const inTime = isSun ? '—' : isLeave ? '—' : '08:' + (10 + (hash * 2)).toString().padStart(2, '0') + ' AM';
-          const outTime = isSun ? '—' : isLeave ? '—' : '04:30 PM';
-
-          return {
-            dateStr,
-            dayName,
-            status,
-            inTime,
-            outTime,
-            isLeave,
-            isSun,
-          };
+          return getStaffDailyAttendance(staff.name, dateStr, allLeaves, staff.currentStatus || staff.status);
         });
 
-        const totalPresent7 = past7Days.filter(d => !d.isSun && !d.isLeave).length;
-        const totalLeave7 = past7Days.filter(d => d.isLeave).length;
+        const totalPresent7 = past7Days.filter((d) => !d.isSun && !d.isLeave).length;
+        const totalLeave7 = past7Days.filter((d) => d.isLeave).length;
+
+        const targetDateStr = staff.baseDate || staffAttendanceDate;
+        const targetLog = getStaffDailyAttendance(staff.name, targetDateStr, allLeaves, staff.currentStatus || staff.status);
 
         return (
           <div
@@ -6908,28 +7555,60 @@ export default function AcademicRolesView({ role, user, activeTab, setActiveTab 
                     </div>
                   </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block' }}>Status on Selected Date:</span>
-                    <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{curDayName}</strong>
-                    <div style={{ marginTop: '4px' }}>
-                      {(() => {
-                        const targetLog = past7Days.find(d => d.dateStr === (staff.baseDate || staffAttendanceDate)) || past7Days[0];
-                        const isPresentDuty = targetLog && targetLog.status.includes('Present');
-                        const isHoliday = targetLog && targetLog.status.includes('Holiday');
-                        const displayStatus = targetLog ? targetLog.status : (staff.currentStatus || 'Present on Duty');
-                        const displayPunch = targetLog ? targetLog.inTime : (staff.currentPunch || '08:15 AM');
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block' }}>Status on Selected Date:</span>
+                      <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{curDayName}</strong>
+                      <div style={{ marginTop: '4px' }}>
+                        {(() => {
+                          const isPresentDuty = targetLog && targetLog.status.includes('Present');
+                          const isHoliday = targetLog && targetLog.status.includes('Holiday');
+                          const displayStatus = targetLog ? targetLog.status : (staff.currentStatus || 'Present on Duty');
+                          const displayPunch = targetLog ? targetLog.inTime : (staff.currentPunch || '08:15 AM');
 
-                        return (
-                          <span
-                            className={`badge ${isPresentDuty ? 'badge-success' : isHoliday ? 'badge-info' : 'badge-danger'}`}
-                            style={{ fontSize: '0.86rem', padding: '5px 12px', fontWeight: 700 }}
-                          >
-                            ● {displayStatus} {displayPunch && displayPunch !== '—' ? `(Punch: ${displayPunch})` : ''}
-                          </span>
-                        );
-                      })()}
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                              <span
+                                className={`badge ${isPresentDuty ? 'badge-success' : isHoliday ? 'badge-info' : 'badge-danger'}`}
+                                style={{ fontSize: '0.86rem', padding: '5px 12px', fontWeight: 700 }}
+                              >
+                                ● {displayStatus} {displayPunch && displayPunch !== '—' ? `(Punch: ${displayPunch})` : ''}
+                              </span>
+                              {!isHoliday && (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  style={{
+                                    fontSize: '0.74rem',
+                                    padding: '3px 10px',
+                                    fontWeight: 700,
+                                    borderColor: targetLog.isLeave ? '#86efac' : '#fca5a5',
+                                    color: targetLog.isLeave ? '#16a34a' : '#dc2626',
+                                    background: targetLog.isLeave ? '#f0fdf4' : '#fef2f2',
+                                    cursor: 'pointer'
+                                  }}
+                                  onClick={() => {
+                                    const updatedLeaves = toggleStaffLeaveOnDate(staff.name, targetDateStr, !targetLog.isLeave);
+                                    if (updatedLeaves) {
+                                      setStaffLeaves([...updatedLeaves]);
+                                      const p = getPortalData() || {};
+                                      p.staffLeaves = updatedLeaves;
+                                      savePortalData(p);
+                                      setData({ ...p });
+                                      setFeedback({
+                                        title: targetLog.isLeave ? 'Leave Revoked / Marked Present' : 'Leave Logged & Counted',
+                                        body: `${staff.name} is now marked ${targetLog.isLeave ? 'Present on Duty' : 'On Leave'} for ${targetDateStr}. Attendance & Duty Log has been updated live.`
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {targetLog.isLeave ? '✓ Revoke Leave & Mark Present' : '📅 Log Leave for this Date'}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
-                  </div>
                 </div>
 
                 

@@ -12,7 +12,7 @@ const realPortalUsers = [
     role: 'superadmin',
     schoolId: 'ALL',
     schoolName: 'Zenith Central Trust',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+    avatar: '',
     status: 'offline',
   },
   {
@@ -22,7 +22,7 @@ const realPortalUsers = [
     role: 'schooladmin',
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+    avatar: '',
     status: 'offline',
   },
   {
@@ -32,7 +32,7 @@ const realPortalUsers = [
     role: 'principal',
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80',
+    avatar: '',
     status: 'offline',
   },
   {
@@ -42,7 +42,7 @@ const realPortalUsers = [
     role: 'teacher',
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
+    avatar: '',
     status: 'offline',
   },
   {
@@ -52,7 +52,7 @@ const realPortalUsers = [
     role: 'finance',
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
-    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=150&q=80',
+    avatar: '',
     status: 'offline',
   },
   {
@@ -62,7 +62,7 @@ const realPortalUsers = [
     role: 'student',
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
+    avatar: '',
     status: 'offline',
   },
   {
@@ -72,7 +72,7 @@ const realPortalUsers = [
     role: 'parent',
     schoolId: 'SCHOOL002',
     schoolName: 'Sri Sankara Vidhyasala Girls High School',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
+    avatar: '',
     status: 'offline',
   },
 ];
@@ -129,21 +129,31 @@ const { memUsers } = require('./userController');
 
 const activeUserPresence = new Map();
 
-const isUserOnline = (userId) => {
+const isUserOnline = (userId, userName) => {
+  if (!userId && !userName) return false;
   const norm = normalizeId(userId);
-  const lastSeen = activeUserPresence.get(norm);
+  const raw = String(userId || '');
+  const uName = userName ? userName.trim().toLowerCase() : '';
+  const lastSeen = activeUserPresence.get(norm) || activeUserPresence.get(raw) || (uName && activeUserPresence.get(uName));
   if (!lastSeen) return false;
   return Date.now() - lastSeen < 12000;
 };
 
 const heartbeat = async (req, res) => {
   try {
-    const currentUserId = normalizeId(req.user);
-    if (currentUserId) {
-      activeUserPresence.set(currentUserId, Date.now());
+    const rawUserId = req.user ? (req.user.userId || req.user.id) : null;
+    const currentUserId = normalizeId(req.user) || normalizeId(rawUserId);
+    const uName = req.user && req.user.name ? req.user.name.trim().toLowerCase() : '';
+    const now = Date.now();
+    if (currentUserId) activeUserPresence.set(currentUserId, now);
+    if (rawUserId) activeUserPresence.set(String(rawUserId), now);
+    if (uName) activeUserPresence.set(uName, now);
 
+    if (currentUserId) {
       memMessages.forEach((m) => {
-        if (normalizeId(m.receiverId) === currentUserId && !m.delivered) {
+        const mReceiver = normalizeId(m.receiverId);
+        const mRecName = (m.receiverName || '').trim().toLowerCase();
+        if ((mReceiver === currentUserId || (rawUserId && m.receiverId === rawUserId) || (uName && mRecName === uName)) && !m.delivered) {
           m.delivered = true;
         }
       });
@@ -151,7 +161,7 @@ const heartbeat = async (req, res) => {
       if (getDBStatus()) {
         try {
           await Message.updateMany(
-            { receiverId: currentUserId, delivered: false },
+            { receiverId: { $in: [currentUserId, rawUserId] }, delivered: false },
             { $set: { delivered: true } }
           );
         } catch (e) {}
@@ -165,10 +175,12 @@ const heartbeat = async (req, res) => {
 
 const offline = async (req, res) => {
   try {
-    const currentUserId = normalizeId(req.user);
-    if (currentUserId) {
-      activeUserPresence.delete(currentUserId);
-    }
+    const rawUserId = req.user ? (req.user.userId || req.user.id) : null;
+    const currentUserId = normalizeId(req.user) || normalizeId(rawUserId);
+    const uName = req.user && req.user.name ? req.user.name.trim().toLowerCase() : '';
+    if (currentUserId) activeUserPresence.delete(currentUserId);
+    if (rawUserId) activeUserPresence.delete(String(rawUserId));
+    if (uName) activeUserPresence.delete(uName);
     return res.json({ success: true, online: false });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -194,7 +206,7 @@ const getContacts = async (req, res) => {
         schoolId: u.schoolId,
         schoolName: u.schoolName,
         status: online ? 'online' : 'offline',
-        avatar: u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+        avatar: (u.avatar && !u.avatar.includes('unsplash')) ? u.avatar : '',
       });
     });
 
@@ -210,7 +222,7 @@ const getContacts = async (req, res) => {
             schoolId: u.schoolId,
             schoolName: u.schoolName,
             status: online ? 'online' : 'offline',
-            avatar: u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+            avatar: (u.avatar && !u.avatar.includes('unsplash')) ? u.avatar : '',
           });
         }
       });
@@ -337,7 +349,7 @@ const getMessages = async (req, res) => {
 
 const sendMessage = async (req, res) => {
   try {
-    const { receiverId, receiverName, receiverRole, text } = req.body;
+    const { receiverId, receiverName, receiverRole, text, messageId } = req.body;
     if (!receiverId || !text) {
       return res.status(400).json({ success: false, message: 'Receiver and message text are required' });
     }
@@ -352,7 +364,7 @@ const sendMessage = async (req, res) => {
 
     const receiverOnline = isUserOnline(normalizedReceiverId);
 
-    const msgId = 'MSG' + String(Date.now()).slice(-4);
+    const msgId = messageId || ('MSG' + String(Date.now()).slice(-4));
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const newMsg = {

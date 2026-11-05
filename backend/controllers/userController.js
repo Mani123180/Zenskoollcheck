@@ -48,7 +48,7 @@ const createUser = async (req, res) => {
       schoolId: schoolId || (req.user && req.user.schoolId) || 'SCH001',
       schoolName: schoolName || (req.user && req.user.schoolName) || 'Campus',
       status: 'Active',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      avatar: '',
     };
 
     if (getDBStatus()) {

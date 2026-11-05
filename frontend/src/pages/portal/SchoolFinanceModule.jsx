@@ -254,7 +254,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
       const currentSchoolName = user?.schoolName;
 
       const schoolFeeRecords = (portal && Array.isArray(portal.feeRecords))
-        ? portal.feeRecords.filter(r => !currentSchoolId || currentSchoolId === 'ALL' || r.schoolId === currentSchoolId || (currentSchoolName && r.schoolName === currentSchoolName))
+        ? portal.feeRecords.filter(r => !currentSchoolId || currentSchoolId === 'ALL' || !r.schoolId || r.schoolId === currentSchoolId || (currentSchoolName && r.schoolName === currentSchoolName))
         : [];
 
       const schoolSalaries = (portal && Array.isArray(portal.salaries))
@@ -332,7 +332,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
       const schoolRecords = (portal && Array.isArray(portal.feeRecords))
         ? portal.feeRecords.filter(r => {
             if (!currentSchoolId || currentSchoolId === 'ALL') return true;
-            return r.schoolId === currentSchoolId || (currentSchoolName && r.schoolName === currentSchoolName);
+            return !r.schoolId || r.schoolId === currentSchoolId || (currentSchoolName && r.schoolName === currentSchoolName);
           })
         : [];
 
@@ -382,6 +382,47 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
           combinedBills = [...defaultFinanceData.bills];
         }
       }
+
+      // Ensure all students registered in portal.students are present in combinedBills
+      const allStudents = (portal && Array.isArray(portal.students)) ? portal.students : [];
+      allStudents.forEach(st => {
+        const alreadyInBills = combinedBills.some(b => b.rollNo === st.roll || b.studentId === st.roll);
+        if (!alreadyInBills) {
+          const totalNum = parseFloat(st.totalFees) || (st.feeItems || []).reduce((acc, it) => acc + (parseFloat(it.netAmount || it.amount) || 0), 0) || 128000;
+          const paidNum = (st.feeItems || []).reduce((acc, it) => acc + (parseFloat(it.paidAmount) || 0), 0);
+          const pendingNum = Math.max(0, totalNum - paidNum);
+          combinedBills.unshift({
+            _id: 'bill_' + st.roll,
+            invoiceNumber: 'INV-2026-' + st.roll,
+            studentId: st.roll,
+            studentName: st.name,
+            rollNo: st.roll,
+            grade: (st.class || 'Grade 10-A').split('-')[0]?.trim() || 'Grade 10',
+            section: (st.class || 'Grade 10-A').split('-')[1]?.trim() || 'A',
+            academicYear: '2026-2027',
+            billingMonth: new Date().toLocaleString('en-US', { month: 'long' }),
+            billingDate: st.admissionDate || new Date().toISOString().split('T')[0],
+            dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+            feeItems: st.feeItems && st.feeItems.length > 0 ? st.feeItems : [
+              { feeType: 'Tuition Fees', amount: 48000, status: paidNum >= 48000 ? 'Paid' : 'Unpaid' },
+              { feeType: 'Term Examination Fees', amount: 15000, status: paidNum >= 63000 ? 'Paid' : 'Unpaid' },
+              { feeType: 'Computer & Science Lab', amount: 20000, status: paidNum >= 83000 ? 'Paid' : 'Unpaid' },
+              { feeType: 'Library & Digital Resources', amount: 12000, status: paidNum >= 95000 ? 'Paid' : 'Unpaid' },
+              { feeType: 'Sports & Extracurricular', amount: 18000, status: paidNum >= 113000 ? 'Paid' : 'Unpaid' },
+              { feeType: 'Campus Development Fund', amount: 15000, status: paidNum >= totalNum ? 'Paid' : 'Unpaid' }
+            ],
+            totalFees: totalNum,
+            paidAmount: paidNum,
+            pendingAmount: pendingNum,
+            paymentStatus: pendingNum === 0 ? 'Paid' : (paidNum > 0 ? 'Partially Paid' : 'Unpaid'),
+            paymentMethod: 'Online Portal',
+            parentName: st.parentName || 'Parent Guardian',
+            parentPhone: st.parentPhone || '+91 98401 00000',
+            schoolId: st.schoolId || currentSchoolId || 'SCHOOL002',
+            remarks: 'Default admission fee structure'
+          });
+        }
+      });
 
       setBills(combinedBills);
       setSelectedStudentCard(prev => {

@@ -577,10 +577,10 @@ const defaultData = {
   ],
 
   staffLeaves: [
-    { id: 'LV-101', teacher: 'Mrs. Selvi Murugan', subject: 'Chemistry', dates: '2026-10-24 to 2026-10-25', reason: 'Family Function in Madurai', status: 'Pending', type: 'Casual Leave' },
-    { id: 'LV-102', teacher: 'Dr. Anandhi Rajan', subject: 'Physics', dates: '2026-10-28', reason: 'Medical Appointment', status: 'Pending', type: 'Medical Leave' },
-    { id: 'LV-100', teacher: 'Mr. Anand Narayanan', subject: 'Physics', dates: '2026-10-15', reason: 'Educational Conference', status: 'Approved', type: 'Duty Leave' },
-    { id: 'LV-103', teacher: 'Mrs. Priya Krishnan', subject: 'Mathematics', dates: '2026-10-20 to 2026-10-21', reason: 'Attending University Valuation Board', status: 'Approved', type: 'Duty Leave' },
+    { id: 'LV-101', teacher: 'Mrs. Selvi Murugan', subject: 'Chemistry', dates: '2026-10-24 to 2026-10-25', fromDate: '2026-10-24', toDate: '2026-10-25', reason: 'Family Function in Madurai', status: 'Pending', type: 'Casual Leave' },
+    { id: 'LV-102', teacher: 'Dr. Anandhi Rajan', subject: 'Physics', dates: '2026-10-28', fromDate: '2026-10-28', toDate: '2026-10-28', reason: 'Medical Appointment', status: 'Pending', type: 'Medical Leave' },
+    { id: 'LV-100', teacher: 'Mr. Anand Narayanan', subject: 'Physics', dates: '2026-10-15', fromDate: '2026-10-15', toDate: '2026-10-15', reason: 'Educational Conference', status: 'Approved', type: 'Duty Leave' },
+    { id: 'LV-103', teacher: 'Mrs. Priya Krishnan', subject: 'Mathematics', dates: '2026-10-20 to 2026-10-21', fromDate: '2026-10-20', toDate: '2026-10-21', reason: 'Attending University Valuation Board', status: 'Approved', type: 'Duty Leave' },
   ],
 
   schoolServiceAssignments: [
@@ -678,8 +678,16 @@ export function getPortalData() {
       if (!parsed.subjects || parsed.subjects.length < defaultData.subjects.length) {
         parsed.subjects = defaultData.subjects;
       }
-      if (!parsed.classTimetables || parsed.classTimetables.length < defaultData.classTimetables.length) {
+      if (!parsed.classTimetables || parsed.classTimetables.length === 0) {
         parsed.classTimetables = defaultData.classTimetables;
+      } else {
+        // Principals do not take class timetable teaching slots
+        parsed.classTimetables = parsed.classTimetables.filter(
+          (t) => !(t && t.teacherName && (
+            t.teacherName.toLowerCase() === 'meena' ||
+            (parsed.principals || []).some((p) => p.name && p.name.toLowerCase() === t.teacherName.toLowerCase())
+          ))
+        );
       }
       if (!parsed.announcements || parsed.announcements.length === 0 || !parsed.announcements[0].image) {
         parsed.announcements = defaultData.announcements;
@@ -764,7 +772,8 @@ export function syncBillToPortalFeeRecords(bill) {
       invoiceNumber: bill.invoiceNumber,
       dueDate: bill.dueDate || '2026-10-15',
       billingMonth: bill.billingMonth || 'October',
-      feeItems: bill.feeItems || []
+      feeItems: bill.feeItems || [],
+      schoolId: bill.schoolId || 'SCHOOL002'
     };
 
     if (idx !== -1) {
@@ -857,5 +866,156 @@ export function isUserActive(userId, username) {
   } catch (e) {}
   return true;
 }
+
+export function normalizeStaffName(name) {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/^(dr|mr|mrs|ms|prof)\.?\s+/i, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
+
+export function isDateWithinLeave(targetDate, leaveRecord) {
+  if (!targetDate || !leaveRecord) return false;
+  let from = leaveRecord.fromDate;
+  let to = leaveRecord.toDate;
+  if (!from && leaveRecord.dates) {
+    if (leaveRecord.dates.includes(' to ')) {
+      const parts = leaveRecord.dates.split(' to ');
+      from = parts[0].trim();
+      to = parts[1].trim();
+    } else {
+      from = leaveRecord.dates.trim();
+      to = leaveRecord.dates.trim();
+    }
+  }
+  if (!from) return false;
+  if (!to) to = from;
+  return targetDate >= from && targetDate <= to;
+}
+
+export function getStaffLeaveOnDate(staffName, targetDate, allLeaves = []) {
+  if (!staffName || !targetDate || !Array.isArray(allLeaves)) return null;
+  const targetNorm = normalizeStaffName(staffName);
+  if (!targetNorm) return null;
+
+  return (
+    allLeaves.find((lv) => {
+      if (!lv) return false;
+      if (lv.status === 'Rejected' || lv.status === 'Declined') return false;
+      const lvTeacherNorm = normalizeStaffName(lv.teacher || lv.staffName || lv.name);
+      if (!lvTeacherNorm) return false;
+      const isNameMatch =
+        targetNorm === lvTeacherNorm ||
+        targetNorm.includes(lvTeacherNorm) ||
+        lvTeacherNorm.includes(targetNorm);
+      if (!isNameMatch) return false;
+      return isDateWithinLeave(targetDate, lv);
+    }) || null
+  );
+}
+
+export function getStaffDailyAttendance(staffName, dateStr, allLeaves = [], staffStatus = 'Active') {
+  const d = new Date(dateStr);
+  const isSun = d.getDay() === 0;
+  const dayName = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  if (isSun) {
+    return {
+      dateStr,
+      dayName,
+      status: 'Holiday (Sun)',
+      inTime: '—',
+      outTime: '—',
+      isLeave: false,
+      isSun: true,
+      leaveRecord: null
+    };
+  }
+
+  const leaveRecord = getStaffLeaveOnDate(staffName, dateStr, allLeaves);
+  if (leaveRecord) {
+    const leaveType = leaveRecord.type || 'Casual Leave';
+    const isApproved = leaveRecord.status === 'Approved';
+    return {
+      dateStr,
+      dayName,
+      status: isApproved ? `On Approved Leave (${leaveType})` : `On Leave (${leaveType} - ${leaveRecord.status || 'Applied'})`,
+      inTime: '—',
+      outTime: '—',
+      isLeave: true,
+      isSun: false,
+      leaveRecord
+    };
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isExplicitLeave = (staffStatus === 'On Leave' && dateStr === todayStr);
+  if (isExplicitLeave) {
+    return {
+      dateStr,
+      dayName,
+      status: 'On Leave (Official Roster)',
+      inTime: '—',
+      outTime: '—',
+      isLeave: true,
+      isSun: false,
+      leaveRecord: null
+    };
+  }
+
+  return {
+    dateStr,
+    dayName,
+    status: 'Present on Duty',
+    inTime: '08:15 AM',
+    outTime: '04:30 PM',
+    isLeave: false,
+    isSun: false,
+    leaveRecord: null
+  };
+}
+
+export function toggleStaffLeaveOnDate(staffName, dateStr, shouldBeOnLeave, leaveType = 'Casual Leave') {
+  try {
+    const store = getPortalData() || {};
+    if (!store.staffLeaves) store.staffLeaves = [];
+
+    if (shouldBeOnLeave) {
+      const existing = getStaffLeaveOnDate(staffName, dateStr, store.staffLeaves);
+      if (!existing) {
+        store.staffLeaves.unshift({
+          id: `LV-${Math.floor(100 + Math.random() * 900)}`,
+          teacher: staffName,
+          dates: dateStr,
+          fromDate: dateStr,
+          toDate: dateStr,
+          reason: 'Authorized Leave Recorded via Attendance & Duty Log',
+          status: 'Approved',
+          type: leaveType,
+          appliedOn: new Date().toISOString().split('T')[0]
+        });
+      }
+    } else {
+      const targetNorm = normalizeStaffName(staffName);
+      store.staffLeaves = store.staffLeaves.filter((lv) => {
+        const lvTeacherNorm = normalizeStaffName(lv.teacher || lv.staffName || lv.name);
+        const isMatch = targetNorm === lvTeacherNorm || targetNorm.includes(lvTeacherNorm) || lvTeacherNorm.includes(targetNorm);
+        if (isMatch && isDateWithinLeave(dateStr, lv)) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    savePortalData(store);
+    return store.staffLeaves;
+  } catch (e) {
+    console.warn('toggleStaffLeaveOnDate error:', e);
+    return null;
+  }
+}
+
 
 

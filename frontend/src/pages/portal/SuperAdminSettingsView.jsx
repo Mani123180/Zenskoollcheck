@@ -47,7 +47,7 @@ export default function SuperAdminSettingsView({ initialSection = 'platform' }) 
     username: user?.username || 'superadmin',
     email: user?.email || 'superadmin@zenschool.com',
     phone: user?.phone || '+91 98401 11001',
-    avatar: user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+    avatar: (user?.avatar && !user.avatar.includes('unsplash')) ? user.avatar : '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
@@ -183,9 +183,29 @@ export default function SuperAdminSettingsView({ initialSection = 'platform' }) 
 
       if (saIndex !== -1) {
         users[saIndex] = { ...users[saIndex], ...updatedUser };
-        store.users = users;
-        savePortalData(store);
+      } else {
+        users.unshift({
+          id: user?.id || user?.userId || 'USR001',
+          username: user?.username || 'superadmin',
+          role: user?.role || 'superadmin',
+          ...updatedUser,
+        });
       }
+      store.users = users;
+      savePortalData(store);
+
+      try {
+        if (api && api.syncAuthUser) {
+          api.syncAuthUser({
+            id: user?.id || user?.userId || 'USR001',
+            username: user?.username || 'superadmin',
+            email: profile.email.trim(),
+            password: profile.newPassword || user?.password,
+            role: user?.role || 'superadmin',
+            name: profile.name.trim()
+          }).catch(() => {});
+        }
+      } catch (_) {}
 
       if (typeof updateCurrentUser === 'function') {
         updateCurrentUser(updatedUser);
@@ -623,12 +643,25 @@ export default function SuperAdminSettingsView({ initialSection = 'platform' }) 
         <div id="settings-content-pane" style={{ maxWidth: '820px', marginTop: '15px' }}>
           <div className="wizard-form-box" style={{ background: '#ffffff', borderRadius: '12px', padding: '26px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '22px', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-              <img
-                src={profile.avatar}
-                alt={profile.name}
-                style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--color-primary)' }}
-                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'; }}
-              />
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  backgroundColor: '#f1f5f9',
+                  border: '2px solid #cbd5e1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#94a3b8',
+                  flexShrink: 0,
+                }}
+                title="Profile"
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+              </div>
               <div>
                 <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-primary)' }}>Super Administrator Profile</h4>
                 <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: '#64748b' }}>Manage your display identity, contact email, and security password.</p>
