@@ -2277,8 +2277,8 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  
  
  
- {activeTab === 'finance-management' && (
-   <SchoolFinanceModule />
+ {(activeTab === 'finance-management' || activeTab === 'financial-manage') && (
+   <SchoolFinanceModule user={user} activeTab={activeTab} setActiveTab={setActiveTab} />
  )}
 
  
@@ -4502,7 +4502,7 @@ export default function SchoolAdminView({ activeTab, setActiveTab, user }) {
  
  
  
- {(activeTab === 'fee-collection-tracker' || activeTab === 'financial-manage') && (
+ {(activeTab === 'fee-collection-tracker') && (
         <div>
           <div style={{
             background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%)',

@@ -793,6 +793,84 @@ export function syncBillToPortalFeeRecords(bill) {
   }
 }
 
+export function removeBillFromPortalFeeRecords(billIdOrInvoice) {
+  if (!billIdOrInvoice) return;
+  try {
+    const cur = getPortalData();
+    let records = Array.isArray(cur.feeRecords) ? [...cur.feeRecords] : [];
+    records = records.filter(r => r.id !== billIdOrInvoice && r.invoiceNumber !== billIdOrInvoice && r.roll !== billIdOrInvoice);
+    cur.feeRecords = records;
+    savePortalData(cur);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fee_records_updated', { detail: { deletedId: billIdOrInvoice, feeRecords: records } }));
+    }
+  } catch (e) {
+    console.warn('removeBillFromPortalFeeRecords error:', e);
+  }
+}
+
+export function syncSalaryToPortal(salary) {
+  if (!salary) return;
+  try {
+    const cur = getPortalData();
+    let salaries = Array.isArray(cur.salaries) ? [...cur.salaries] : [];
+    const idx = salaries.findIndex(s => (salary._id && s._id === salary._id) || (salary.salarySlipNo && s.salarySlipNo === salary.salarySlipNo));
+    if (idx !== -1) {
+      salaries[idx] = { ...salaries[idx], ...salary };
+    } else {
+      salaries.unshift(salary);
+    }
+    cur.salaries = salaries;
+    savePortalData(cur);
+  } catch (e) {
+    console.warn('syncSalaryToPortal error:', e);
+  }
+}
+
+export function removeSalaryFromPortal(salaryIdOrSlip) {
+  if (!salaryIdOrSlip) return;
+  try {
+    const cur = getPortalData();
+    let salaries = Array.isArray(cur.salaries) ? [...cur.salaries] : [];
+    salaries = salaries.filter(s => s._id !== salaryIdOrSlip && s.salarySlipNo !== salaryIdOrSlip);
+    cur.salaries = salaries;
+    savePortalData(cur);
+  } catch (e) {
+    console.warn('removeSalaryFromPortal error:', e);
+  }
+}
+
+export function syncExpenseToPortal(expense) {
+  if (!expense) return;
+  try {
+    const cur = getPortalData();
+    let expenses = Array.isArray(cur.expenses) ? [...cur.expenses] : [];
+    const idx = expenses.findIndex(x => (expense._id && x._id === expense._id) || (expense.expenseId && x.expenseId === expense.expenseId));
+    if (idx !== -1) {
+      expenses[idx] = { ...expenses[idx], ...expense };
+    } else {
+      expenses.unshift(expense);
+    }
+    cur.expenses = expenses;
+    savePortalData(cur);
+  } catch (e) {
+    console.warn('syncExpenseToPortal error:', e);
+  }
+}
+
+export function removeExpenseFromPortal(expenseId) {
+  if (!expenseId) return;
+  try {
+    const cur = getPortalData();
+    let expenses = Array.isArray(cur.expenses) ? [...cur.expenses] : [];
+    expenses = expenses.filter(x => x._id !== expenseId && x.expenseId !== expenseId);
+    cur.expenses = expenses;
+    savePortalData(cur);
+  } catch (e) {
+    console.warn('removeExpenseFromPortal error:', e);
+  }
+}
+
 export function getInitialPortalData() {
   const data = getPortalData();
   savePortalData(data);
@@ -1014,6 +1092,43 @@ export function toggleStaffLeaveOnDate(staffName, dateStr, shouldBeOnLeave, leav
   } catch (e) {
     console.warn('toggleStaffLeaveOnDate error:', e);
     return null;
+  }
+}
+
+export function syncPaymentToPortal(txn) {
+  try {
+    if (!txn) return;
+    const store = getPortalData() || {};
+    if (!Array.isArray(store.paymentHistory)) {
+      store.paymentHistory = [];
+    }
+    const txnId = txn.transactionId || txn._id;
+    const idx = store.paymentHistory.findIndex(p => (p.transactionId && p.transactionId === txnId) || (p._id && p._id === txnId));
+    if (idx >= 0) {
+      store.paymentHistory[idx] = { ...store.paymentHistory[idx], ...txn };
+    } else {
+      store.paymentHistory.unshift({
+        ...txn,
+        transactionId: txn.transactionId || `TXN-${Date.now()}`,
+        transactionDate: txn.transactionDate || new Date().toISOString().split('T')[0],
+        paymentStatus: txn.paymentStatus || 'Completed'
+      });
+    }
+    savePortalData(store);
+    try {
+      window.dispatchEvent(new CustomEvent('payment_history_updated', { detail: txn }));
+    } catch {}
+  } catch (err) {
+    console.warn('syncPaymentToPortal error:', err);
+  }
+}
+
+export function getPortalPaymentHistory() {
+  try {
+    const store = getPortalData() || {};
+    return Array.isArray(store.paymentHistory) ? store.paymentHistory : [];
+  } catch {
+    return [];
   }
 }
 

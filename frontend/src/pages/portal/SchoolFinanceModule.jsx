@@ -1,7 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../../services/api';
 import { downloadStudentBillPDF, downloadSalarySlipPDF } from '../../services/pdfDownloadUtil';
-import { getPortalData, syncBillToPortalFeeRecords } from '../../services/portalData';
+import {
+  getPortalData,
+  syncBillToPortalFeeRecords,
+  syncSalaryToPortal,
+  removeSalaryFromPortal,
+  syncExpenseToPortal,
+  removeExpenseFromPortal,
+  syncPaymentToPortal,
+  getPortalPaymentHistory
+} from '../../services/portalData';
 import * as XLSX from 'xlsx';
 import { defaultFinanceData } from '../../services/defaultFinanceData';
 
@@ -231,6 +240,20 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
   const [reportYear, setReportYear] = useState('2026-2027');
   const [reportClass, setReportClass] = useState('All');
   const [reportStatus, setReportStatus] = useState('All');
+  const [reportSearch, setReportSearch] = useState('');
+
+  const [selectedTxnForReceipt, setSelectedTxnForReceipt] = useState(null);
+  const [isManualTxnModalOpen, setIsManualTxnModalOpen] = useState(false);
+  const [manualTxnForm, setManualTxnForm] = useState({
+    transactionType: 'Student Fee Payment',
+    partyName: '',
+    partyRole: 'Student',
+    invoiceNumber: '',
+    amount: '',
+    paymentMethod: 'Cash',
+    transactionDate: new Date().toISOString().split('T')[0],
+    remarks: ''
+  });
 
   
   const [paymentRecordForm, setPaymentRecordForm] = useState({
@@ -488,6 +511,16 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
 
   const loadSchoolExpenses = async () => {
     try {
+      let expenseList = [];
+      try {
+        const res = await api.getSchoolExpenses();
+        if (res && res.success && Array.isArray(res.expenses)) {
+          expenseList = res.expenses;
+        }
+      } catch (e) {
+        console.warn('api.getSchoolExpenses fallback to portal:', e.message);
+      }
+
       const portal = getPortalData();
       const currentSchoolId = user?.schoolId;
       const currentSchoolName = user?.schoolName;
@@ -496,18 +529,35 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
         ? portal.expenses.filter(x => !currentSchoolId || currentSchoolId === 'ALL' || x.schoolId === currentSchoolId)
         : [];
 
-      if (schoolExpenses.length > 0) {
-        setExpenses(schoolExpenses);
+      let combinedExpenses = [];
+      if (expenseList.length > 0) {
+        const expIds = new Set(expenseList.map(x => x.expenseId || x._id));
+        const extraPortal = schoolExpenses.filter(x => !expIds.has(x.expenseId || x._id));
+        combinedExpenses = [...expenseList, ...extraPortal];
       } else {
-        setExpenses(defaultFinanceData.expenses);
+        combinedExpenses = schoolExpenses.length > 0 ? schoolExpenses : defaultFinanceData.expenses;
       }
+
+      const normalized = combinedExpenses.map(e => {
+        const amt = Number(e.amount) || 0;
+        const paid = Number(e.paidAmount) || 0;
+        const pend = e.pendingAmount !== undefined ? Number(e.pendingAmount) : Math.max(0, amt - paid);
+        return {
+          ...e,
+          amount: amt,
+          paidAmount: paid,
+          pendingAmount: pend,
+          paymentStatus: pend <= 0 ? 'Paid' : (paid > 0 ? 'Partially Paid' : 'Pending')
+        };
+      });
+
+      setExpenses(normalized);
     } catch (err) {
       console.warn('School Expenses fallback:', err.message);
       setExpenses(defaultFinanceData.expenses);
     }
   };
 
-  
   const loadPaymentHistory = async () => {
     try {
       const res = await api.getPaymentHistory({
@@ -516,14 +566,21 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
         startDate: payStartDate,
         endDate: payEndDate
       });
-      if (res && res.success && Array.isArray(res.transactions) && res.transactions.length > 0) {
-        setPaymentHistory(res.transactions);
+      const portalPayments = getPortalPaymentHistory();
+      let combined = [];
+      if (res && res.success && Array.isArray(res.transactions)) {
+        const apiIds = new Set(res.transactions.map(t => t.transactionId || t._id));
+        const extraPortal = portalPayments.filter(p => !apiIds.has(p.transactionId || p._id));
+        combined = [...res.transactions, ...extraPortal];
       } else {
-        setPaymentHistory(defaultFinanceData.paymentHistory);
+        combined = portalPayments.length > 0 ? portalPayments : (defaultFinanceData.paymentHistory || []);
       }
+      setPaymentHistory(combined.length > 0 ? combined : (defaultFinanceData.paymentHistory || []));
     } catch (err) {
       console.warn('Payment History API fallback to demo data:', err.message);
-      setPaymentHistory(defaultFinanceData.paymentHistory);
+      const portalPayments = getPortalPaymentHistory();
+      const base = portalPayments.length > 0 ? portalPayments : (defaultFinanceData.paymentHistory || []);
+      setPaymentHistory(base);
     }
   };
 
@@ -1058,11 +1115,16 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
     setLoading(true);
     try {
       if (editingExpense) {
-        await api.updateSchoolExpense(editingExpense._id || editingExpense.expenseId, expenseForm);
+        const res = await api.updateSchoolExpense(editingExpense._id || editingExpense.expenseId, expenseForm);
         showToast('Updated', 'Expense entry updated successfully.');
+        const updated = (res && res.expense) || { ...editingExpense, ...expenseForm };
+        syncExpenseToPortal(updated);
       } else {
-        await api.addSchoolExpense(expenseForm);
+        const res = await api.addSchoolExpense(expenseForm);
         showToast('Expense Added', 'New school expense recorded successfully.');
+        if (res && res.expense) {
+          syncExpenseToPortal(res.expense);
+        }
       }
       setIsExpenseModalOpen(false);
       loadSchoolExpenses();
@@ -1076,11 +1138,13 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
   };
 
   const handleDeleteExpense = async (expense) => {
+    if (!expense) return;
     if (!window.confirm(`Are you sure you want to remove expense ${expense.expenseName} (${expense.expenseId})?`)) {
       return;
     }
     try {
       await api.deleteSchoolExpense(expense._id || expense.expenseId);
+      removeExpenseFromPortal(expense._id || expense.expenseId);
       showToast('Deleted', 'Expense record deleted.');
       loadSchoolExpenses();
       loadDashboardData();
@@ -1125,7 +1189,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
       if (activePayingRecord._paymentType === 'Student') {
         const res = await api.recordStudentBillPayment(activePayingRecord._id || activePayingRecord.invoiceNumber, paymentRecordForm);
         loadStudentBills();
-        const updatedBill = res.bill || {
+        const updatedBill = res?.bill || {
           ...activePayingRecord,
           paidAmount: (Number(activePayingRecord.paidAmount) || 0) + payAmt,
           pendingAmount: Math.max(0, (Number(activePayingRecord.pendingAmount) || 0) - payAmt),
@@ -1135,12 +1199,68 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
           setSelectedStudentCard(updatedBill);
         }
         syncBillToPortalFeeRecords(updatedBill);
+        const txn = res?.transaction || {
+          transactionId: `TXN-${Date.now()}`,
+          transactionDate: paymentRecordForm.paymentDate || new Date().toISOString().split('T')[0],
+          transactionType: 'Student Fee Payment',
+          referenceId: activePayingRecord.invoiceNumber,
+          invoiceNumber: activePayingRecord.invoiceNumber,
+          partyName: activePayingRecord.studentName,
+          partyRole: 'Student',
+          amount: payAmt,
+          paymentMethod: paymentRecordForm.paymentMethod || 'Cash',
+          paymentStatus: 'Completed',
+          remarks: paymentRecordForm.remarks || `Fee payment towards ${activePayingRecord.invoiceNumber}`
+        };
+        syncPaymentToPortal(txn);
       } else if (activePayingRecord._paymentType === 'Salary') {
-        await api.recordStaffSalaryPayment(activePayingRecord._id || activePayingRecord.salarySlipNo, paymentRecordForm);
+        const res = await api.recordStaffSalaryPayment(activePayingRecord._id || activePayingRecord.salarySlipNo, paymentRecordForm);
+        const updatedSal = (res && res.salary) || {
+          ...activePayingRecord,
+          paidAmount: (Number(activePayingRecord.paidAmount) || 0) + payAmt,
+          pendingAmount: Math.max(0, (Number(activePayingRecord.pendingAmount) || 0) - payAmt),
+          paymentStatus: (Number(activePayingRecord.pendingAmount) || 0) - payAmt <= 0 ? 'Paid' : 'Partially Paid'
+        };
+        syncSalaryToPortal(updatedSal);
         loadStaffSalaries();
+        const txn = res?.transaction || {
+          transactionId: `TXN-${Date.now()}`,
+          transactionDate: paymentRecordForm.paymentDate || new Date().toISOString().split('T')[0],
+          transactionType: 'Staff Salary Payment',
+          referenceId: activePayingRecord.salarySlipNo,
+          invoiceNumber: activePayingRecord.salarySlipNo,
+          partyName: activePayingRecord.staffName,
+          partyRole: 'Staff',
+          amount: payAmt,
+          paymentMethod: paymentRecordForm.paymentMethod || 'Bank Transfer',
+          paymentStatus: 'Completed',
+          remarks: paymentRecordForm.remarks || `Salary payout for ${activePayingRecord.staffName}`
+        };
+        syncPaymentToPortal(txn);
       } else if (activePayingRecord._paymentType === 'Expense') {
-        await api.recordSchoolExpensePayment(activePayingRecord._id || activePayingRecord.expenseId, paymentRecordForm);
+        const res = await api.recordSchoolExpensePayment(activePayingRecord._id || activePayingRecord.expenseId, paymentRecordForm);
+        const updatedExp = (res && res.expense) || {
+          ...activePayingRecord,
+          paidAmount: (Number(activePayingRecord.paidAmount) || 0) + payAmt,
+          pendingAmount: Math.max(0, (Number(activePayingRecord.pendingAmount) || 0) - payAmt),
+          paymentStatus: (Number(activePayingRecord.pendingAmount) || 0) - payAmt <= 0 ? 'Paid' : 'Partially Paid'
+        };
+        syncExpenseToPortal(updatedExp);
         loadSchoolExpenses();
+        const txn = res?.transaction || {
+          transactionId: `TXN-${Date.now()}`,
+          transactionDate: paymentRecordForm.paymentDate || new Date().toISOString().split('T')[0],
+          transactionType: 'School Expense Payment',
+          referenceId: activePayingRecord.expenseId,
+          invoiceNumber: activePayingRecord.invoiceNumber || activePayingRecord.expenseId,
+          partyName: activePayingRecord.vendorName,
+          partyRole: 'Vendor',
+          amount: payAmt,
+          paymentMethod: paymentRecordForm.paymentMethod || 'Bank Transfer',
+          paymentStatus: 'Completed',
+          remarks: paymentRecordForm.remarks || `Vendor payout for ${activePayingRecord.expenseName}`
+        };
+        syncPaymentToPortal(txn);
       }
 
       showToast('Payment Successful', `₹${payAmt.toLocaleString()} payment recorded successfully!`);
@@ -1149,6 +1269,45 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
       loadPaymentHistory();
     } catch (err) {
       showToast('Error Recording Payment', err.message, true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveManualPayment = async (e) => {
+    e.preventDefault();
+    const numAmt = Number(manualTxnForm.amount);
+    if (!manualTxnForm.partyName.trim() || isNaN(numAmt) || numAmt <= 0) {
+      showToast('Validation Error', 'Party name and valid positive amount are required.', true);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.addPaymentTransaction(manualTxnForm);
+      const newTxn = res?.transaction || {
+        ...manualTxnForm,
+        transactionId: `TXN-${Date.now()}`,
+        amount: numAmt,
+        paymentStatus: 'Completed'
+      };
+      syncPaymentToPortal(newTxn);
+      showToast('Payment Recorded', `Transaction for ₹${numAmt.toLocaleString()} saved.`);
+      setIsManualTxnModalOpen(false);
+      setManualTxnForm({
+        transactionType: 'Student Fee Payment',
+        partyName: '',
+        partyRole: 'Student',
+        invoiceNumber: '',
+        amount: '',
+        paymentMethod: 'Cash',
+        transactionDate: new Date().toISOString().split('T')[0],
+        remarks: ''
+      });
+      loadPaymentHistory();
+      loadDashboardData();
+    } catch (err) {
+      showToast('Error', err.message, true);
     } finally {
       setLoading(false);
     }
@@ -1243,6 +1402,518 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
     const matchStatus = expenseStatusFilter === 'All' || e.paymentStatus === expenseStatusFilter;
     return matchSearch && matchCat && matchStatus;
   });
+
+  const reportMonthsList = ['All', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const availableClasses = useMemo(() => {
+    const classSet = new Set();
+    bills.forEach(b => {
+      if (b.grade) classSet.add(b.grade);
+    });
+    return ['All', ...Array.from(classSet).sort()];
+  }, [bills]);
+
+  const filteredPaymentHistory = useMemo(() => {
+    return paymentHistory.filter((p) => {
+      if (payTypeFilter && payTypeFilter !== 'All' && p.transactionType !== payTypeFilter) {
+        return false;
+      }
+      if (paySearch.trim()) {
+        const q = paySearch.toLowerCase();
+        const matchesId = (p.transactionId || '').toLowerCase().includes(q);
+        const matchesParty = (p.partyName || '').toLowerCase().includes(q);
+        const matchesRef = (p.invoiceNumber || p.referenceId || '').toLowerCase().includes(q);
+        const matchesRemark = (p.remarks || '').toLowerCase().includes(q);
+        if (!matchesId && !matchesParty && !matchesRef && !matchesRemark) return false;
+      }
+      if (payStartDate && p.transactionDate && p.transactionDate < payStartDate) return false;
+      if (payEndDate && p.transactionDate && p.transactionDate > payEndDate) return false;
+      return true;
+    });
+  }, [paymentHistory, payTypeFilter, paySearch, payStartDate, payEndDate]);
+
+  const paymentHistoryKPIs = useMemo(() => {
+    const totalCount = filteredPaymentHistory.length;
+    const totalInflow = filteredPaymentHistory
+      .filter(p => p.transactionType === 'Student Fee Payment')
+      .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const totalOutflow = filteredPaymentHistory
+      .filter(p => p.transactionType !== 'Student Fee Payment')
+      .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const netCash = totalInflow - totalOutflow;
+    return { totalCount, totalInflow, totalOutflow, netCash };
+  }, [filteredPaymentHistory]);
+
+  const generatedReport = useMemo(() => {
+    let title = '';
+    let description = '';
+    let headers = [];
+    let rows = [];
+    let exportRows = [];
+    let summary = { totalCount: 0, totalAmount: 0, totalPaid: 0, totalPending: 0 };
+
+    const matchesMonth = (monthVal) => {
+      if (!reportMonth || reportMonth === 'All') return true;
+      if (!monthVal) return false;
+      return String(monthVal).toLowerCase().includes(reportMonth.toLowerCase()) || reportMonth.toLowerCase().includes(String(monthVal).toLowerCase());
+    };
+
+    const matchesYear = (yearVal) => {
+      if (!reportYear || reportYear === 'All') return true;
+      if (!yearVal) return true;
+      return String(yearVal).includes(reportYear);
+    };
+
+    const matchesClass = (classVal) => {
+      if (!reportClass || reportClass === 'All') return true;
+      if (!classVal) return false;
+      return classVal === reportClass;
+    };
+
+    const matchesStatus = (statusVal) => {
+      if (!reportStatus || reportStatus === 'All') return true;
+      if (!statusVal) return false;
+      if (reportStatus === 'Paid') return statusVal === 'Paid';
+      if (reportStatus === 'Pending') return statusVal === 'Pending' || statusVal === 'Partially Paid' || statusVal === 'Overdue' || statusVal === 'Unpaid';
+      return statusVal === reportStatus;
+    };
+
+    const searchFilter = (item, fields) => {
+      if (!reportSearch.trim()) return true;
+      const q = reportSearch.toLowerCase();
+      return fields.some(f => {
+        const val = item[f];
+        return val && String(val).toLowerCase().includes(q);
+      });
+    };
+
+    if (reportType === 'student-fee-collection') {
+      title = 'Student Fee Collection Register';
+      description = 'Official student fee ledger with invoice numbers, fees billed, collections received, and outstanding dues.';
+      headers = [
+        { label: 'Invoice No', key: 'invoiceNumber' },
+        { label: 'Student Name', key: 'studentName' },
+        { label: 'Class & Sec', key: 'gradeSec' },
+        { label: 'Month', key: 'billingMonth' },
+        { label: 'Total Billed', key: 'totalFees', align: 'right', isCurrency: true },
+        { label: 'Paid / Collected', key: 'paidAmount', align: 'right', isCurrency: true, color: '#10b981' },
+        { label: 'Pending Due', key: 'pendingAmount', align: 'right', isCurrency: true, color: '#ef4444' },
+        { label: 'Status', key: 'paymentStatus', align: 'center', isBadge: true },
+        { label: 'Due Date', key: 'dueDate' }
+      ];
+
+      const filtered = bills.filter(b =>
+        matchesMonth(b.billingMonth) &&
+        matchesYear(b.academicYear) &&
+        matchesClass(b.grade) &&
+        matchesStatus(b.paymentStatus) &&
+        searchFilter(b, ['studentName', 'invoiceNumber', 'studentId', 'rollNo', 'grade'])
+      ).map(b => ({
+        ...b,
+        gradeSec: `${b.grade || ''} - ${b.section || ''}`
+      }));
+
+      rows = filtered;
+      summary.totalCount = filtered.length;
+      summary.totalAmount = filtered.reduce((s, b) => s + (Number(b.totalFees) || 0), 0);
+      summary.totalPaid = filtered.reduce((s, b) => s + (Number(b.paidAmount) || 0), 0);
+      summary.totalPending = filtered.reduce((s, b) => s + (Number(b.pendingAmount) || 0), 0);
+
+      exportRows = filtered.map(b => ({
+        'Invoice No': b.invoiceNumber,
+        'Student Name': b.studentName,
+        'Roll No': b.rollNo || b.studentId,
+        'Class': b.grade,
+        'Section': b.section,
+        'Billing Month': b.billingMonth,
+        'Academic Year': b.academicYear,
+        'Total Fees (₹)': b.totalFees,
+        'Paid Amount (₹)': b.paidAmount,
+        'Pending Amount (₹)': b.pendingAmount,
+        'Payment Status': b.paymentStatus,
+        'Due Date': b.dueDate
+      }));
+
+    } else if (reportType === 'student-pending-fees') {
+      title = 'Student Pending & Overdue Fees Statement';
+      description = 'Complete list of student defaulters and outstanding tuition/transport fee receivables.';
+      headers = [
+        { label: 'Invoice No', key: 'invoiceNumber' },
+        { label: 'Student Name', key: 'studentName' },
+        { label: 'Class & Sec', key: 'gradeSec' },
+        { label: 'Month', key: 'billingMonth' },
+        { label: 'Total Billed', key: 'totalFees', align: 'right', isCurrency: true },
+        { label: 'Paid Amount', key: 'paidAmount', align: 'right', isCurrency: true, color: '#10b981' },
+        { label: 'Pending Due', key: 'pendingAmount', align: 'right', isCurrency: true, color: '#ef4444', bold: true },
+        { label: 'Due Date', key: 'dueDate' },
+        { label: 'Status', key: 'paymentStatus', align: 'center', isBadge: true }
+      ];
+
+      const filtered = bills.filter(b =>
+        Number(b.pendingAmount) > 0 &&
+        matchesMonth(b.billingMonth) &&
+        matchesYear(b.academicYear) &&
+        matchesClass(b.grade) &&
+        searchFilter(b, ['studentName', 'invoiceNumber', 'studentId', 'rollNo', 'grade'])
+      ).map(b => ({
+        ...b,
+        gradeSec: `${b.grade || ''} - ${b.section || ''}`
+      }));
+
+      rows = filtered;
+      summary.totalCount = filtered.length;
+      summary.totalAmount = filtered.reduce((s, b) => s + (Number(b.totalFees) || 0), 0);
+      summary.totalPaid = filtered.reduce((s, b) => s + (Number(b.paidAmount) || 0), 0);
+      summary.totalPending = filtered.reduce((s, b) => s + (Number(b.pendingAmount) || 0), 0);
+
+      exportRows = filtered.map(b => ({
+        'Invoice No': b.invoiceNumber,
+        'Student Name': b.studentName,
+        'Roll No': b.rollNo || b.studentId,
+        'Class': b.grade,
+        'Billing Month': b.billingMonth,
+        'Total Fees (₹)': b.totalFees,
+        'Paid (₹)': b.paidAmount,
+        'Pending Due (₹)': b.pendingAmount,
+        'Due Date': b.dueDate,
+        'Status': b.paymentStatus
+      }));
+
+    } else if (reportType === 'staff-salary-report') {
+      title = 'Staff Salary & Payroll Register';
+      description = 'Complete monthly payroll register including gross salary, statutory deductions (PF/ESI), and net disbursed pay.';
+      headers = [
+        { label: 'Slip No', key: 'salarySlipNo' },
+        { label: 'Staff Name', key: 'staffName' },
+        { label: 'Designation', key: 'designation' },
+        { label: 'Month', key: 'salaryMonth' },
+        { label: 'Gross Salary', key: 'grossSalary', align: 'right', isCurrency: true },
+        { label: 'Deductions', key: 'totalDeductions', align: 'right', isCurrency: true, color: '#f59e0b' },
+        { label: 'Net Payable', key: 'netSalary', align: 'right', isCurrency: true },
+        { label: 'Paid Amount', key: 'paidAmount', align: 'right', isCurrency: true, color: '#10b981' },
+        { label: 'Pending', key: 'pendingAmount', align: 'right', isCurrency: true, color: '#ef4444' },
+        { label: 'Status', key: 'paymentStatus', align: 'center', isBadge: true }
+      ];
+
+      const filtered = salaries.filter(s =>
+        matchesMonth(s.salaryMonth) &&
+        matchesYear(s.academicYear) &&
+        matchesStatus(s.paymentStatus) &&
+        searchFilter(s, ['staffName', 'salarySlipNo', 'designation', 'staffId', 'department'])
+      );
+
+      rows = filtered;
+      summary.totalCount = filtered.length;
+      summary.totalAmount = filtered.reduce((sum, s) => sum + (Number(s.netSalary) || 0), 0);
+      summary.totalPaid = filtered.reduce((sum, s) => sum + (Number(s.paidAmount) || 0), 0);
+      summary.totalPending = filtered.reduce((sum, s) => sum + (Number(s.pendingAmount) || 0), 0);
+
+      exportRows = filtered.map(s => ({
+        'Slip No': s.salarySlipNo,
+        'Staff ID': s.staffId,
+        'Staff Name': s.staffName,
+        'Designation': s.designation,
+        'Department': s.department,
+        'Month': s.salaryMonth,
+        'Gross Salary (₹)': s.grossSalary,
+        'Deductions (₹)': s.totalDeductions,
+        'Net Salary (₹)': s.netSalary,
+        'Paid Amount (₹)': s.paidAmount,
+        'Pending (₹)': s.pendingAmount,
+        'Payment Method': s.paymentMethod,
+        'Status': s.paymentStatus
+      }));
+
+    } else if (reportType === 'staff-salary-pending') {
+      title = 'Staff Salary Pending Liabilities Statement';
+      description = 'Outstanding payroll commitments and pending salary disbursements for school staff.';
+      headers = [
+        { label: 'Slip No', key: 'salarySlipNo' },
+        { label: 'Staff Name', key: 'staffName' },
+        { label: 'Designation', key: 'designation' },
+        { label: 'Month', key: 'salaryMonth' },
+        { label: 'Net Salary', key: 'netSalary', align: 'right', isCurrency: true },
+        { label: 'Paid Amount', key: 'paidAmount', align: 'right', isCurrency: true, color: '#10b981' },
+        { label: 'Outstanding Balance', key: 'pendingAmount', align: 'right', isCurrency: true, color: '#ef4444', bold: true },
+        { label: 'Payment Mode', key: 'paymentMethod' },
+        { label: 'Status', key: 'paymentStatus', align: 'center', isBadge: true }
+      ];
+
+      const filtered = salaries.filter(s =>
+        Number(s.pendingAmount) > 0 &&
+        matchesMonth(s.salaryMonth) &&
+        matchesYear(s.academicYear) &&
+        searchFilter(s, ['staffName', 'salarySlipNo', 'designation', 'staffId', 'department'])
+      );
+
+      rows = filtered;
+      summary.totalCount = filtered.length;
+      summary.totalAmount = filtered.reduce((sum, s) => sum + (Number(s.netSalary) || 0), 0);
+      summary.totalPaid = filtered.reduce((sum, s) => sum + (Number(s.paidAmount) || 0), 0);
+      summary.totalPending = filtered.reduce((sum, s) => sum + (Number(s.pendingAmount) || 0), 0);
+
+      exportRows = filtered.map(s => ({
+        'Slip No': s.salarySlipNo,
+        'Staff Name': s.staffName,
+        'Designation': s.designation,
+        'Month': s.salaryMonth,
+        'Net Salary (₹)': s.netSalary,
+        'Paid Amount (₹)': s.paidAmount,
+        'Outstanding Balance (₹)': s.pendingAmount,
+        'Status': s.paymentStatus
+      }));
+
+    } else if (reportType === 'school-expense-report') {
+      title = 'Campus Operating Expenses Register';
+      description = 'Complete ledger of campus utilities, repairs, vendor payables, and administrative expenses.';
+      headers = [
+        { label: 'Expense ID', key: 'expenseId' },
+        { label: 'Category', key: 'expenseCategory' },
+        { label: 'Expense Title', key: 'expenseName' },
+        { label: 'Vendor Name', key: 'vendorName' },
+        { label: 'Invoice No', key: 'invoiceNumber' },
+        { label: 'Date', key: 'expenseDate' },
+        { label: 'Total Amount', key: 'amount', align: 'right', isCurrency: true },
+        { label: 'Paid Amount', key: 'paidAmount', align: 'right', isCurrency: true, color: '#10b981' },
+        { label: 'Pending Dues', key: 'pendingAmount', align: 'right', isCurrency: true, color: '#ef4444' },
+        { label: 'Status', key: 'paymentStatus', align: 'center', isBadge: true }
+      ];
+
+      const filtered = expenses.filter(e =>
+        matchesMonth(e.expenseDate) &&
+        matchesStatus(e.paymentStatus) &&
+        searchFilter(e, ['expenseName', 'expenseId', 'vendorName', 'invoiceNumber', 'expenseCategory'])
+      );
+
+      rows = filtered;
+      summary.totalCount = filtered.length;
+      summary.totalAmount = filtered.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      summary.totalPaid = filtered.reduce((sum, e) => sum + (Number(e.paidAmount) || 0), 0);
+      summary.totalPending = filtered.reduce((sum, e) => sum + (Number(e.pendingAmount) || 0), 0);
+
+      exportRows = filtered.map(e => ({
+        'Expense ID': e.expenseId,
+        'Category': e.expenseCategory,
+        'Title': e.expenseName,
+        'Vendor': e.vendorName,
+        'Invoice No': e.invoiceNumber,
+        'Date': e.expenseDate,
+        'Amount (₹)': e.amount,
+        'Paid (₹)': e.paidAmount,
+        'Pending (₹)': e.pendingAmount,
+        'Status': e.paymentStatus
+      }));
+
+    } else if (reportType === 'monthly-income-report') {
+      title = 'Monthly Fee Revenue & Collection Summary';
+      description = 'Monthly breakdown of student fee billings, collections, and fee realization efficiency.';
+      headers = [
+        { label: 'Billing Month', key: 'month' },
+        { label: 'Total Invoices', key: 'count', align: 'center' },
+        { label: 'Total Billed Amount', key: 'billed', align: 'right', isCurrency: true },
+        { label: 'Total Collected', key: 'collected', align: 'right', isCurrency: true, color: '#10b981' },
+        { label: 'Pending Balance', key: 'pending', align: 'right', isCurrency: true, color: '#ef4444' },
+        { label: 'Collection Rate', key: 'rate', align: 'center' }
+      ];
+
+      const monthsMap = {};
+      bills.forEach(b => {
+        const m = b.billingMonth || 'October';
+        if (!monthsMap[m]) {
+          monthsMap[m] = { month: m, count: 0, billed: 0, collected: 0, pending: 0 };
+        }
+        monthsMap[m].count += 1;
+        monthsMap[m].billed += Number(b.totalFees) || 0;
+        monthsMap[m].collected += Number(b.paidAmount) || 0;
+        monthsMap[m].pending += Number(b.pendingAmount) || 0;
+      });
+
+      let grouped = Object.values(monthsMap).map(item => ({
+        ...item,
+        rate: item.billed > 0 ? `${Math.round((item.collected / item.billed) * 100)}%` : '0%'
+      }));
+
+      if (reportMonth && reportMonth !== 'All') {
+        grouped = grouped.filter(g => matchesMonth(g.month));
+      }
+
+      rows = grouped;
+      summary.totalCount = grouped.length;
+      summary.totalAmount = grouped.reduce((sum, g) => sum + g.billed, 0);
+      summary.totalPaid = grouped.reduce((sum, g) => sum + g.collected, 0);
+      summary.totalPending = grouped.reduce((sum, g) => sum + g.pending, 0);
+
+      exportRows = grouped.map(g => ({
+        'Billing Month': g.month,
+        'Total Invoices': g.count,
+        'Total Billed (₹)': g.billed,
+        'Total Collected (₹)': g.collected,
+        'Pending (₹)': g.pending,
+        'Collection Rate': g.rate
+      }));
+
+    } else if (reportType === 'monthly-expense-report') {
+      title = 'Campus Operating Expenses Breakdown by Category';
+      description = 'Aggregated expenditure statement organized by institutional operational cost centers.';
+      headers = [
+        { label: 'Expense Category', key: 'category' },
+        { label: 'Records Count', key: 'count', align: 'center' },
+        { label: 'Total Incurred', key: 'total', align: 'right', isCurrency: true },
+        { label: 'Paid Amount', key: 'paid', align: 'right', isCurrency: true, color: '#10b981' },
+        { label: 'Outstanding Balance', key: 'pending', align: 'right', isCurrency: true, color: '#ef4444' },
+        { label: 'Settlement %', key: 'settledRate', align: 'center' }
+      ];
+
+      const catMap = {};
+      expenses.forEach(e => {
+        const c = e.expenseCategory || 'General & Administration';
+        if (!catMap[c]) {
+          catMap[c] = { category: c, count: 0, total: 0, paid: 0, pending: 0 };
+        }
+        catMap[c].count += 1;
+        catMap[c].total += Number(e.amount) || 0;
+        catMap[c].paid += Number(e.paidAmount) || 0;
+        catMap[c].pending += Number(e.pendingAmount) || 0;
+      });
+
+      const grouped = Object.values(catMap).map(c => ({
+        ...c,
+        settledRate: c.total > 0 ? `${Math.round((c.paid / c.total) * 100)}%` : '0%'
+      }));
+
+      rows = grouped;
+      summary.totalCount = grouped.length;
+      summary.totalAmount = grouped.reduce((s, c) => s + c.total, 0);
+      summary.totalPaid = grouped.reduce((s, c) => s + c.paid, 0);
+      summary.totalPending = grouped.reduce((s, c) => s + c.pending, 0);
+
+      exportRows = grouped.map(c => ({
+        'Expense Category': c.category,
+        'Records': c.count,
+        'Total Incurred (₹)': c.total,
+        'Paid (₹)': c.paid,
+        'Outstanding (₹)': c.pending,
+        'Settlement Rate': c.settledRate
+      }));
+
+    } else if (reportType === 'annual-finance-report') {
+      title = 'Institutional Annual Balance Sheet & Audit Statement';
+      description = 'Consolidated institutional audit: Total fee income vs Outflows (Staff Payroll & Operating Expenses).';
+
+      const totalFeeIncome = bills.reduce((s, b) => s + (Number(b.paidAmount) || 0), 0);
+      const totalFeeBilled = bills.reduce((s, b) => s + (Number(b.totalFees) || 0), 0);
+      const totalFeePending = bills.reduce((s, b) => s + (Number(b.pendingAmount) || 0), 0);
+
+      const totalSalaryPaid = salaries.reduce((s, sal) => s + (Number(sal.paidAmount) || 0), 0);
+      const totalSalaryGross = salaries.reduce((s, sal) => s + (Number(sal.netSalary) || 0), 0);
+      const totalSalaryPending = salaries.reduce((s, sal) => s + (Number(sal.pendingAmount) || 0), 0);
+
+      const totalExpensePaid = expenses.reduce((s, e) => s + (Number(e.paidAmount) || 0), 0);
+      const totalExpenseTotal = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const totalExpensePending = expenses.reduce((s, e) => s + (Number(e.pendingAmount) || 0), 0);
+
+      const totalInflow = totalFeeIncome;
+      const totalOutflow = totalSalaryPaid + totalExpensePaid;
+      const netOperatingSurplus = totalInflow - totalOutflow;
+
+      headers = [
+        { label: 'Financial Head', key: 'head', bold: true },
+        { label: 'Head Type', key: 'category' },
+        { label: 'Total Incurred / Billed', key: 'total', align: 'right', isCurrency: true },
+        { label: 'Cash Realized / Disbursed', key: 'cashFlow', align: 'right', isCurrency: true },
+        { label: 'Outstanding Balance', key: 'pending', align: 'right', isCurrency: true },
+        { label: 'Audit Remarks', key: 'remarks' }
+      ];
+
+      rows = [
+        {
+          head: 'Revenue: Student Fees Collected',
+          category: 'Institutional Inflow',
+          total: totalFeeBilled,
+          cashFlow: totalFeeIncome,
+          pending: totalFeePending,
+          remarks: 'Tuition, transport, term & activity fees realized'
+        },
+        {
+          head: 'Expenditure: Staff Salaries Disbursed',
+          category: 'Payroll Outflow',
+          total: totalSalaryGross,
+          cashFlow: totalSalaryPaid,
+          pending: totalSalaryPending,
+          remarks: 'Teaching & non-teaching staff monthly compensation'
+        },
+        {
+          head: 'Expenditure: Campus Operating Expenses',
+          category: 'Operations Outflow',
+          total: totalExpenseTotal,
+          cashFlow: totalExpensePaid,
+          pending: totalExpensePending,
+          remarks: 'Utilities, maintenance, vendor & lab operating costs'
+        },
+        {
+          head: 'NET INSTITUTIONAL SURPLUS / (DEFICIT)',
+          category: 'Balance Sheet Position',
+          total: totalFeeBilled - (totalSalaryGross + totalExpenseTotal),
+          cashFlow: netOperatingSurplus,
+          pending: totalFeePending - (totalSalaryPending + totalExpensePending),
+          remarks: netOperatingSurplus >= 0 ? 'Surplus Positive Operating Balance' : 'Operating Deficit'
+        }
+      ];
+
+      summary.totalCount = 4;
+      summary.totalAmount = totalFeeIncome;
+      summary.totalPaid = totalOutflow;
+      summary.totalPending = netOperatingSurplus;
+
+      exportRows = rows.map(r => ({
+        'Financial Head': r.head,
+        'Category': r.category,
+        'Total (₹)': r.total,
+        'Cash Flow (₹)': r.cashFlow,
+        'Outstanding Balance (₹)': r.pending,
+        'Remarks': r.remarks
+      }));
+
+    } else { // payment-history-report
+      title = 'Centralized Payment Audit & Transaction Journal';
+      description = 'Complete ledger journal of every cash, bank, and online payment transaction.';
+      headers = [
+        { label: 'Txn ID', key: 'transactionId' },
+        { label: 'Date', key: 'transactionDate' },
+        { label: 'Type', key: 'transactionType' },
+        { label: 'Party Name', key: 'partyName' },
+        { label: 'Reference / Invoice', key: 'invoiceNumber' },
+        { label: 'Payment Method', key: 'paymentMethod' },
+        { label: 'Amount', key: 'amount', align: 'right', isCurrency: true },
+        { label: 'Status', key: 'paymentStatus', align: 'center', isBadge: true }
+      ];
+
+      const filtered = paymentHistory.filter(p =>
+        matchesMonth(p.transactionDate) &&
+        searchFilter(p, ['transactionId', 'partyName', 'invoiceNumber', 'transactionType', 'remarks'])
+      );
+
+      rows = filtered;
+      summary.totalCount = filtered.length;
+      summary.totalAmount = filtered.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      summary.totalPaid = filtered.filter(p => p.transactionType === 'Student Fee Payment').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      summary.totalPending = filtered.filter(p => p.transactionType !== 'Student Fee Payment').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+
+      exportRows = filtered.map(p => ({
+        'Transaction ID': p.transactionId,
+        'Date': p.transactionDate,
+        'Type': p.transactionType,
+        'Party': p.partyName,
+        'Invoice/Ref': p.invoiceNumber,
+        'Method': p.paymentMethod,
+        'Amount (₹)': p.amount,
+        'Status': p.paymentStatus,
+        'Remarks': p.remarks
+      }));
+    }
+
+    return { title, description, headers, rows, exportRows, summary };
+  }, [reportType, reportMonth, reportYear, reportClass, reportStatus, reportSearch, bills, salaries, expenses, paymentHistory]);
 
   return (
     <div className="school-finance-container" style={{ padding: '4px' }}>
@@ -1367,7 +2038,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
             </div>
 
             
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+            <div className="sa-finance-filter-group" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Academic Year</label>
                 <select
@@ -1436,7 +2107,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
           </div>
 
           
-          <div style={{
+          <div className="sa-finance-kpi-grid" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
             gap: '16px',
@@ -1750,7 +2421,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
           </div>
 
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+          <div className="sa-finance-charts-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px', marginBottom: '24px' }}>
             
             <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px' }}>
               <h4 style={{ margin: '0 0 16px', fontSize: '1rem', color: '#1e3a8a', fontWeight: 700 }}>
@@ -2271,7 +2942,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
               <table className="sa-schools-table" style={{ width: '100%', minWidth: '1350px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 2 }}>STUDENT NAME</th>
+                    <th className="finance-sticky-left" style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 2, minWidth: '180px' }}>STUDENT NAME</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569' }}>GRADE / CLASS</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569' }}>SECTION</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569' }}>MONTH</th>
@@ -2284,7 +2955,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                     <th style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.76rem', color: '#ef4444' }}>PENDING AMOUNT</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.76rem', color: '#475569' }}>STATUS</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569' }}>DUE DATE</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.76rem', color: '#475569', position: 'sticky', right: 0, background: '#f1f5f9', zIndex: 2 }}>ACTIONS</th>
+                    <th className="finance-sticky-right" style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.76rem', color: '#475569', position: 'sticky', right: 0, background: '#f1f5f9', zIndex: 2, minWidth: '190px' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2314,9 +2985,9 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                             transition: 'background 0.15s ease'
                           }}
                         >
-                          <td style={{ padding: '12px 14px', position: 'sticky', left: 0, background: isSelected ? '#eff6ff' : '#ffffff', zIndex: 1 }}>
-                            <div style={{ fontWeight: 800, color: '#1e3a8a', fontSize: '0.88rem' }}>{b.studentName}</div>
-                            <div style={{ fontSize: '0.74rem', color: '#64748b' }}>Roll: {b.rollNo || b.studentId} • Inv: {b.invoiceNumber}</div>
+                          <td className="finance-sticky-left" style={{ padding: '12px 14px', position: 'sticky', left: 0, background: isSelected ? '#eff6ff' : '#ffffff', zIndex: 1, minWidth: '180px' }}>
+                            <div style={{ fontWeight: 800, color: '#1e3a8a', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>{b.studentName}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap' }}>Roll: {b.rollNo || b.studentId} • Inv: {b.invoiceNumber}</div>
                           </td>
                           <td style={{ padding: '12px 14px', fontSize: '0.84rem', color: '#334155' }}>
                             {b.grade}
@@ -2412,7 +3083,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                           <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b', whiteSpace: 'nowrap' }}>
                             {b.dueDate}
                           </td>
-                          <td style={{ padding: '12px 14px', textAlign: 'center', position: 'sticky', right: 0, background: isSelected ? '#eff6ff' : '#ffffff', zIndex: 1 }}>
+                          <td className="finance-sticky-right" style={{ padding: '12px 14px', textAlign: 'center', position: 'sticky', right: 0, background: isSelected ? '#eff6ff' : '#ffffff', zIndex: 1, minWidth: '190px' }}>
                             <div style={{ display: 'inline-flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
                               <button
                                 className="btn btn-sm btn-outline"
@@ -2834,7 +3505,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
               <table className="sa-schools-table" style={{ width: '100%', minWidth: '1300px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 2 }}>STAFF NAME</th>
+                    <th className="finance-sticky-left" style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 2, minWidth: '180px' }}>STAFF NAME</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569' }}>CATEGORY</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569' }}>DESIGNATION</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.76rem', color: '#475569' }}>DEPARTMENT</th>
@@ -2848,7 +3519,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                     <th style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.76rem', color: '#10b981' }}>PAID</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.76rem', color: '#ef4444' }}>PENDING</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.76rem', color: '#475569' }}>STATUS</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.76rem', color: '#475569', position: 'sticky', right: 0, background: '#f1f5f9', zIndex: 2 }}>ACTIONS</th>
+                    <th className="finance-sticky-right" style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.76rem', color: '#475569', position: 'sticky', right: 0, background: '#f1f5f9', zIndex: 2, minWidth: '160px' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2869,9 +3540,9 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
 
                       return (
                         <tr key={s._id || s.salarySlipNo} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '12px 14px', position: 'sticky', left: 0, background: '#ffffff', zIndex: 1 }}>
-                            <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>{s.staffName}</div>
-                            <div style={{ fontSize: '0.74rem', color: '#64748b' }}>ID: {s.staffId} • Slip: {s.salarySlipNo}</div>
+                          <td className="finance-sticky-left" style={{ padding: '12px 14px', position: 'sticky', left: 0, background: '#ffffff', zIndex: 1, minWidth: '180px' }}>
+                            <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>{s.staffName}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap' }}>ID: {s.staffId} • Slip: {s.salarySlipNo}</div>
                           </td>
                           <td style={{ padding: '12px 14px' }}>
                             <span style={{
@@ -2923,7 +3594,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                               {s.paymentStatus}
                             </span>
                           </td>
-                          <td style={{ padding: '12px 14px', textAlign: 'center', position: 'sticky', right: 0, background: '#ffffff', zIndex: 1 }}>
+                          <td className="finance-sticky-right" style={{ padding: '12px 14px', textAlign: 'center', position: 'sticky', right: 0, background: '#ffffff', zIndex: 1, minWidth: '160px' }}>
                             <div style={{ display: 'inline-flex', gap: '6px' }}>
                               {s.pendingAmount > 0 && (
                                 <button
@@ -3004,7 +3675,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                 onClick={() => handleOpenExpenseModal()}
                 style={{ borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                <span></span> Add New Expense
+                <span>+</span> Add New Expense
               </button>
 
               <button
@@ -3165,15 +3836,15 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                                 style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px' }}
                                 title="Edit Expense"
                               >
-                                
+                                Edit
                               </button>
                               <button
-                                className="btn btn-sm btn-outline"
+                                className="btn btn-sm"
                                 onClick={() => handleDeleteExpense(e)}
-                                style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px', color: '#ef4444' }}
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}
                                 title="Delete Expense"
                               >
-                                
+                                Delete
                               </button>
                             </div>
                           </td>
@@ -3191,6 +3862,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
       
       
       
+      {/* 5. Institutional Financial Reports */}
       {subTab === 'finance-reports' && (
         <div>
           <div style={{
@@ -3204,10 +3876,10 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
               Institutional Financial Statements & Audit Reports
             </h3>
             <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
-              Download detailed reports in PDF and Excel format with custom date, class, and status filters
+              Generate, preview, and download detailed reports in PDF and Excel format with custom date, class, and status filters
             </div>
 
-            
+            {/* Report Type Selector */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -3236,7 +3908,8 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                       borderRadius: '8px',
                       padding: '12px 14px',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.2s ease',
+                      boxShadow: isSelected ? '0 2px 8px rgba(37,99,235,0.15)' : 'none'
                     }}
                   >
                     <div style={{ fontWeight: 700, fontSize: '0.86rem', color: isSelected ? '#1e3a8a' : '#0f172a' }}>
@@ -3251,31 +3924,41 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
             </div>
           </div>
 
-          
+          {/* Filter and Action Controls */}
           <div style={{
             background: '#ffffff',
             border: '1px solid #e2e8f0',
             borderRadius: '12px',
-            padding: '18px 20px',
+            padding: '16px 20px',
             marginBottom: '20px',
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '16px',
+            gap: '14px',
             alignItems: 'center',
             justifyContent: 'space-between'
           }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', flex: 1 }}>
+              <div style={{ minWidth: '180px', flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Search Report</label>
+                <input
+                  type="text"
+                  placeholder="Search by name, invoice, ID..."
+                  value={reportSearch}
+                  onChange={(e) => setReportSearch(e.target.value)}
+                  style={{ width: '100%', padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
+                />
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Month</label>
                 <select
                   value={reportMonth}
                   onChange={(e) => setReportMonth(e.target.value)}
-                  style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
+                  style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
                 >
-                  <option value="All">All Months</option>
-                  <option value="October">October</option>
-                  <option value="November">November</option>
-                  <option value="September">September</option>
+                  {reportMonthsList.map(m => (
+                    <option key={m} value={m}>{m === 'All' ? 'All Months' : m}</option>
+                  ))}
                 </select>
               </div>
 
@@ -3284,8 +3967,9 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                 <select
                   value={reportYear}
                   onChange={(e) => setReportYear(e.target.value)}
-                  style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
+                  style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
                 >
+                  <option value="All">All Years</option>
                   <option value="2026-2027">2026-2027</option>
                   <option value="2025-2026">2025-2026</option>
                 </select>
@@ -3296,12 +3980,11 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                 <select
                   value={reportClass}
                   onChange={(e) => setReportClass(e.target.value)}
-                  style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
+                  style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
                 >
-                  <option value="All">All Classes</option>
-                  <option value="Grade 10">Grade 10</option>
-                  <option value="Grade 9">Grade 9</option>
-                  <option value="Grade 11">Grade 11</option>
+                  {availableClasses.map(c => (
+                    <option key={c} value={c}>{c === 'All' ? 'All Classes' : c}</option>
+                  ))}
                 </select>
               </div>
 
@@ -3310,83 +3993,238 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                 <select
                   value={reportStatus}
                   onChange={(e) => setReportStatus(e.target.value)}
-                  style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
+                  style={{ padding: '7px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.84rem' }}
                 >
                   <option value="All">All Statuses</option>
-                  <option value="Paid">Paid</option>
+                  <option value="Paid">Paid / Settled</option>
                   <option value="Pending">Pending / Unpaid</option>
                 </select>
               </div>
+
+              {(reportMonth !== 'All' || reportClass !== 'All' || reportStatus !== 'All' || reportSearch || reportYear !== '2026-2027') && (
+                <div style={{ alignSelf: 'flex-end' }}>
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() => {
+                      setReportMonth('All');
+                      setReportClass('All');
+                      setReportStatus('All');
+                      setReportYear('2026-2027');
+                      setReportSearch('');
+                    }}
+                    style={{ padding: '7px 12px', fontSize: '0.78rem', borderRadius: '6px' }}
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div className="finance-report-action-buttons" style={{ display: 'flex', gap: '10px' }}>
               <button
-                className="btn btn-outline"
-                onClick={() => {
-                  let exportData = [];
-                  if (reportType.includes('student')) {
-                    exportData = bills.map(b => ({
-                      Invoice: b.invoiceNumber,
-                      Student: b.studentName,
-                      Class: b.grade,
-                      Total: b.totalFees,
-                      Paid: b.paidAmount,
-                      Pending: b.pendingAmount,
-                      Status: b.paymentStatus
-                    }));
-                  } else if (reportType.includes('salary')) {
-                    exportData = salaries.map(s => ({
-                      Slip: s.salarySlipNo,
-                      Staff: s.staffName,
-                      Designation: s.designation,
-                      Gross: s.grossSalary,
-                      Deductions: s.totalDeductions,
-                      Net: s.netSalary,
-                      Status: s.paymentStatus
-                    }));
-                  } else if (reportType.includes('expense')) {
-                    exportData = expenses.map(e => ({
-                      ID: e.expenseId,
-                      Category: e.expenseCategory,
-                      Expense: e.expenseName,
-                      Vendor: e.vendorName,
-                      Amount: e.amount,
-                      Status: e.paymentStatus
-                    }));
-                  } else {
-                    exportData = paymentHistory.map(p => ({
-                      TxnID: p.transactionId,
-                      Date: p.transactionDate,
-                      Type: p.transactionType,
-                      Party: p.partyName,
-                      Amount: p.amount,
-                      Method: p.paymentMethod
-                    }));
-                  }
-                  exportToExcel(exportData, reportType);
-                }}
-                style={{ borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                className="btn btn-outline finance-mobile-full-btn"
+                onClick={() => exportToExcel(generatedReport.exportRows, generatedReport.title.replace(/\s+/g, '_'))}
+                style={{ borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                title="Export current filtered report to Excel (.xlsx)"
               >
-                Download Excel
+                <span>📊</span> Download Excel
               </button>
 
               <button
-                className="btn btn-primary"
-                onClick={() => {
-                  window.print();
-                }}
-                style={{ borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                className="btn btn-primary finance-mobile-full-btn"
+                onClick={() => window.print()}
+                style={{ borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                title="Print or Save PDF report"
               >
-                Print / Save PDF
+                <span>🖨️</span> Print / Save PDF
               </button>
+            </div>
+          </div>
+
+          {/* Generated Report KPI Summary Cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+            gap: '14px',
+            marginBottom: '20px'
+          }}>
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px 18px' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Records</div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#1e3a8a', marginTop: '4px' }}>
+                {generatedReport.summary.totalCount} {reportType.includes('student') ? 'Students' : reportType.includes('staff') ? 'Staff' : 'Entries'}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>Matching active criteria</div>
+            </div>
+
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px 18px' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                {reportType === 'annual-finance-report' ? 'Total Institutional Inflow' : 'Total Billed / Gross'}
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+                ₹{generatedReport.summary.totalAmount.toLocaleString()}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>Consolidated value</div>
+            </div>
+
+            <div style={{ border: '1px solid #bbf7d0', borderRadius: '10px', padding: '16px 18px', background: '#f0fdf4' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>
+                {reportType === 'annual-finance-report' ? 'Total Outflow (Salaries + Exp)' : 'Total Paid / Collected'}
+              </div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>
+                ₹{generatedReport.summary.totalPaid.toLocaleString()}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#16a34a', marginTop: '4px' }}>Verified & reconciled</div>
+            </div>
+
+            <div style={{
+              background: generatedReport.summary.totalPending > 0 ? '#fef2f2' : '#f8fafc',
+              border: `1px solid ${generatedReport.summary.totalPending > 0 ? '#fecaca' : '#e2e8f0'}`,
+              borderRadius: '10px',
+              padding: '16px 18px'
+            }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: generatedReport.summary.totalPending > 0 ? '#dc2626' : '#64748b', textTransform: 'uppercase' }}>
+                {reportType === 'annual-finance-report' ? 'Net Operating Balance' : 'Total Pending / Overdue'}
+              </div>
+              <div style={{
+                fontSize: '1.45rem',
+                fontWeight: 800,
+                color: generatedReport.summary.totalPending > 0 ? (reportType === 'annual-finance-report' ? '#15803d' : '#dc2626') : '#64748b',
+                marginTop: '4px'
+              }}>
+                ₹{generatedReport.summary.totalPending.toLocaleString()}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>
+                {reportType === 'annual-finance-report' ? (generatedReport.summary.totalPending >= 0 ? 'Surplus Reserve' : 'Deficit') : 'Outstanding balance'}
+              </div>
+            </div>
+          </div>
+
+          {/* Generated Report Data Table */}
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#1e3a8a', fontWeight: 800 }}>
+                  {generatedReport.title}
+                </h4>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                  {generatedReport.description} • Filter: {reportMonth} | {reportClass} | {reportStatus}
+                </div>
+              </div>
+              <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                Showing <strong>{generatedReport.rows.length}</strong> records
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto', width: '100%' }}>
+              <table className="sa-schools-table" style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                    {generatedReport.headers.map((h, idx) => (
+                      <th
+                        key={idx}
+                        style={{
+                          padding: '12px 14px',
+                          textAlign: h.align || 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: '#475569',
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        {h.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {generatedReport.rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={generatedReport.headers.length} style={{ textAlign: 'center', padding: '42px', color: '#94a3b8' }}>
+                        No records found matching the selected report filters ({reportMonth}, {reportClass}, {reportStatus}).
+                      </td>
+                    </tr>
+                  ) : (
+                    generatedReport.rows.map((row, rIdx) => (
+                      <tr key={row._id || row.id || row.invoiceNumber || row.salarySlipNo || row.expenseId || rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        {generatedReport.headers.map((h, cIdx) => {
+                          const val = row[h.key];
+                          const isCurrency = h.isCurrency;
+                          const isBadge = h.isBadge;
+
+                          return (
+                            <td
+                              key={cIdx}
+                              style={{
+                                padding: '12px 14px',
+                                textAlign: h.align || 'left',
+                                fontSize: '0.84rem',
+                                color: h.color || (h.bold ? '#0f172a' : '#334155'),
+                                fontWeight: h.bold ? 700 : 500
+                              }}
+                            >
+                              {isBadge ? (
+                                <span
+                                  className={`badge ${
+                                    val === 'Paid' || val === 'Completed'
+                                      ? 'badge-success'
+                                      : val === 'Partially Paid'
+                                      ? 'badge-warning'
+                                      : 'badge-danger'
+                                  }`}
+                                  style={{ fontSize: '0.72rem' }}
+                                >
+                                  {val || 'N/A'}
+                                </span>
+                              ) : isCurrency ? (
+                                `₹${Number(val || 0).toLocaleString()}`
+                              ) : (
+                                val !== undefined && val !== null ? String(val) : '—'
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {generatedReport.rows.length > 0 && (
+                  <tfoot>
+                    <tr style={{ background: '#f8fafc', borderTop: '2px solid #cbd5e1', fontWeight: 800 }}>
+                      <td style={{ padding: '12px 14px', color: '#1e3a8a' }}>TOTAL SUMMARY</td>
+                      {generatedReport.headers.slice(1).map((h, idx) => {
+                        if (h.key === 'totalFees' || h.key === 'grossSalary' || h.key === 'total') {
+                          return (
+                            <td key={idx} style={{ padding: '12px 14px', textAlign: h.align || 'right', color: '#0f172a' }}>
+                              ₹{generatedReport.summary.totalAmount.toLocaleString()}
+                            </td>
+                          );
+                        }
+                        if (h.key === 'paidAmount' || h.key === 'cashFlow' || h.key === 'collected' || h.key === 'paid') {
+                          return (
+                            <td key={idx} style={{ padding: '12px 14px', textAlign: h.align || 'right', color: '#16a34a' }}>
+                              ₹{generatedReport.summary.totalPaid.toLocaleString()}
+                            </td>
+                          );
+                        }
+                        if (h.key === 'pendingAmount' || h.key === 'pending') {
+                          return (
+                            <td key={idx} style={{ padding: '12px 14px', textAlign: h.align || 'right', color: generatedReport.summary.totalPending > 0 ? '#dc2626' : '#64748b' }}>
+                              ₹{generatedReport.summary.totalPending.toLocaleString()}
+                            </td>
+                          );
+                        }
+                        return <td key={idx} style={{ padding: '12px 14px' }}>—</td>;
+                      })}
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
             </div>
           </div>
         </div>
       )}
 
-      
-      
-      
+      {/* 6. Centralized Payment History */}
       {subTab === 'payment-history' && (
         <div>
           <div style={{
@@ -3410,16 +4248,87 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
               </div>
             </div>
 
-            <button
-              className="btn btn-outline"
-              onClick={() => exportToExcel(paymentHistory, 'Centralized_Payment_History')}
-              style={{ borderRadius: '8px' }}
-            >
-              Export Excel
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setIsManualTxnModalOpen(true)}
+                style={{ borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <span>+</span> Record Payment
+              </button>
+
+              <button
+                className="btn btn-outline"
+                onClick={() => {
+                  const exportRows = filteredPaymentHistory.map(p => ({
+                    'Transaction ID': p.transactionId,
+                    'Date': p.transactionDate,
+                    'Type': p.transactionType,
+                    'Party Name': p.partyName,
+                    'Party Role': p.partyRole || '—',
+                    'Reference / Invoice': p.invoiceNumber || p.referenceId || '—',
+                    'Amount (₹)': p.amount,
+                    'Payment Method': p.paymentMethod,
+                    'Status': p.paymentStatus || 'Completed',
+                    'Remarks': p.remarks || '—'
+                  }));
+                  exportToExcel(exportRows, 'Payment_History_Audit_Journal');
+                }}
+                style={{ borderRadius: '8px' }}
+              >
+                Export Excel
+              </button>
+            </div>
           </div>
 
-          
+          {/* KPI Summary Cards for Payments */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+            gap: '14px',
+            marginBottom: '20px'
+          }}>
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px 18px' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Transactions</div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#1e3a8a', marginTop: '4px' }}>
+                {paymentHistoryKPIs.totalCount} Receipts & Payouts
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>In current audit ledger</div>
+            </div>
+
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '16px 18px' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Total Inflow (Student Fees)</div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>
+                ₹{paymentHistoryKPIs.totalInflow.toLocaleString()}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#16a34a', marginTop: '4px' }}>Revenue collected</div>
+            </div>
+
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '16px 18px' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase' }}>Total Outflow (Salaries + Exp)</div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#dc2626', marginTop: '4px' }}>
+                ₹{paymentHistoryKPIs.totalOutflow.toLocaleString()}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#dc2626', marginTop: '4px' }}>Disbursements executed</div>
+            </div>
+
+            <div style={{
+              background: paymentHistoryKPIs.netCash >= 0 ? '#eff6ff' : '#fef2f2',
+              border: `1px solid ${paymentHistoryKPIs.netCash >= 0 ? '#bfdbfe' : '#fecaca'}`,
+              borderRadius: '10px',
+              padding: '16px 18px'
+            }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: paymentHistoryKPIs.netCash >= 0 ? '#2563eb' : '#dc2626', textTransform: 'uppercase' }}>Net Cash Flow</div>
+              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: paymentHistoryKPIs.netCash >= 0 ? '#1d4ed8' : '#dc2626', marginTop: '4px' }}>
+                ₹{paymentHistoryKPIs.netCash.toLocaleString()}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>
+                {paymentHistoryKPIs.netCash >= 0 ? 'Positive Operating Surplus' : 'Net Operating Deficit'}
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Toolbar */}
           <div style={{
             background: '#f8fafc',
             border: '1px solid #e2e8f0',
@@ -3473,12 +4382,27 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                 style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
               />
             </div>
+
+            {(paySearch || payTypeFilter !== 'All' || payStartDate || payEndDate) && (
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={() => {
+                  setPaySearch('');
+                  setPayTypeFilter('All');
+                  setPayStartDate('');
+                  setPayEndDate('');
+                }}
+                style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+              >
+                Clear
+              </button>
+            )}
           </div>
 
-          
+          {/* Payment History Table */}
           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto', width: '100%' }}>
-              <table className="sa-schools-table" style={{ width: '100%', minWidth: '1000px', borderCollapse: 'collapse' }}>
+              <table className="sa-schools-table" style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.75rem', color: '#64748b' }}>TRANSACTION ID</th>
@@ -3490,17 +4414,18 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.75rem', color: '#64748b' }}>METHOD</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.75rem', color: '#64748b' }}>STATUS</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: '0.75rem', color: '#64748b' }}>REMARKS</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.75rem', color: '#64748b' }}>ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paymentHistory.length === 0 ? (
+                  {filteredPaymentHistory.length === 0 ? (
                     <tr>
-                      <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
-                        No payment transactions found in database.
+                      <td colSpan="10" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                        No payment transactions found matching current filters.
                       </td>
                     </tr>
                   ) : (
-                    paymentHistory.map((p) => {
+                    filteredPaymentHistory.map((p) => {
                       const typeColor = p.transactionType === 'Student Fee Payment'
                         ? '#10b981'
                         : p.transactionType === 'Staff Salary Payment'
@@ -3529,9 +4454,14 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                           </td>
                           <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0f172a', fontSize: '0.86rem' }}>
                             {p.partyName}
+                            {p.partyRole && (
+                              <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '6px', fontWeight: 500 }}>
+                                ({p.partyRole})
+                              </span>
+                            )}
                           </td>
                           <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
-                            {p.invoiceNumber || '—'}
+                            {p.invoiceNumber || p.referenceId || '—'}
                           </td>
                           <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
                             ₹{Number(p.amount).toLocaleString()}
@@ -3546,6 +4476,16 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                           </td>
                           <td style={{ padding: '12px 14px', fontSize: '0.78rem', color: '#64748b', maxWidth: '200px' }}>
                             {p.remarks || '—'}
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <button
+                              className="btn btn-sm btn-outline"
+                              onClick={() => setSelectedTxnForReceipt(p)}
+                              style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px' }}
+                              title="View Payment Voucher Receipt"
+                            >
+                              Receipt
+                            </button>
                           </td>
                         </tr>
                       );
@@ -3570,7 +4510,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
             </div>
 
             <form onSubmit={handleSaveBill} style={{ padding: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px' }}>
+              <div className="finance-form-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px' }}>
                 <div>
                   <label className="form-label">Student Name *</label>
                   <input
@@ -3813,7 +4753,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                   const pending = Math.max(0, calculatedTotal - paid);
 
                   return (
-                    <div style={{
+                    <div className="finance-total-summary-bar" style={{
                       display: 'flex',
                       justifyContent: 'flex-end',
                       gap: '24px',
@@ -3832,8 +4772,8 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                 })()}
               </div>
 
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px' }}>
+              {/* Payment details */}
+              <div className="finance-form-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px' }}>
                 <div>
                   <label className="form-label">Initial Paid Amount (₹)</label>
                   <input
@@ -3896,7 +4836,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
             </div>
 
             <form onSubmit={handleSaveSalary} style={{ padding: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px' }}>
+              <div className="finance-form-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '16px' }}>
                 <div>
                   <label className="form-label">Staff Type *</label>
                   <select
@@ -3990,14 +4930,14 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
               </div>
 
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="finance-form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px' }}>
                   <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1e3a8a', marginBottom: '10px' }}>
                     1. Earnings Breakdown (₹)
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div className="finance-form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
                       <label className="form-label">Basic Salary *</label>
                       <input
@@ -4061,7 +5001,7 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                     2. Deductions Breakdown (₹)
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div className="finance-form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
                       <label className="form-label">Provident Fund (PF)</label>
                       <input
@@ -5254,6 +6194,300 @@ export default function SchoolFinanceModule({ user, activeTab, setActiveTab }) {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Receipt / Voucher Modal */}
+      {selectedTxnForReceipt && (
+        <div className="modal-overlay" style={{ display: 'flex', zIndex: 10000 }}>
+          <div className="modal-content" style={{ maxWidth: '600px', padding: '0', borderRadius: '14px', overflow: 'hidden' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+              color: '#ffffff',
+              padding: '20px 24px',
+              textAlign: 'center',
+              position: 'relative'
+            }}>
+              <button
+                onClick={() => setSelectedTxnForReceipt(null)}
+                style={{
+                  position: 'absolute',
+                  right: '16px',
+                  top: '16px',
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: '#ffffff',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  lineHeight: '28px'
+                }}
+              >
+                &times;
+              </button>
+              <div style={{ fontSize: '0.82rem', letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.9 }}>
+                Institutional Financial Record
+              </div>
+              <h3 style={{ margin: '4px 0 0', fontSize: '1.25rem', fontWeight: 800 }}>
+                Sri Sankara Vidhyasala Girls High School
+              </h3>
+              <div style={{ fontSize: '0.78rem', opacity: 0.85, marginTop: '2px' }}>
+                Kodumudi, Erode District • Affiliated to State Board (Tamil Nadu)
+              </div>
+              <div style={{
+                display: 'inline-block',
+                marginTop: '10px',
+                padding: '4px 14px',
+                background: 'rgba(255,255,255,0.15)',
+                borderRadius: '20px',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                letterSpacing: '0.5px'
+              }}>
+                OFFICIAL PAYMENT VOUCHER / AUDIT RECEIPT
+              </div>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '14px',
+                marginBottom: '18px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Voucher / Txn ID</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e3a8a', marginTop: '2px' }}>
+                    {selectedTxnForReceipt.transactionId}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Transaction Date</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                    {selectedTxnForReceipt.transactionDate}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Payment Mode</div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#475569', marginTop: '2px' }}>
+                    {selectedTxnForReceipt.paymentMethod || 'Cash'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Audit Status</div>
+                  <div style={{ marginTop: '2px' }}>
+                    <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>
+                      ✓ {selectedTxnForReceipt.paymentStatus || 'Completed'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '0.86rem' }}>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '8px 0', color: '#64748b', fontWeight: 600, width: '40%' }}>Category / Type:</td>
+                    <td style={{ padding: '8px 0', fontWeight: 700, color: '#1e3a8a' }}>{selectedTxnForReceipt.transactionType}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '8px 0', color: '#64748b', fontWeight: 600 }}>Party Name:</td>
+                    <td style={{ padding: '8px 0', fontWeight: 700, color: '#0f172a' }}>
+                      {selectedTxnForReceipt.partyName}
+                      {selectedTxnForReceipt.partyRole && ` (${selectedTxnForReceipt.partyRole})`}
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '8px 0', color: '#64748b', fontWeight: 600 }}>Reference / Invoice:</td>
+                    <td style={{ padding: '8px 0', fontWeight: 700, color: '#475569' }}>
+                      {selectedTxnForReceipt.invoiceNumber || selectedTxnForReceipt.referenceId || 'Direct Settlement'}
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '8px 0', color: '#64748b', fontWeight: 600 }}>Auditor Remarks:</td>
+                    <td style={{ padding: '8px 0', color: '#64748b' }}>{selectedTxnForReceipt.remarks || 'Standard verified transaction entry'}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style={{
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '8px',
+                padding: '16px',
+                textAlign: 'center',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase' }}>
+                  Total Amount Paid / Received
+                </div>
+                <div style={{ fontSize: '1.9rem', fontWeight: 800, color: '#15803d', marginTop: '4px' }}>
+                  ₹{Number(selectedTxnForReceipt.amount || 0).toLocaleString()}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '28px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1' }}>
+                <div style={{ textAlign: 'center', minWidth: '140px' }}>
+                  <div style={{ borderTop: '1px solid #94a3b8', paddingTop: '4px', fontSize: '0.74rem', color: '#64748b' }}>
+                    Cashier / Accountant
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', minWidth: '140px' }}>
+                  <div style={{ borderTop: '1px solid #94a3b8', paddingTop: '4px', fontSize: '0.74rem', color: '#64748b' }}>
+                    Institutional Auditor
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setSelectedTxnForReceipt(null)}
+                  style={{ borderRadius: '8px' }}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => window.print()}
+                  style={{ borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <span>🖨️</span> Print Voucher
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Payment Recording Modal */}
+      {isManualTxnModalOpen && (
+        <div className="modal-overlay" style={{ display: 'flex', zIndex: 10000 }}>
+          <div className="modal-content" style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <h3>Record Payment Transaction</h3>
+              <button className="modal-close" onClick={() => setIsManualTxnModalOpen(false)}>&times;</button>
+            </div>
+
+            <form onSubmit={handleSaveManualPayment} style={{ padding: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label">Transaction Type *</label>
+                  <select
+                    className="form-control"
+                    value={manualTxnForm.transactionType}
+                    onChange={(e) => {
+                      const t = e.target.value;
+                      setManualTxnForm({
+                        ...manualTxnForm,
+                        transactionType: t,
+                        partyRole: t === 'Staff Salary Payment' ? 'Staff' : t === 'School Expense Payment' ? 'Vendor' : 'Student'
+                      });
+                    }}
+                  >
+                    <option value="Student Fee Payment">Student Fee Payment (Inflow)</option>
+                    <option value="Staff Salary Payment">Staff Salary Payment (Outflow)</option>
+                    <option value="School Expense Payment">School Expense Payment (Outflow)</option>
+                  </select>
+                </div>
+
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label">Party Name *</label>
+                  <input
+                    type="text"
+                    required
+                    className="form-control"
+                    value={manualTxnForm.partyName}
+                    onChange={(e) => setManualTxnForm({ ...manualTxnForm, partyName: e.target.value })}
+                    placeholder={
+                      manualTxnForm.transactionType === 'Student Fee Payment'
+                        ? 'e.g. Kavitha Selvam'
+                        : manualTxnForm.transactionType === 'Staff Salary Payment'
+                        ? 'e.g. Mrs. Revathi Chandran'
+                        : 'e.g. Tamil Nadu Electricity Board'
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Invoice / Reference No</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={manualTxnForm.invoiceNumber}
+                    onChange={(e) => setManualTxnForm({ ...manualTxnForm, invoiceNumber: e.target.value })}
+                    placeholder="e.g. INV-2026-0042"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Transaction Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={manualTxnForm.transactionDate}
+                    onChange={(e) => setManualTxnForm({ ...manualTxnForm, transactionDate: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Amount (₹) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    className="form-control"
+                    value={manualTxnForm.amount}
+                    onChange={(e) => setManualTxnForm({ ...manualTxnForm, amount: e.target.value })}
+                    placeholder="e.g. 15000"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Payment Method</label>
+                  <select
+                    className="form-control"
+                    value={manualTxnForm.paymentMethod}
+                    onChange={(e) => setManualTxnForm({ ...manualTxnForm, paymentMethod: e.target.value })}
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer (NEFT/RTGS)</option>
+                    <option value="UPI / NetBanking">UPI / NetBanking</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Demand Draft">Demand Draft</option>
+                    <option value="Credit Card">Credit Card</option>
+                  </select>
+                </div>
+
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label">Remarks / Description</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={manualTxnForm.remarks}
+                    onChange={(e) => setManualTxnForm({ ...manualTxnForm, remarks: e.target.value })}
+                    placeholder="e.g. Paid in full via school fee counter"
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setIsManualTxnModalOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Recording...' : 'Save & Record Transaction'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

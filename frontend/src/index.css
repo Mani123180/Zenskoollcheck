@@ -4061,6 +4061,404 @@ img {
     padding: 10px 16px !important;
     font-size: 0.88rem !important;
   }
+
+  /* ==========================================================================
+     Financial Dashboard & Modal Comprehensive Mobile Optimization
+     ========================================================================== */
+  /* 1. Modal Overlay & Container on Mobile */
+  .modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(15, 23, 42, 0.75) !important;
+    backdrop-filter: blur(4px) !important;
+    padding: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 99999 !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal-overlay .modal-content,
+  .modal-content.wizard-modal-lg,
+  .modal-content {
+    width: 100% !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: 92vh !important;
+    border-radius: 14px !important;
+    margin: auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal-header {
+    padding: 14px 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    background: #f8fafc !important;
+  }
+
+  .modal-header h3 {
+    font-size: 1.05rem !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+    max-width: 85% !important;
+  }
+
+  .modal-close {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 1.4rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    border-radius: 50% !important;
+    background: #e2e8f0 !important;
+    color: #475569 !important;
+    border: none !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* 2. All Form Grids inside Modals: Convert multi-column grids to clean 1-column stack */
+  .modal-content form {
+    padding: 14px !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal-content form div[style*="display: grid"],
+  .modal-content form div[style*="display: 'grid'"],
+  .modal-content div[style*="gridTemplateColumns"],
+  .modal-content div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal-content form div[style*="gridColumn"],
+  .modal-content form div[style*="grid-column"],
+  .modal-content div[style*="gridColumn"],
+  .modal-content div[style*="grid-column"] {
+    grid-column: span 1 !important;
+  }
+
+  .modal-content .form-label {
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    margin-bottom: 4px !important;
+    display: block !important;
+  }
+
+  .modal-content .form-control,
+  .modal-content input,
+  .modal-content select,
+  .modal-content textarea {
+    font-size: 15px !important;
+    min-height: 40px !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Modal Action Buttons: Full-width stacked for easy thumb tapping */
+  .modal-actions,
+  .modal-content form > div:last-child {
+    flex-direction: column-reverse !important;
+    width: 100% !important;
+    gap: 10px !important;
+    margin-top: 16px !important;
+  }
+
+  .modal-actions button,
+  .modal-content form > div:last-child button {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 12px 16px !important;
+    font-size: 0.94rem !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    justify-content: center !important;
+  }
+
+  /* 3. Table containers inside modals & pages: Horizontal smooth scrolling */
+  .modal-content div[style*="overflowX"],
+  .modal-content div[style*="overflow-x"],
+  .school-finance-container div[style*="overflowX"],
+  .school-finance-container div[style*="overflow-x"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: block !important;
+    border-radius: 8px !important;
+  }
+
+  /* 4. Financial Dashboard Overview Header & Banners */
+  .school-finance-container {
+    padding: 4px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  .school-finance-container > div:first-of-type {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 12px 14px !important;
+    gap: 10px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .school-finance-container > div:first-of-type > div:first-child {
+    width: 100% !important;
+  }
+
+  .school-finance-container > div:first-of-type > div:last-child {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    justify-content: flex-start !important;
+  }
+
+  /* Dashboard Filter Card Mobile Stack */
+  .school-finance-container div[style*="Campus Finance Overview"] {
+    padding: 14px 16px !important;
+  }
+
+  .sa-finance-filter-group {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    width: 100% !important;
+    margin-top: 12px !important;
+  }
+
+  .sa-finance-filter-group > div {
+    width: 100% !important;
+  }
+
+  .sa-finance-filter-group select {
+    width: 100% !important;
+    font-size: 0.84rem !important;
+    padding: 8px 10px !important;
+  }
+
+  .sa-finance-filter-group button {
+    grid-column: span 2 !important;
+    width: 100% !important;
+    margin-top: 4px !important;
+    padding: 10px !important;
+    justify-content: center !important;
+  }
+
+  /* 5. Executive Total KPI Cards (Dashboard Overview, Reports, Payments) */
+  .sa-finance-kpi-grid,
+  .school-finance-container div[style*="minmax(260px, 1fr)"],
+  .school-finance-container div[style*="minmax(210px, 1fr)"],
+  .school-finance-container div[style*="minmax(220px, 1fr)"] {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    width: 100% !important;
+    margin-bottom: 18px !important;
+  }
+
+  @media (max-width: 480px) {
+    .sa-finance-kpi-grid,
+    .school-finance-container div[style*="minmax(260px, 1fr)"],
+    .school-finance-container div[style*="minmax(210px, 1fr)"],
+    .school-finance-container div[style*="minmax(220px, 1fr)"] {
+      grid-template-columns: 1fr !important;
+      gap: 10px !important;
+    }
+  }
+
+  .sa-finance-kpi-card,
+  .school-finance-container div[style*="minmax(260px, 1fr)"] > div,
+  .school-finance-container div[style*="minmax(210px, 1fr)"] > div,
+  .school-finance-container div[style*="minmax(220px, 1fr)"] > div {
+    padding: 12px 14px !important;
+    border-radius: 10px !important;
+    box-sizing: border-box !important;
+  }
+
+  .sa-finance-kpi-card div[style*="fontSize: '1.5rem'"],
+  .sa-finance-kpi-card div[style*="fontSize: '1.45rem'"],
+  .school-finance-container div[style*="minmax(260px, 1fr)"] div[style*="fontSize: '1.5rem'"],
+  .school-finance-container div[style*="minmax(260px, 1fr)"] div[style*="font-size: 1.5rem"],
+  .school-finance-container div[style*="minmax(210px, 1fr)"] div[style*="fontSize: '1.45rem'"],
+  .school-finance-container div[style*="minmax(210px, 1fr)"] div[style*="font-size: 1.45rem"] {
+    font-size: 1.25rem !important;
+    line-height: 1.2 !important;
+    word-break: break-word !important;
+  }
+
+  /* 6. Charts Container on Mobile: Stack 1-column */
+  .sa-finance-charts-grid,
+  .school-finance-container div[style*="minmax(380px, 1fr)"] {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    width: 100% !important;
+    margin-bottom: 18px !important;
+  }
+
+  .sa-finance-charts-grid > div,
+  .school-finance-container div[style*="minmax(380px, 1fr)"] > div {
+    padding: 14px 16px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 7. Drill Down Modal Content Mobile Optimization */
+  .modal-content div[style*="minmax(180px, 1fr)"],
+  .modal-content div[style*="minmax(200px, 1fr)"] {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin-bottom: 14px !important;
+  }
+
+  @media (max-width: 480px) {
+    .modal-content div[style*="minmax(180px, 1fr)"],
+    .modal-content div[style*="minmax(200px, 1fr)"] {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  .modal-content div[style*="minmax(180px, 1fr)"] > div,
+  .modal-content div[style*="minmax(200px, 1fr)"] > div {
+    padding: 10px 12px !important;
+  }
+
+  .modal-content div[style*="minmax(180px, 1fr)"] div[style*="fontSize: '1.3rem'"],
+  .modal-content div[style*="minmax(180px, 1fr)"] div[style*="fontSize: '1.4rem'"],
+  .modal-content div[style*="minmax(200px, 1fr)"] div[style*="fontSize: '1.3rem'"],
+  .modal-content div[style*="minmax(200px, 1fr)"] div[style*="fontSize: '1.4rem'"] {
+    font-size: 1.12rem !important;
+  }
+
+  /* Drilldown Modal Footer Buttons Stack */
+  .modal-content > div:last-child[style*="justify-content: space-between"],
+  .modal-content > div:last-child[style*="justifyContent: 'space-between'"] {
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 14px 16px !important;
+  }
+
+  .modal-content > div:last-child[style*="justify-content: space-between"] button,
+  .modal-content > div:last-child[style*="justifyContent: 'space-between'"] button {
+    width: 100% !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 11px !important;
+  }
+
+  /* 8. Reports & Payment History Filter Bars & Tables on Mobile */
+  .finance-sticky-left,
+  .finance-sticky-right,
+  .sa-schools-table th.finance-sticky-left,
+  .sa-schools-table th.finance-sticky-right,
+  .sa-schools-table td.finance-sticky-left,
+  .sa-schools-table td.finance-sticky-right,
+  .sa-schools-table th[style*="position: sticky"],
+  .sa-schools-table td[style*="position: sticky"],
+  .sa-schools-table th[style*="position: 'sticky'"],
+  .sa-schools-table td[style*="position: 'sticky'"] {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    box-shadow: none !important;
+  }
+
+  .finance-report-action-buttons {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin-top: 10px !important;
+  }
+
+  .finance-mobile-full-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    padding: 10px 14px !important;
+    white-space: normal !important;
+  }
+
+  .finance-form-grid-3,
+  .modal-content form div[style*="repeat(3, 1fr)"],
+  .modal-content form div[style*="repeat(3,1fr)"] {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .finance-form-grid-2,
+  .modal-content form div[style*="1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .finance-total-summary-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    background: #f1f5f9 !important;
+    padding: 12px !important;
+    border-radius: 8px !important;
+  }
+
+  .finance-total-summary-bar > div {
+    display: flex !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    font-size: 0.92rem !important;
+  }
+
+  .school-finance-container div[style*="Institutional Financial Statements"] ~ div[style*="display: flex"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 14px !important;
+  }
+
+  .school-finance-container div[style*="Institutional Financial Statements"] ~ div[style*="display: flex"] > div:first-child {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .school-finance-container div[style*="Institutional Financial Statements"] ~ div[style*="display: flex"] > div:first-child > div:first-child {
+    grid-column: span 2 !important;
+  }
+
+  .school-finance-container div[style*="Institutional Financial Statements"] ~ div[style*="display: flex"] > div:last-child {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .school-finance-container div[style*="Institutional Financial Statements"] ~ div[style*="display: flex"] > div:last-child button {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px !important;
+  }
 }
 
 /* Clean white logo badge */

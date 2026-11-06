@@ -1222,6 +1222,20 @@ exports.updateStaffSalary = async (req, res) => {
   }
 };
 
+exports.deleteStaffSalary = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (getDBStatus()) {
+      await StaffSalary.findByIdAndDelete(id);
+    } else {
+      memoryStaffSalaries = memoryStaffSalaries.filter(s => s._id !== id && s.salarySlipNo !== id);
+    }
+    res.json({ success: true, message: 'Staff salary record deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.recordStaffSalaryPayment = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1530,6 +1544,52 @@ exports.getPaymentHistory = async (req, res) => {
     }
 
     res.json({ success: true, transactions: txns });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.addPaymentHistory = async (req, res) => {
+  try {
+    const {
+      transactionType,
+      partyName,
+      partyRole,
+      invoiceNumber,
+      amount,
+      paymentMethod,
+      transactionDate,
+      remarks
+    } = req.body;
+
+    const numAmt = Number(amount);
+    if (!partyName || !numAmt || numAmt <= 0) {
+      return res.status(400).json({ success: false, message: 'Party Name and valid Amount are required.' });
+    }
+
+    const txn = {
+      transactionId: `TXN-${Date.now()}`,
+      schoolId: req.user?.schoolId || 'SCHOOL002',
+      transactionDate: transactionDate || new Date().toISOString().split('T')[0],
+      transactionType: transactionType || 'Student Fee Payment',
+      referenceId: invoiceNumber || `REF-${Math.floor(1000 + Math.random() * 9000)}`,
+      invoiceNumber: invoiceNumber || '',
+      partyName: partyName.trim(),
+      partyRole: partyRole || (transactionType === 'Staff Salary Payment' ? 'Staff' : transactionType === 'School Expense Payment' ? 'Vendor' : 'Student'),
+      amount: numAmt,
+      paymentMethod: paymentMethod || 'Cash',
+      paymentStatus: 'Completed',
+      remarks: remarks || 'Direct payment recorded via journal',
+      recordedBy: req.user?.name || 'School Administrator'
+    };
+
+    if (getDBStatus()) {
+      await PaymentHistory.create(txn);
+    } else {
+      memoryPaymentHistory.unshift({ _id: `pay_${Date.now()}`, ...txn });
+    }
+
+    res.status(201).json({ success: true, message: 'Payment transaction recorded successfully', transaction: txn });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

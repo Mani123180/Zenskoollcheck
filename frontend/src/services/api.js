@@ -396,6 +396,14 @@ export const api = {
     return handleResponse(res);
   },
 
+  deleteStaffSalary: async (id) => {
+    const res = await fetch(`${API_BASE}/finance/staff-salaries/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(res);
+  },
+
   recordStaffSalaryPayment: async (id, paymentData) => {
     const res = await fetch(`${API_BASE}/finance/staff-salaries/${id}/pay`, {
       method: 'POST',
@@ -453,6 +461,15 @@ export const api = {
     const query = new URLSearchParams(filters).toString();
     const res = await fetch(`${API_BASE}/finance/payment-history${query ? `?${query}` : ''}`, {
       headers: getAuthHeaders(),
+    });
+    return handleResponse(res);
+  },
+
+  addPaymentTransaction: async (txnData) => {
+    const res = await fetch(`${API_BASE}/finance/payment-history`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(txnData),
     });
     return handleResponse(res);
   },
